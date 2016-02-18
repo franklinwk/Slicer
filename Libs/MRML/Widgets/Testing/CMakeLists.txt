@@ -1,6 +1,28 @@
-
 set(KIT ${PROJECT_NAME})
-set(CMAKE_TESTDRIVER_AFTER_TESTMAIN  "DEBUG_LEAKS_ENABLE_EXIT_ERROR();")
+
+#-----------------------------------------------------------------------------
+set(${KIT}Testing_ITK_COMPONENTS
+  ITKCommon
+  )
+find_package(ITK 4.6 COMPONENTS ${${KIT}Testing_ITK_COMPONENTS} REQUIRED)
+set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
+list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
+list(APPEND ITK_INCLUDE_DIRS
+  ${ITKFactoryRegistration_INCLUDE_DIRS}
+  )
+include(${ITK_USE_FILE})
+
+#-----------------------------------------------------------------------------
+set(CMAKE_TESTDRIVER_BEFORE_TESTMAIN  "
+  TESTING_OUTPUT_INIT();
+  itk::itkFactoryRegistration();
+  ")
+
+set(CMAKE_TESTDRIVER_AFTER_TESTMAIN  "
+  TESTING_OUTPUT_ASSERT_WARNINGS_ERRORS(0);
+  DEBUG_LEAKS_ENABLE_EXIT_ERROR();
+  ")
+
 set(TEST_SOURCES
   qMRMLCheckableNodeComboBoxTest.cxx
   qMRMLCheckableNodeComboBoxTest1.cxx
@@ -19,6 +41,8 @@ set(TEST_SOURCES
   qMRMLLayoutManagerTest2.cxx
   qMRMLLayoutManagerTest3.cxx
   qMRMLLayoutManagerTest4.cxx
+  qMRMLLayoutManagerVisibilityTest.cxx
+  qMRMLLayoutManagerWithCustomFactoryTest.cxx
   qMRMLLinearTransformSliderTest1.cxx
   qMRMLListWidgetTest1.cxx
   qMRMLMatrixWidgetTest1.cxx
@@ -27,6 +51,8 @@ set(TEST_SOURCES
   qMRMLModelTreeViewTest1.cxx
   qMRMLLabelComboBoxTest.cxx
   qMRMLNavigationViewTest1.cxx
+  qMRMLNodeAttributeTableViewTest.cxx
+  qMRMLNodeAttributeTableWidgetTest.cxx
   qMRMLNodeComboBoxTest1.cxx
   qMRMLNodeComboBoxTest2.cxx
   qMRMLNodeComboBoxTest3.cxx
@@ -54,6 +80,7 @@ set(TEST_SOURCES
   qMRMLSliceControllerWidgetTest.cxx
   qMRMLSliceWidgetTest1.cxx
   qMRMLSliceWidgetTest2.cxx
+  qMRMLTableViewTest1.cxx
   qMRMLTransformSlidersTest1.cxx
   qMRMLThreeDViewTest1.cxx
   qMRMLThreeDWidgetTest1.cxx
@@ -65,7 +92,7 @@ set(TEST_SOURCES
   qMRMLVolumeThresholdWidgetTest2.cxx
   qMRMLWidgetsExportTest1.cxx
   qMRMLWindowLevelWidgetTest1.cxx
-  EXTRA_INCLUDE vtkMRMLDebugLeaksMacro.h
+  EXTRA_INCLUDE qMRMLWidgetCxxTests.h 
   )
 
 if(Slicer_USE_QtTesting)
@@ -115,14 +142,20 @@ QT4_GENERATE_MOCS(
   qMRMLColorModelTest.cxx
   qMRMLDisplayNodeViewComboBoxTest.cxx
   qMRMLLabelComboBoxTest.cxx
+  qMRMLLayoutManagerWithCustomFactoryTest.cxx
+  qMRMLNodeAttributeTableViewTest.cxx
+  qMRMLNodeAttributeTableWidgetTest.cxx
   qMRMLSceneModelTest.cxx
   qMRMLSliceControllerWidgetTest.cxx
   )
 
 include_directories( ${CMAKE_CURRENT_BINARY_DIR})
+include_directories( ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(${KIT}CxxTests ${Tests} ${Tests_MOC_CXX} ${Tests_UtilityFiles})
 target_link_libraries(${KIT}CxxTests ${KIT})
+
+set_target_properties(${KIT}CxxTests PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
 
 macro(SCENE_TEST TESTNAME SCENEFILENAME)
   add_test(
@@ -148,6 +181,8 @@ simple_test( qMRMLLayoutManagerTest1 )
 simple_test( qMRMLLayoutManagerTest2 )
 simple_test( qMRMLLayoutManagerTest3 )
 simple_test( qMRMLLayoutManagerTest4 )
+simple_test( qMRMLLayoutManagerVisibilityTest )
+simple_test( qMRMLLayoutManagerWithCustomFactoryTest )
 simple_test( qMRMLLinearTransformSliderTest1 )
 simple_test( qMRMLListWidgetTest1 )
 simple_test( qMRMLMatrixWidgetTest1 )
@@ -156,6 +191,8 @@ simple_test( qMRMLModelTest1 )
 simple_test( qMRMLModelTreeViewTest1 )
 simple_test( qMRMLLabelComboBoxTest )
 simple_test( qMRMLNavigationViewTest1 )
+simple_test( qMRMLNodeAttributeTableViewTest )
+simple_test( qMRMLNodeAttributeTableWidgetTest )
 simple_test( qMRMLNodeComboBoxTest1 )
 simple_test( qMRMLNodeComboBoxTest2 )
 SCENE_TEST(  qMRMLNodeComboBoxTest3 diffusionEditor.mrml )
@@ -173,14 +210,15 @@ simple_test( qMRMLSceneFactoryWidgetTest1 )
 simple_test( qMRMLSceneModelTest )
 simple_test( qMRMLSceneModelTest1 )
 simple_test( qMRMLSceneModelHierarchyModelTest1 )
-simple_test( qMRMLSceneModelHierarchyModelTest2 vol_and_cube.mrml)
+SCENE_TEST( qMRMLSceneModelHierarchyModelTest2 vol_and_cube.mrml)
 simple_test( qMRMLSceneTransformModelTest1 )
 SCENE_TEST(  qMRMLSceneTransformModelTest2 vol_and_cube.mrml )
 simple_test( qMRMLSceneDisplayableModelTest1 )
 SCENE_TEST(  qMRMLSceneDisplayableModelTest2 vol_and_cube.mrml )
 simple_test( qMRMLSliceControllerWidgetTest )
 SCENE_TEST( qMRMLSliceWidgetTest1 vol_and_cube.mrml)
-SCENE_TEST( qMRMLSliceWidgetTest2 fixed.nrrd)
+SCENE_TEST( qMRMLSliceWidgetTest2 TestData/fixed.nrrd)
+simple_test( qMRMLTableViewTest1 )
 simple_test( qMRMLTransformSlidersTest1 )
 simple_test( qMRMLThreeDViewTest1 )
 simple_test( qMRMLThreeDWidgetTest1 )

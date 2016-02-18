@@ -15,7 +15,7 @@
 #ifndef __vtkMRMLBSplineTransformNode_h
 #define __vtkMRMLBSplineTransformNode_h
 
-#include "vtkMRMLNonlinearTransformNode.h"
+#include "vtkMRMLTransformNode.h"
 
 class vtkMRMLStorageNode;
 
@@ -24,38 +24,37 @@ class vtkMRMLStorageNode;
 ///
 /// MRML node for representing a nonlinear transformation to the parent
 /// node in the form of a vtkBSplineDeformableTransform.
-class VTK_MRML_EXPORT vtkMRMLBSplineTransformNode : public vtkMRMLNonlinearTransformNode
+class VTK_MRML_EXPORT vtkMRMLBSplineTransformNode : public vtkMRMLTransformNode
 {
   public:
   static vtkMRMLBSplineTransformNode *New();
-  vtkTypeMacro(vtkMRMLBSplineTransformNode,vtkMRMLNonlinearTransformNode);
+  vtkTypeMacro(vtkMRMLBSplineTransformNode,vtkMRMLTransformNode);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   virtual vtkMRMLNode* CreateNodeInstance();
 
-  /// 
+  ///
   /// Read node attributes from XML file
   virtual void ReadXMLAttributes( const char** atts);
 
-  /// 
+  ///
   /// Write this node's information to a MRML file in XML format.
   virtual void WriteXML(ostream& of, int indent);
 
-  /// 
+  ///
   /// Copy the node's attributes to this object
   virtual void Copy(vtkMRMLNode *node);
 
-  /// 
+  ///
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName() {return "BSplineTransform";};
 
-  /// 
+  ///
   /// Create default storage node or NULL if does not have one
   virtual vtkMRMLStorageNode* CreateDefaultStorageNode()
     {
     return Superclass::CreateDefaultStorageNode();
     };
-
 
 protected:
   vtkMRMLBSplineTransformNode();

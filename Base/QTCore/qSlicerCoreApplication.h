@@ -33,7 +33,6 @@
 #include "vtkSlicerConfigure.h" // For Slicer_USE_PYTHONQT
 #include "qSlicerBaseQTCoreExport.h"
 
-class ctkErrorLogModel;
 #ifdef Slicer_BUILD_DICOM_SUPPORT
 class ctkDICOMDatabase;
 #endif
@@ -48,8 +47,10 @@ class qSlicerCorePythonManager;
 #ifdef Slicer_BUILD_EXTENSIONMANAGER_SUPPORT
 class qSlicerExtensionsManagerModel;
 #endif
+class vtkDataIOManagerLogic;
 class vtkSlicerApplicationLogic;
 class vtkMRMLApplicationLogic;
+class vtkMRMLRemoteIOLogic;
 class vtkMRMLScene;
 
 class Q_SLICER_BASE_QTCORE_EXPORT qSlicerCoreApplication : public QApplication
@@ -60,17 +61,21 @@ class Q_SLICER_BASE_QTCORE_EXPORT qSlicerCoreApplication : public QApplication
 
   /// This property holds the path where the Slicer application is.
   /// For example, for an installed Slicer on Windows, the path can be
-  /// "C:\Program Files (x86)\Slicer 4.3.0\".
+  /// "C:\Program Files (x86)\Slicer 4.4.0\".
   /// \sa slicerHome(), temporaryPath, isInstalled
   Q_PROPERTY(QString slicerHome READ slicerHome CONSTANT)
+  Q_PROPERTY(QString defaultScenePath READ defaultScenePath WRITE setDefaultScenePath)
+  Q_PROPERTY(QString slicerSharePath READ slicerSharePath CONSTANT)
   Q_PROPERTY(QString temporaryPath READ temporaryPath WRITE setTemporaryPath)
   Q_PROPERTY(QString launcherExecutableFilePath READ launcherExecutableFilePath CONSTANT)
   Q_PROPERTY(QString launcherSettingsFilePath READ launcherSettingsFilePath CONSTANT)
+  Q_PROPERTY(QString slicerDefaultSettingsFilePath READ slicerDefaultSettingsFilePath CONSTANT)
   Q_PROPERTY(QString slicerUserSettingsFilePath READ slicerUserSettingsFilePath CONSTANT)
   Q_PROPERTY(QString slicerRevisionUserSettingsFilePath READ slicerRevisionUserSettingsFilePath CONSTANT)
   Q_PROPERTY(QString extensionsInstallPath READ extensionsInstallPath WRITE setExtensionsInstallPath)
   Q_PROPERTY(QString intDir READ intDir CONSTANT)
   Q_PROPERTY(bool isInstalled READ isInstalled CONSTANT)
+  Q_PROPERTY(bool isRelease READ isRelease CONSTANT)
   Q_PROPERTY(QString repositoryUrl READ repositoryUrl CONSTANT)
   Q_PROPERTY(QString repositoryBranch READ repositoryBranch CONSTANT)
   Q_PROPERTY(QString repositoryRevision READ repositoryRevision CONSTANT)
@@ -144,6 +149,23 @@ public:
   /// \sa slicerHome
   QString slicerHome() const;
 
+  /// Get default scene directory
+  ///
+  /// This returns the full path where scenes are saved to by default
+  ///
+  QString defaultScenePath() const;
+
+  /// Set default slicer scene directory
+  void setDefaultScenePath(const QString& path);
+
+  /// Get slicer share directory
+  ///
+  /// This returns the partial path where slicer resources are located, which
+  /// is normally of the form <code>"share/Slicer-<i>version</i>"</code>.
+  ///
+  /// \sa slicerSharePath, slicerHome()
+  QString slicerSharePath() const;
+
   /// Returns True if module identified by \a moduleFileName is a descendant of slicer home.
   /// \sa slicerHome()
   bool isEmbeddedModule(const QString& moduleFileName)const;
@@ -165,6 +187,10 @@ public:
 
   /// If any, return slicer user settings file path specific to a given revision of Slicer.
   QString launcherRevisionSpecificUserSettingsFilePath()const;
+
+  /// If any, return slicer default settings file path.
+  /// \sa defaultSettings()
+  QString slicerDefaultSettingsFilePath()const;
 
   /// Return slicer user settings file path.
   /// \sa userSettings()
@@ -189,6 +215,13 @@ public:
 
   /// Return true is this instance of Slicer is running from an installed directory
   bool isInstalled()const;
+
+  /// \brief Return true if this instance of Slicer is a \a Release build.
+  ///
+  /// \copydetails qSlicerUtils::isRelease()
+  ///
+  /// \sa qSlicerUtils::isRelease()
+  bool isRelease()const;
 
 #ifdef Slicer_USE_PYTHONQT
   /// Get python manager
@@ -225,8 +258,9 @@ public:
   /// \note qSlicerCoreApplication takes ownership of the object
   void setCoreCommandOptions(qSlicerCoreCommandOptions* options);
 
-  /// Get errorLogModel
-  Q_INVOKABLE ctkErrorLogModel* errorLogModel()const;
+  /// Get slicer application default settings.
+  /// \sa slicerDefaultSettingsFilePath()
+  Q_INVOKABLE QSettings* defaultSettings()const;
 
   /// Get slicer application user settings
   /// \note It will also instantiate a QSettings object if required.
@@ -295,11 +329,13 @@ public:
 
   static void loadLanguage();
 
-  /// If system certificates couldn't be found, load certicates bundled into 'Slicer.crt'.
+  /// Load certicates bundled into '<slicerHome>/<SLICER_SHARE_DIR>/Slicer.crt'.
   /// For more details, see Slicer/Base/QTCore/Resources/Certs/README
-  /// Returns \a False if 'Slicer.crt' also failed to be loaded.
+  /// Returns \a False if 'Slicer.crt' failed to be loaded.
   /// \sa QSslSocket::defaultCaCertificates()
-  static bool loadCaCertificates();
+  static bool loadCaCertificates(const QString& slicerHome);
+
+  Q_INVOKABLE int registerResource(const QByteArray& data);
 
 public slots:
 
@@ -307,11 +343,14 @@ public slots:
   /// \sa QCoreApplication::arguments()
   static void restart();
 
+  bool unregisterResource(int handle);
+
 protected:
   ///
   virtual void handlePreApplicationCommandLineArguments();
 
   /// Set MRML Scene
+  /// \sa vtkSlicerApplicationLogic::SetMRMLSceneDataIO
   virtual void setMRMLScene(vtkMRMLScene * scene);
 
 protected slots:

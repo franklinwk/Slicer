@@ -17,6 +17,8 @@
 #include "vtkMRMLScene.h"
 
 // VTK includes
+#include <vtkAlgorithm.h>
+#include <vtkAlgorithmOutput.h>
 #include <vtkColorTransferFunction.h>
 #include <vtkImageData.h>
 #include <vtkPointData.h>
@@ -221,7 +223,16 @@ void qSlicerScalarVolumeDisplayWidget::updateTransferFunction()
     return;
     }
   double range[2] = {0,255};
-  imageData->GetScalarRange(range);
+  vtkMRMLScalarVolumeDisplayNode* displayNode =
+    this->volumeDisplayNode();
+  if (displayNode)
+    {
+    displayNode->GetDisplayScalarRange(range);
+    }
+  else
+    {
+    imageData->GetScalarRange(range);
+    }
   // AdjustRange call will take out points that are outside of the new
   // range, but it needs the points to be there in order to work, so call
   // RemoveAllPoints after it's done

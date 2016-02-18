@@ -35,16 +35,12 @@
 
 // ITK includes
 #include <itkConfigure.h>
-#if ITK_VERSION_MAJOR > 3
-#  include <itkFactoryRegistration.h>
-#endif
+#include <itkFactoryRegistration.h>
 
 //-----------------------------------------------------------------------------
 int qSlicerVolumesModuleWidgetTest1( int argc, char * argv[] )
 {
-#if ITK_VERSION_MAJOR > 3
   itk::itkFactoryRegistration();
-#endif
 
   qSlicerApplication app(argc, argv);
 
@@ -68,7 +64,7 @@ int qSlicerVolumesModuleWidgetTest1( int argc, char * argv[] )
     return EXIT_FAILURE;
     }
   module.setMRMLScene(scene.GetPointer());
-  
+
   dynamic_cast<QWidget*>(module.widgetRepresentation())->show();
 
   if (argc < 3 || QString(argv[2]) != "-I")

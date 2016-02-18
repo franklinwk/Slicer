@@ -107,6 +107,15 @@ class Q_SLICER_BASE_QTCORE_EXPORT qSlicerAbstractCoreModule : public QObject
   /// \sa isHidden
   Q_PROPERTY(bool hidden READ isHidden)
 
+  /// This property holds whether the module should be able to create new
+  /// widget representations or not.
+  /// By default, modules can create new widget representations.
+  /// \sa isWidgetRepresentationCreationEnabled
+  /// \sa setWidgetRepresentationCreationEnabled
+  Q_PROPERTY(bool widgetRepresentationCreationEnabled
+             READ isWidgetRepresentationCreationEnabled
+             WRITE setWidgetRepresentationCreationEnabled)
+
   /// This property holds the help of the module.
   /// The help is displayed inside the module as a tab.
   /// \a helpText must be reimplemented for each module.
@@ -133,7 +142,7 @@ class Q_SLICER_BASE_QTCORE_EXPORT qSlicerAbstractCoreModule : public QObject
 
   /// This property holds the URL of the module for the Slicer wiki.
   /// It can be used in the help/ackknowledgement.
-  /// \tbd: obsolete ? should be static ?
+  /// \todo Is the slicerWikiUrl module property obsolete ? should it be static ?
   Q_PROPERTY(QString slicerWikiUrl READ slicerWikiUrl)
 
   /// This property holds the module name list of the module dependencies.
@@ -157,6 +166,12 @@ class Q_SLICER_BASE_QTCORE_EXPORT qSlicerAbstractCoreModule : public QObject
   /// \a isInstalled is set by the module factory and shouldn't be
   /// reimplemented in each module.
   Q_PROPERTY(bool isInstalled READ isInstalled)
+
+  /// This property holds whether module is a built-in Slicer module or
+  /// one from an extension or any user-specified folder.
+  /// \a isBuiltIn is set by the module factory and shouldn't be
+  /// reimplemented in each module.
+  Q_PROPERTY(bool isBuiltIn READ isBuiltIn)
 
 public:
 
@@ -199,9 +214,10 @@ public:
   /// Return the category index of the module.
   virtual int index()const;
 
-  /// Returns true if the module should be hidden to the user.
-  /// By default, modules are not hidden.
-  /// \sa hidden
+  /// Returns \a true if the module should be hidden to the user.
+  /// By default, interactive modules are visible and non-interactive
+  /// modules are hidden.
+  /// \sa hidden, widgetRepresentationAvailable
   virtual bool isHidden()const;
 
   /// Return the contributors of the module
@@ -215,16 +231,23 @@ public:
   /// Must be reimplemented in the derived classes
   virtual QString acknowledgementText()const;
 
+  /// Set/Get if the module should be able to create new widget
+  /// representations or not.
+  /// \sa widgetRepresentation()
+  bool isWidgetRepresentationCreationEnabled()const;
+  void setWidgetRepresentationCreationEnabled(bool value);
+
   /// This method allows to get a pointer to the WidgetRepresentation.
   /// If no WidgetRepresentation already exists, one will be created calling
   /// 'createWidgetRepresentation' method.
   /// \sa createNewWidgetRepresentation(), createWidgetRepresentation()
   qSlicerAbstractModuleRepresentation* widgetRepresentation();
 
-  /// Force the creation of a new widget representation. 
-  /// It does not return the widget of the module, but a new instance instead. 
+  /// Force the creation of a new widget representation.
+  /// It does not return the widget of the module, but a new instance instead.
   /// It can be useful when embedding a module widget into another module.
   /// \sa widgetRepresentation(), createWidgetRepresentation()
+  /// \sa isWidgetRepresentationCreationEnabled()
   qSlicerAbstractModuleRepresentation* createNewWidgetRepresentation();
 
   /// Get/Set the application logic.
@@ -252,6 +275,11 @@ public:
   /// \todo Ideally this function should be added within the qSlicerLoadableModule.
   bool isInstalled()const;
   void setInstalled(bool value);
+
+  /// Determine if this module is a built-in Slicer module or one from an extension
+  /// or any user-specified folder.
+  bool isBuiltIn()const;
+  void setBuiltIn(bool value);
 
 public slots:
 

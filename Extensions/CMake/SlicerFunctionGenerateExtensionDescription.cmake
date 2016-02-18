@@ -20,12 +20,40 @@
 
 function(slicerFunctionGenerateExtensionDescription)
   set(options)
-  set(oneValueArgs EXTENSION_NAME EXTENSION_CATEGORY EXTENSION_ICONURL EXTENSION_CONTRIBUTORS EXTENSION_STATUS EXTENSION_HOMEPAGE EXTENSION_DESCRIPTION EXTENSION_SCREENSHOTURLS EXTENSION_DEPENDS EXTENSION_BUILD_SUBDIRECTORY EXTENSION_ENABLED EXTENSION_WC_TYPE EXTENSION_WC_REVISION EXTENSION_WC_ROOT EXTENSION_WC_URL DESTINATION_DIR SLICER_WC_REVISION SLICER_WC_ROOT)
+  set(oneValueArgs
+    DESTINATION_DIR
+    EXTENSION_BUILD_SUBDIRECTORY
+    EXTENSION_CATEGORY
+    EXTENSION_CONTRIBUTORS
+    EXTENSION_DEPENDS
+    EXTENSION_DESCRIPTION
+    EXTENSION_ENABLED
+    EXTENSION_HOMEPAGE
+    EXTENSION_ICONURL
+    EXTENSION_NAME
+    EXTENSION_SCREENSHOTURLS
+    EXTENSION_STATUS
+    EXTENSION_WC_REVISION
+    EXTENSION_WC_ROOT
+    EXTENSION_WC_TYPE
+    EXTENSION_WC_URL
+    SLICER_WC_REVISION
+    SLICER_WC_ROOT
+    )
   set(multiValueArgs)
   cmake_parse_arguments(MY "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   # Sanity checks
-  set(expected_nonempty_vars EXTENSION_NAME EXTENSION_WC_TYPE EXTENSION_WC_REVISION EXTENSION_WC_ROOT EXTENSION_WC_URL SLICER_WC_REVISION SLICER_WC_ROOT)
+  set(expected_nonempty_vars
+    EXTENSION_NAME
+    EXTENSION_WC_REVISION
+    EXTENSION_WC_ROOT
+    EXTENSION_WC_TYPE
+    EXTENSION_WC_URL
+    SLICER_WC_REVISION
+    SLICER_WC_ROOT
+
+    )
   foreach(var ${expected_nonempty_vars})
     if("${MY_${var}}" STREQUAL "")
       message(FATAL_ERROR "CMake variable ${var} is empty !")
@@ -114,7 +142,7 @@ category    ${MY_EXTENSION_CATEGORY}
 iconurl     ${MY_EXTENSION_ICONURL}
 
 # Give people an idea what to expect from this code
-#  - Is it just a test or something you stand beind?
+#  - Is it just a test or something you stand behind?
 status      ${MY_EXTENSION_STATUS}
 
 # One line stating what the module does

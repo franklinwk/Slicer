@@ -26,7 +26,6 @@ PURPOSE.  See the above copyright notice for more information.
 
 #include "itkExtractImageFilter.h"
 
-vtkCxxRevisionMacro(vtkITKLevelTracingImageFilter, "$Revision: 1.0 $");
 vtkStandardNewMacro(vtkITKLevelTracingImageFilter);
 
 // Description:
@@ -64,7 +63,7 @@ void vtkITKLevelTracingTrace(vtkITKLevelTracingImageFilter *vtkNotUsed(self), T*
   typename ImageType::RegionType region;
   typename ImageType::IndexType index;
   typename ImageType::SizeType size;
-  index[0] = extent[0];   
+  index[0] = extent[0];
   index[1] = extent[2];
   index[2] = extent[4];
   region.SetIndex( index );
@@ -78,9 +77,7 @@ void vtkITKLevelTracingTrace(vtkITKLevelTracingImageFilter *vtkNotUsed(self), T*
   typedef itk::Image<T,2> Image2DType;
   typedef itk::ExtractImageFilter<ImageType, Image2DType> ExtractType;
   typename ExtractType::Pointer extract = ExtractType::New();
-#if  ITK_VERSION_MAJOR >=4
   extract->SetDirectionCollapseToIdentity(); //If you don't care about resulting image dimension
-#endif
 
   typedef typename ExtractType::InputImageRegionType ExtractionRegionType;
   ExtractionRegionType extractRegion;
@@ -120,7 +117,7 @@ void vtkITKLevelTracingTrace(vtkITKLevelTracingImageFilter *vtkNotUsed(self), T*
 
   extractRegion.SetIndex( extractIndex );
   extractRegion.SetSize( extractSize );
-  extract->SetExtractionRegion( extractRegion );  
+  extract->SetExtractionRegion( extractRegion );
 
   tracing->SetSeed(seed2D);
 
@@ -174,13 +171,13 @@ void vtkITKLevelTracingTrace(vtkITKLevelTracingImageFilter *vtkNotUsed(self), T*
         chain3D[1] = chainTemp[1] ;
         break;
       }
-  
+
     newPoints->InsertPoint(i, chain3D[0], chain3D[1], chain3D[2]);
     ptIds[i] = i;
     offset = chain->IncrementInput(i);
     chainTemp[0] = chainTemp[0] + offset[0];
     chainTemp[1] = chainTemp[1] + offset[1];
-    //vtkGenericWarningMacro( << "Chain point: "  << chainTemp );  
+    //vtkGenericWarningMacro( << "Chain point: "  << chainTemp );
     }
   while( i < numberChain );
 
@@ -190,7 +187,7 @@ void vtkITKLevelTracingTrace(vtkITKLevelTracingImageFilter *vtkNotUsed(self), T*
 }
 
 //
-// Contouring filter specialized for volumes and "short int" data values.  
+// Contouring filter specialized for volumes and "short int" data values.
 //
 int vtkITKLevelTracingImageFilter::RequestData(
   vtkInformation *vtkNotUsed(request),
@@ -247,8 +244,8 @@ int vtkITKLevelTracingImageFilter::RequestData(
     estimatedSize = 1024;
   }
   vtkDebugMacro(<< "Estimated allocation size is " << estimatedSize);
-  
-  newPts = vtkPoints::New(); 
+
+  newPts = vtkPoints::New();
   newPts->Allocate(estimatedSize,estimatedSize/2);
 
   newPolys = vtkCellArray::New();
@@ -280,13 +277,13 @@ int vtkITKLevelTracingImageFilter::RequestData(
         );
     } //switch
   }
-  else if (inScalars->GetNumberOfComponents() == 3) 
+  else if (inScalars->GetNumberOfComponents() == 3)
     {
     // RGB - convert for now...
     vtkSmartPointer<vtkUnsignedCharArray> grayScalars
       = vtkUnsignedCharArray::New();
     grayScalars->SetNumberOfTuples( inScalars->GetNumberOfTuples() );
-      
+
     double in[3];
     unsigned char out;
     for (vtkIdType i=0; i < inScalars->GetNumberOfTuples(); ++i)
@@ -300,7 +297,7 @@ int vtkITKLevelTracingImageFilter::RequestData(
 
     vtkITKLevelTracingTrace(this,
                             (unsigned char *)grayScalars->GetVoidPointer(0),
-                            dims, extent, origin, spacing, 
+                            dims, extent, origin, spacing,
                             newPts, newPolys, this->Seed, this->Plane);
     }
   else
@@ -308,11 +305,11 @@ int vtkITKLevelTracingImageFilter::RequestData(
     vtkErrorMacro(<< "Can only trace scalar and RGB images.");
     }
 
-  vtkDebugMacro(<<"Created: " 
+  vtkDebugMacro(<<"Created: "
     << newPts->GetNumberOfPoints() << " points. " );
   //
   // Update ourselves.  Because we don't know up front how many edges
-  // we've created, take care to reclaim memory. 
+  // we've created, take care to reclaim memory.
   //
   output->SetPoints(newPts);
   newPts->Delete();

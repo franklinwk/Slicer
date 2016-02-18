@@ -155,6 +155,16 @@ void qSlicerCLIModuleWidgetPrivate::setupUi(qSlicerWidget* widget)
   this->connect(this->MRMLCommandLineModuleNodeSelector,
                 SIGNAL(nodeAddedByUser(vtkMRMLNode*)),
                 SLOT(setDefaultNodeValue(vtkMRMLNode*)));
+
+  // Scene must be set in node selector widgets before the MRMLCommandLineModuleNodeSelector widget
+  // because when the scene is set in MRMLCommandLineModuleNodeSelector the first available module node
+  // is automatically selected and all widgets are updated.
+  // Node selector widgets can only be updated if the scene is already set, therefore
+  // we set the scene here for all widgets, before MRMLCommandLineModuleNodeSelector has a chance to trigger
+  // an update. Scene in MRMLCommandLineModuleNodeSelector will be set later by qSlicerAbstractCoreModule.
+  emit q->mrmlSceneChanged(this->module()->mrmlScene());
+  this->connect(q, SIGNAL(mrmlSceneChanged(vtkMRMLScene*)),
+              this->MRMLCommandLineModuleNodeSelector, SLOT(setMRMLScene(vtkMRMLScene*)));
 }
 
 //-----------------------------------------------------------------------------
@@ -167,6 +177,7 @@ void qSlicerCLIModuleWidgetPrivate::updateUiFromCommandLineModuleNode(
     this->ApplyPushButton->setEnabled(false);
     this->CancelPushButton->setEnabled(false);
     this->DefaultPushButton->setEnabled(false);
+    this->CLIModuleUIHelper->updateUi(0); // disable widgets
     return;
     }
 
@@ -353,6 +364,29 @@ void qSlicerCLIModuleWidget::setup()
 
   d->setupUi(this);
 }
+
+//-----------------------------------------------------------------------------
+void qSlicerCLIModuleWidget::enter()
+{
+  Q_D(qSlicerCLIModuleWidget);
+
+  this->Superclass::enter();
+
+  // Make sure a command line module node is available when the module widget
+  // is activated. If no CLI node is available then create a new one.
+  if (d->MRMLCommandLineModuleNodeSelector->currentNode() == NULL)
+    {
+    bool wasBlocked = d->MRMLCommandLineModuleNodeSelector->blockSignals(true);
+    vtkMRMLCommandLineModuleNode* node = vtkMRMLCommandLineModuleNode::SafeDownCast(d->MRMLCommandLineModuleNodeSelector->addNode());
+    Q_ASSERT(node);
+    // Initialize module description (just to avoid warnings
+    // when the node is set as current node and GUI is attempted to be updated from the node)
+    d->setDefaultNodeValue(node);
+    d->MRMLCommandLineModuleNodeSelector->blockSignals(wasBlocked);
+    this->setCurrentCommandLineModuleNode(node);
+    Q_ASSERT(d->CommandLineModuleNode);
+    }
+} 
 
 //-----------------------------------------------------------------------------
 vtkMRMLCommandLineModuleNode * qSlicerCLIModuleWidget::currentCommandLineModuleNode()const

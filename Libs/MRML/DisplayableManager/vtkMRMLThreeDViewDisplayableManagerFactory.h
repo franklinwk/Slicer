@@ -33,14 +33,14 @@ class vtkRenderer;
 
 /// \brief Factory where displayable manager classes are registered.
 ///
-/// A displayable manager class is responsible to represente a 
+/// A displayable manager class is responsible to represente a
 /// MRMLDisplayable node in a renderer.
 class VTK_MRML_DISPLAYABLEMANAGER_EXPORT vtkMRMLThreeDViewDisplayableManagerFactory
   : public vtkMRMLDisplayableManagerFactory
 {
 public:
 
-  vtkTypeRevisionMacro(vtkMRMLThreeDViewDisplayableManagerFactory,
+  vtkTypeMacro(vtkMRMLThreeDViewDisplayableManagerFactory,
                        vtkMRMLDisplayableManagerFactory);
   void PrintSelf(ostream& os, vtkIndent indent);
 
@@ -67,7 +67,9 @@ private:
 
 };
 
+//BTX
 VTK_SINGLETON_DECLARE_INITIALIZER(VTK_MRML_DISPLAYABLEMANAGER_EXPORT,
                                   vtkMRMLThreeDViewDisplayableManagerFactory);
+//ETX
 
 #endif

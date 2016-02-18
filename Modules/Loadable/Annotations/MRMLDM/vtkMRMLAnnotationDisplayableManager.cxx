@@ -24,7 +24,6 @@
 // MRML includes
 #include <vtkMRMLApplicationLogic.h>
 #include <vtkMRMLInteractionNode.h>
-#include <vtkMRMLLinearTransformNode.h>
 #include <vtkMRMLScene.h>
 #include <vtkMRMLSelectionNode.h>
 #include <vtkMRMLSliceCompositeNode.h>
@@ -70,7 +69,6 @@ typedef void (*fp)(void);
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro (vtkMRMLAnnotationDisplayableManager);
-vtkCxxRevisionMacro (vtkMRMLAnnotationDisplayableManager, "$Revision: 1.2 $");
 
 //---------------------------------------------------------------------------
 vtkMRMLAnnotationDisplayableManager::vtkMRMLAnnotationDisplayableManager()
@@ -1005,7 +1003,10 @@ void vtkMRMLAnnotationDisplayableManager::OnMRMLSliceNodeModifiedEvent(vtkMRMLSl
             if (overLineRep)
               {
               overLine->Off();
-              underLine->Off();
+              if (underLine)
+                {
+                underLine->Off();
+                }
 
               double lineOpacity = lineDisplayNode->GetProjectedOpacity();
               double lineColor[3];
@@ -2046,12 +2047,11 @@ void vtkMRMLAnnotationDisplayableManager::GetWorldToLocalCoordinates(vtkMRMLAnno
     }
 
   vtkMRMLTransformNode* tnode = node->GetParentTransformNode();
-  if (tnode != NULL && tnode->IsLinear())
+  if (tnode != NULL && tnode->IsTransformToWorldLinear())
     {
     vtkNew<vtkMatrix4x4> transformToWorld;
     transformToWorld->Identity();
-    vtkMRMLLinearTransformNode *lnode = vtkMRMLLinearTransformNode::SafeDownCast(tnode);
-    lnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
+    tnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
     transformToWorld->Invert();
 
     double p[4];

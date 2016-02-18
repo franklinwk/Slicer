@@ -37,9 +37,12 @@ public:
   typedef LinearInterpolateImageFunction<ImageType,
                                          TCoordRep>                           LinearInterpolateImageFunctionType;
 
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(DiffusionTensor3DLinearInterpolateFunction, DiffusionTensor3DInterpolateImageFunctionReimplementation);
+
   itkNewMacro(Self);
 protected:
-  void AllocateInterpolator();
+  void AllocateInterpolator() ITK_OVERRIDE;
 
   typename LinearInterpolateImageFunctionType::Pointer linearInterpolator[6];
 };

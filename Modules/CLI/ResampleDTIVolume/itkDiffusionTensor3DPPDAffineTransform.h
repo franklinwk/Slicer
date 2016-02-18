@@ -50,14 +50,18 @@ public:
   typedef typename Superclass::VectorType                           VectorType;
   typedef DiffusionTensor3DExtended<double>::EigenValuesArrayType   EValuesType;
   typedef DiffusionTensor3DExtended<double>::EigenVectorsMatrixType EVectorsType;
+
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(DiffusionTensor3DPPDAffineTransform, DiffusionTensor3DAffineTransform);
+
   itkNewMacro( Self );
   using Superclass::EvaluateTransformedTensor;
-  virtual TensorDataType EvaluateTransformedTensor( TensorDataType & tensor );
+  virtual TensorDataType EvaluateTransformedTensor( TensorDataType & tensor ) ITK_OVERRIDE;
 
   void SetMatrix( MatrixTransformType & matrix );
 
 protected:
-  void PreCompute();
+  void PreCompute() ITK_OVERRIDE;
 
   InternalMatrixTransformType ComputeMatrixFromAxisAndAngle( VectorType axis, double cosangle );
 

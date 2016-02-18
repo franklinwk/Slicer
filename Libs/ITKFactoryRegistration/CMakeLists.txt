@@ -2,7 +2,43 @@ project(ITKFactoryRegistration)
 
 cmake_minimum_required(VERSION 2.8.4)
 
-find_package(ITK REQUIRED)
+# --------------------------------------------------------------------------
+# Dependencies
+# --------------------------------------------------------------------------
+
+#
+# ITK
+#
+set(ITK_IO_MODULES_USED
+  ITKIOJPEG
+  ITKIOGDCM
+  ITKIOBMP
+  ITKIOLSM
+  ITKIOPNG
+  ITKIOTIFF
+  ITKIOVTK
+  ITKIOStimulate
+  ITKIOBioRad
+  ITKIOMeta
+  ITKIOMRC
+  ITKIONIFTI
+  ITKIONRRD
+  ITKIOGIPL
+  ITKIOTransformHDF5
+  ITKIOTransformInsightLegacy
+  ITKIOTransformMatlab
+  MGHIO
+  )
+if(Slicer_BUILD_DICOM_SUPPORT)
+  list(APPEND ITK_IO_MODULES_USED ITKIODCMTK)
+endif()
+
+set(${PROJECT_NAME}_ITK_COMPONENTS
+  ITKIOImageBase
+  ITKIOTransformBase
+  ${ITK_IO_MODULES_USED}
+  )
+find_package(ITK 4.6 COMPONENTS ${${PROJECT_NAME}_ITK_COMPONENTS} REQUIRED)
 
 # This is the Slicer library in charge of registering the default ITK factories.
 set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 0)
@@ -65,6 +101,16 @@ if(Slicer_LIBRARY_PROPERTIES)
 endif()
 
 # --------------------------------------------------------------------------
+# Folder
+# --------------------------------------------------------------------------
+if(NOT DEFINED ${PROJECT_NAME}_FOLDER)
+  set(${PROJECT_NAME}_FOLDER ${PROJECT_NAME})
+endif()
+if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+  set_target_properties(${lib_name} PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+endif()
+
+# --------------------------------------------------------------------------
 # Export target
 # --------------------------------------------------------------------------
 if(NOT DEFINED ${PROJECT_NAME}_EXPORT_FILE)
@@ -93,4 +139,3 @@ install(TARGETS ${lib_name}
 # --------------------------------------------------------------------------
 set(${PROJECT_NAME}_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}
   CACHE INTERNAL "${PROJECT_NAME} include dirs" FORCE)
-

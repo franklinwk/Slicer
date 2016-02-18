@@ -45,17 +45,15 @@ public:
   typedef Transform<OutputDataType, NDimensions, NDimensions>          TransformType;
   typedef typename OutputDeformationFieldType::RegionType              OutputImageRegionType;
 
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(TransformDeformationFieldFilter, ImageToImageFilter);
+
   itkNewMacro( Self );
 // /Set the transform
   itkSetObjectMacro( Transform, TransformType );
-#if 0 // HACK ITK_VERSION_MAJOR < 4
-// /Set the input deformation field
-  void SetInput( const InputDeformationFieldType * inputDeformationField );
-
-#endif
 
 // /Get the time of the last modification of the object
-  unsigned long GetMTime() const;
+  unsigned long GetMTime() const ITK_OVERRIDE;
 
 #ifdef ITK_USE_CONCEPT_CHECKING
   /** Begin concept checking */
@@ -67,18 +65,14 @@ public:
 #endif
 protected:
   TransformDeformationFieldFilter();
-#if ITK_VERSION_MAJOR < 4
-  void ThreadedGenerateData( const OutputImageRegionType & outputRegionForThread, int threadId );
 
-#else
-  void ThreadedGenerateData( const OutputImageRegionType & outputRegionForThread, ThreadIdType threadId );
+  void ThreadedGenerateData( const OutputImageRegionType & outputRegionForThread, ThreadIdType threadId ) ITK_OVERRIDE;
 
-#endif
-  void BeforeThreadedGenerateData();
+  void BeforeThreadedGenerateData() ITK_OVERRIDE;
 
-  void GenerateOutputInformation();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
 private:
   typename TransformType::Pointer m_Transform;

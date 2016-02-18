@@ -4,16 +4,26 @@ project(vtkTeem)
 cmake_minimum_required(VERSION 2.8.4)
 #-----------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
-# See http://cmake.org/cmake/help/cmake-2-8-docs.html#section_Policies for details
-#-----------------------------------------------------------------------------
-if(POLICY CMP0017)
-  cmake_policy(SET CMP0017 OLD)
+# --------------------------------------------------------------------------
+# Options
+# --------------------------------------------------------------------------
+if(NOT DEFINED BUILD_SHARED_LIBS)
+  option(BUILD_SHARED_LIBS "Build with shared libraries." ON)
 endif()
 
-find_package(VTK REQUIRED)
-include(${VTK_USE_FILE})
+# --------------------------------------------------------------------------
+# Dependencies
+# --------------------------------------------------------------------------
 
+#
+# VTK
+#
+#find_package(VTK REQUIRED)
+#include(${VTK_USE_FILE})
+
+#
+# Teem
+#
 find_package(Teem REQUIRED NO_MODULE)
 # XXX Since no TeemConfigVersion.cmake is configured, let's check the version explicitly
 if(${Teem_VERSION_MAJOR}.${Teem_VERSION_MINOR}.${Teem_VERSION_PATCH} VERSION_LESS 1.10)
@@ -25,19 +35,6 @@ include(${Teem_USE_FILE})
 # XXX Teem 1.11.0 or Teem >= 4168 - This variable won't be needed anymore.
 #     See http://sourceforge.net/p/teem/code/4168/
 set(Teem_LIBRARIES teem)
-
-if(NOT DEFINED BUILD_SHARED_LIBS)
-  option(BUILD_SHARED_LIBS "Build with shared libraries." ON)
-endif()
-
-# --------------------------------------------------------------------------
-# Include dirs
-# --------------------------------------------------------------------------
-set(include_dirs
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
-  )
-include_directories(${include_dirs})
 
 # --------------------------------------------------------------------------
 # Configure headers
@@ -65,8 +62,6 @@ endif()
 # Sources
 # --------------------------------------------------------------------------
 set(vtkTeem_SRCS
-  vtkNRRDReader.cxx
-  vtkNRRDWriter.cxx
   vtkDiffusionTensorMathematics.cxx
   vtkTeemEstimateDiffusionTensor.cxx
   vtkDiffusionTensorGlyph.cxx
@@ -76,6 +71,8 @@ set(vtkTeem_SRCS
   vtkHyperPointandArray.cxx
   vtkHyperStreamlineDTMRI.cxx
   vtkHyperStreamlineTeem.cxx
+  vtkNRRDReader.cxx
+  vtkNRRDWriter.cxx
   vtkPreciseHyperStreamline.cxx
   vtkPreciseHyperStreamlinePoints.cxx
   vtkSeedTracts.cxx
@@ -99,6 +96,14 @@ set_source_files_properties(
   vtkTractographyPointAndArray.cxx
   WRAP_EXCLUDE
   )
+# --------------------------------------------------------------------------
+# Include dirs
+# --------------------------------------------------------------------------
+set(include_dirs
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_BINARY_DIR}
+  )
+include_directories(BEFORE ${include_dirs})
 
 # --------------------------------------------------------------------------
 # Build library
@@ -108,13 +113,9 @@ set(lib_name ${PROJECT_NAME})
 set(srcs ${vtkTeem_SRCS})
 add_library(${lib_name} ${srcs})
 
-set(VTK_LIBRARIES
-  vtkCommon
-  vtkFiltering
-  vtkGraphics
-  vtkIO
-  vtkImaging
-  )
+# Teem vtkNRRDReader overwrites VTK vtkNrrdReader
+set(VTK_WRAP_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} ${VTK_INCLUDE_DIRS}
+    CACHE INTERNAL "VTK wrap include dirs" FORCE)
 
 set(libs
   ${Teem_LIBRARIES}
@@ -125,6 +126,16 @@ target_link_libraries(${lib_name} ${libs})
 # Apply user-defined properties to the library target.
 if(Slicer_LIBRARY_PROPERTIES)
   set_target_properties(${lib_name} PROPERTIES ${Slicer_LIBRARY_PROPERTIES})
+endif()
+
+# --------------------------------------------------------------------------
+# Folder
+# --------------------------------------------------------------------------
+if(NOT DEFINED ${PROJECT_NAME}_FOLDER)
+  set(${PROJECT_NAME}_FOLDER ${PROJECT_NAME})
+endif()
+if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+  set_target_properties(${lib_name} PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
 endif()
 
 # --------------------------------------------------------------------------
@@ -165,6 +176,11 @@ if(VTK_WRAP_PYTHON)
     )
   # Export target
   export(TARGETS ${lib_name}Python ${lib_name}PythonD APPEND FILE ${${PROJECT_NAME}_EXPORT_FILE})
+  # Folder
+  if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+    set_target_properties(${lib_name}Python PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+    set_target_properties(${lib_name}PythonD PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+  endif()
 endif()
 
 # --------------------------------------------------------------------------

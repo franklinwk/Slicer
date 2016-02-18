@@ -10,15 +10,24 @@ endif()
 # Install ITK
 # -------------------------------------------------------------------------
 if(NOT "${ITK_DIR}" STREQUAL "" AND EXISTS "${ITK_DIR}/CMakeCache.txt")
-set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${ITK_DIR};ITK;RuntimeLibraries;/")
-  if(${ITK_VERSION_MAJOR} STREQUAL "4")
-    # GDCM
-    set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${ITK_DIR};ITK;Libraries;/")
-    # HDF5
-    set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${ITK_DIR};ITK;libraries;/")
-    # HDF5 until ITK4. final, then it can be removed
-    set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${ITK_DIR};ITK;Unspecified;/")
+  set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${ITK_DIR};ITK;RuntimeLibraries;/")
+  # GDCM
+  set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${ITK_DIR};ITK;Libraries;/")
+  # HDF5
+  set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${ITK_DIR};ITK;libraries;/")
+  # HDF5 until ITK4. final, then it can be removed
+  set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${ITK_DIR};ITK;Unspecified;/")
+
+  # -------------------------------------------------------------------------
+  # Install ITKPython
+  # -------------------------------------------------------------------------
+  if(Slicer_INSTALL_ITKPython)
+    if("${Slicer_WRAP_ITK_INSTALL_COMPONENT_IDENTIFIER}" STREQUAL "")
+      message(FATAL_ERROR "To allow optional packaging of ITK Wrapping. Slicer_WRAP_ITK_INSTALL_COMPONENT_IDENTIFIER should never be empty")
+    endif()
+    set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${ITK_DIR};ITK;${Slicer_WRAP_ITK_INSTALL_COMPONENT_IDENTIFIER}RuntimeLibraries;/")
   endif()
+
 endif()
 
 # -------------------------------------------------------------------------
@@ -41,15 +50,7 @@ endif()
 # Install Teem
 # -------------------------------------------------------------------------
 if(NOT "${Teem_DIR}" STREQUAL "" AND EXISTS "${Teem_DIR}/CMakeCache.txt")
-  set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${Teem_DIR};teem;ALL;/")
-endif()
-
-# -------------------------------------------------------------------------
-# Install BatchMake
-# -------------------------------------------------------------------------
-if(Slicer_USE_BatchMake
-  AND NOT "${BatchMake_DIR}" STREQUAL "" AND EXISTS "${BatchMake_DIR}/CMakeCache.txt")
-  set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${BatchMake_DIR};BatchMake;Runtime;/")
+  set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${Teem_DIR};teem;RuntimeLibraries;/")
 endif()
 
 # -------------------------------------------------------------------------

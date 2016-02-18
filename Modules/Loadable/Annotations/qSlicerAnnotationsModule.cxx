@@ -45,7 +45,7 @@ qSlicerAnnotationsModule::~qSlicerAnnotationsModule()
 void qSlicerAnnotationsModule::setup()
 {
   /// Register Displayable Managers:
-  
+
   // 3D
   QStringList threeDdisplayableManagers;
   threeDdisplayableManagers
@@ -90,7 +90,7 @@ void qSlicerAnnotationsModule::setup()
 
   ioManager->registerIO(new qSlicerNodeWriter(
     "Annotations", QString("AnnotationFile"),
-    QStringList() << "vtkMRMLAnnotationNode", this));
+    QStringList() << "vtkMRMLAnnotationNode", true, this));
 }
 
 //-----------------------------------------------------------------------------

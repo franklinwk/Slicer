@@ -1,6 +1,6 @@
 import os
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # slicerCloseCrashBug2590
@@ -96,40 +96,7 @@ class slicerCloseCrashBug2590Widget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="slicerCloseCrashBug2590"):
     self.onReload()
@@ -142,8 +109,8 @@ class slicerCloseCrashBug2590Widget:
 #
 
 class slicerCloseCrashBug2590Logic:
-  """This class should implement all the actual 
-  computation done by your module.  The interface 
+  """This class should implement all the actual
+  computation done by your module.  The interface
   should be such that other python code can import
   this class and make use of the functionality without
   requiring an instance of the Widget
@@ -152,14 +119,14 @@ class slicerCloseCrashBug2590Logic:
     pass
 
   def hasImageData(self,volumeNode):
-    """This is a dummy logic method that 
+    """This is a dummy logic method that
     returns true if the passed in volume
     node has valid image data
     """
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -302,7 +269,7 @@ class slicerCloseCrashBug2590Test(unittest.TestCase):
       roi = changeTracker.defineROIStep._ChangeTrackerDefineROIStep__roi
       roi.SetXYZ(-2.81037, 28.7629, 28.4536)
       roi.SetRadiusXYZ(22.6467, 22.6804, 22.9897)
-    
+
       self.delayDisplay('Go Forward')
       changeTracker.workflow.goForward()
 
@@ -311,7 +278,7 @@ class slicerCloseCrashBug2590Test(unittest.TestCase):
 
       self.delayDisplay('Go Forward')
       changeTracker.workflow.goForward()
-        
+
       self.delayDisplay('Pick Metric')
       checkList = changeTracker.analyzeROIStep._ChangeTrackerAnalyzeROIStep__metricCheckboxList
       index = checkList.values().index('IntensityDifferenceMetric')

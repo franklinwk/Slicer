@@ -3,6 +3,7 @@ import unittest
 import qt
 import slicer
 import EditorLib
+from EditorLib.EditUtil import EditUtil
 
 class ThresholdThreading(unittest.TestCase):
   def setUp(self):
@@ -47,7 +48,7 @@ class ThresholdThreading(unittest.TestCase):
     # now, define an ROI in it
     #
     roi = slicer.vtkMRMLAnnotationROINode()
-    slicer.mrmlScene.AddNode(roi) 
+    slicer.mrmlScene.AddNode(roi)
     roi.SetXYZ(-2, 104, -80)
     roi.SetRadiusXYZ(30, 30, 30)
 
@@ -76,18 +77,17 @@ class ThresholdThreading(unittest.TestCase):
     # got to the editor and do some drawing
     #
     self.delayDisplay("Paint some things")
-    editUtil = EditorLib.EditUtil.EditUtil()
-    parameterNode = editUtil.getParameterNode()
+    parameterNode = EditUtil.getParameterNode()
     lm = slicer.app.layoutManager()
     paintEffect = EditorLib.PaintEffectOptions()
     paintEffect.setMRMLDefaults()
     paintEffect.__del__()
     sliceWidget = lm.sliceWidget('Red')
     paintTool = EditorLib.PaintEffectTool(sliceWidget)
-    editUtil.setLabel(1)
+    EditUtil.setLabel(1)
     paintTool.paintAddPoint(100,100)
     paintTool.paintApply()
-    editUtil.setLabel(2)
+    EditUtil.setLabel(2)
     paintTool.paintAddPoint(200,200)
     paintTool.paintApply()
     paintTool.cleanup()

@@ -4,19 +4,27 @@ project(FreeSurfer)
 cmake_minimum_required(VERSION 2.8.4)
 #-----------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
-# See http://cmake.org/cmake/help/cmake-2-8-docs.html#section_Policies for details
-#-----------------------------------------------------------------------------
-if(POLICY CMP0017)
-  cmake_policy(SET CMP0017 OLD)
-endif()
-
-find_package(VTK REQUIRED)
-include(${VTK_USE_FILE})
-
+# --------------------------------------------------------------------------
+# Options
+# --------------------------------------------------------------------------
 if(NOT DEFINED BUILD_SHARED_LIBS)
   option(BUILD_SHARED_LIBS "Build with shared libraries." ON)
 endif()
+
+# --------------------------------------------------------------------------
+# Dependencies
+# --------------------------------------------------------------------------
+
+#
+# VTK
+#
+#find_package(VTK REQUIRED)
+#include(${VTK_USE_FILE})
+
+#
+# ZLIB
+#
+find_package(ZLIB REQUIRED)
 
 # --------------------------------------------------------------------------
 # Include dirs
@@ -24,6 +32,7 @@ endif()
 set(include_dirs
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
+  ${ZLIB_INCLUDE_DIRS}
   )
 include_directories(${include_dirs})
 
@@ -76,8 +85,6 @@ set(srcs ${FreeSurfer_SRCS})
 
 add_library(${lib_name} ${srcs})
 
-set(VTK_LIBRARIES vtkCommon vtkFiltering vtkIO)
-
 set(libs
   ${VTK_LIBRARIES}
   ${ZLIB_LIBRARIES}
@@ -87,6 +94,16 @@ target_link_libraries(${lib_name} ${libs})
 # Apply user-defined properties to the library target.
 if(Slicer_LIBRARY_PROPERTIES)
   set_target_properties(${lib_name} PROPERTIES ${Slicer_LIBRARY_PROPERTIES})
+endif()
+
+# --------------------------------------------------------------------------
+# Folder
+# --------------------------------------------------------------------------
+if(NOT DEFINED ${PROJECT_NAME}_FOLDER)
+  set(${PROJECT_NAME}_FOLDER ${PROJECT_NAME})
+endif()
+if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+  set_target_properties(${lib_name} PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
 endif()
 
 # --------------------------------------------------------------------------
@@ -128,6 +145,11 @@ if(VTK_WRAP_PYTHON)
     )
   # Export target
   export(TARGETS ${lib_name}Python ${lib_name}PythonD APPEND FILE ${${PROJECT_NAME}_EXPORT_FILE})
+  # Folder
+  if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+    set_target_properties(${lib_name}Python PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+    set_target_properties(${lib_name}PythonD PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+  endif()
 endif()
 
 # --------------------------------------------------------------------------
@@ -153,6 +175,7 @@ endforeach()
 install(
   FILES ${RESFILES}
   DESTINATION ${${PROJECT_NAME}_INSTALL_SHARE_DIR}
+  COMPONENT Runtime
   )
 
 # --------------------------------------------------------------------------

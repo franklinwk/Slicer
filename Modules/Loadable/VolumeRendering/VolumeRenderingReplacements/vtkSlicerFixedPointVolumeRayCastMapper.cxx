@@ -39,9 +39,9 @@ PURPOSE.  See the above copyright notice for more information.
 #include "vtkTransform.h"
 #include "vtkVolumeProperty.h"
 #include "vtkSlicerFixedPointRayCastImage.h"
+#include <vtkVersion.h>
 
 
-vtkCxxRevisionMacro(vtkSlicerFixedPointVolumeRayCastMapper, "$Revision: 1.20.4.1 $");
 vtkStandardNewMacro(vtkSlicerFixedPointVolumeRayCastMapper);
 vtkCxxSetObjectMacro(vtkSlicerFixedPointVolumeRayCastMapper, RayCastImage, vtkSlicerFixedPointRayCastImage);
 
@@ -293,8 +293,8 @@ void vtkSlicerFixedPointVolumeRayCastMapperComputeGradients( T *dataPtr,
                         else if ( (cdptr+d*xstep) <= lastPixel && (cdptr-d*xstep) >= dataPtr )
                         {
                             n[0] = (float)*(cdptr-d*xstep) - (float)*(cdptr+d*xstep);
-                        } 
-                        else 
+                        }
+                        else
                         {
                             n[0] = 0;
                         }
@@ -311,8 +311,8 @@ void vtkSlicerFixedPointVolumeRayCastMapperComputeGradients( T *dataPtr,
                         else if ( (cdptr+d*ystep) <= lastPixel && (cdptr-d*ystep) >= dataPtr )
                         {
                             n[1] = (float)*(cdptr-d*ystep) - (float)*(cdptr+d*ystep);
-                        } 
-                        else 
+                        }
+                        else
                         {
                             n[1] = 0;
                         }
@@ -329,8 +329,8 @@ void vtkSlicerFixedPointVolumeRayCastMapperComputeGradients( T *dataPtr,
                         else if ( (cdptr+d*zstep) <= lastPixel && (cdptr-d*zstep) >= dataPtr )
                         {
                             n[2] = (float)*(cdptr-d*zstep) - (float)*(cdptr+d*zstep);
-                        } 
-                        else 
+                        }
+                        else
                         {
                             n[2] = 0;
                         }
@@ -1197,9 +1197,9 @@ void vtkSlicerFixedPointVolumeRayCastMapper::PerVolumeInitialization( vtkRendere
     }
     else
     {
-        input->UpdateInformation();
-        input->SetUpdateExtentToWholeExtent();
-        input->Update();
+        this->UpdateInformation();
+        this->SetUpdateExtentToWholeExtent();
+        this->Update();
     }
 
     // Compute some matrices from voxels to view and vice versa based
@@ -2230,15 +2230,9 @@ void vtkSlicerFixedPointVolumeRayCastMapper::ComputeMatrices( double inputOrigin
     // Don't replace this with the GetCompositePerspectiveTransformMatrix
     // because that turns off stereo rendering!!!
     this->PerspectiveTransform->Identity();
-#if ( (VTK_MAJOR_VERSION >= 6) || ( VTK_MAJOR_VERSION == 5 && VTK_MINOR_VERSION >= 4 ) )
     this->PerspectiveTransform->
         Concatenate(cam->GetProjectionTransformMatrix(aspect[0]/aspect[1],
         0.0, 1.0 ));
-#else
-    this->PerspectiveTransform->
-        Concatenate(cam->GetPerspectiveTransformMatrix(aspect[0]/aspect[1],
-        0.0, 1.0 ));
-#endif
     this->PerspectiveTransform->Concatenate(cam->GetViewTransformMatrix());
     this->PerspectiveMatrix->DeepCopy(this->PerspectiveTransform->GetMatrix());
 

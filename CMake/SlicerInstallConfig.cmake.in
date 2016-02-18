@@ -22,9 +22,7 @@ set(Slicer_BUILD_QTLOADABLEMODULES "@Slicer_BUILD_QTLOADABLEMODULES@")
 set(Slicer_BUILD_SHARED "@BUILD_SHARED_LIBS@")
 
 # Slicer options
-set(Slicer_USE_BatchMake "@Slicer_USE_BatchMake@")
 set(Slicer_USE_IGSTK "@Slicer_USE_IGSTK@")
-set(Slicer_USE_MIDAS "@Slicer_USE_MIDAS@")
 set(Slicer_USE_NAVITRACK "@Slicer_USE_NAVITRACK@")
 set(Slicer_USE_NUMPY "@Slicer_USE_NUMPY@")
 set(Slicer_USE_PYTHONQT "@Slicer_USE_PYTHONQT@")
@@ -55,6 +53,7 @@ set(Slicer_Libs_LIBRARY_DIRS
   "${Slicer_HOME}/lib/ModuleDescriptionParser"
   "${Slicer_HOME}/lib/Qdec"
   "${Slicer_HOME}/lib/tclap"
+  "${Slicer_HOME}/lib/vtkAddon"
   "${Slicer_HOME}/lib/vtkITK"
   "${Slicer_HOME}/lib/vtkTeem"
   "${Slicer_HOME}/lib/TclTk/lib"
@@ -74,6 +73,7 @@ set(Slicer_Libs_INCLUDE_DIRS
   "${Slicer_HOME}/include/ModuleDescriptionParser"
   "${Slicer_HOME}/include/Qdec"
   "${Slicer_HOME}/include/tclap"
+  "${Slicer_HOME}/include/vtkAddon"
   "${Slicer_HOME}/include/vtkITK"
   "${Slicer_HOME}/include/vtkTeem"
   )

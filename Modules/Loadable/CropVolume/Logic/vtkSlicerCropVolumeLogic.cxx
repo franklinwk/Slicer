@@ -29,9 +29,11 @@
 #include <vtkMRMLDiffusionTensorVolumeNode.h>
 #include <vtkMRMLDiffusionWeightedVolumeNode.h>
 #include <vtkMRMLDiffusionWeightedVolumeDisplayNode.h>
+#include <vtkMRMLLabelMapVolumeNode.h>
+#include <vtkMRMLLinearTransformNode.h>
 #include <vtkMRMLVectorVolumeNode.h>
 #include <vtkMRMLVectorVolumeDisplayNode.h>
-#include <vtkMRMLLinearTransformNode.h>
+#include <vtkMRMLTransformNode.h>
 #include <vtkMRMLVolumeNode.h>
 #include <vtkMRMLAnnotationROINode.h>
 
@@ -42,6 +44,7 @@
 #include <vtkMatrix4x4.h>
 #include <vtkObjectFactory.h>
 #include <vtkSmartPointer.h>
+#include <vtkVersion.h>
 
 // STD includes
 #include <cassert>
@@ -65,7 +68,6 @@ vtkSlicerCropVolumeLogic::vtkInternal::vtkInternal()
 }
 
 //----------------------------------------------------------------------------
-vtkCxxRevisionMacro(vtkSlicerCropVolumeLogic, "$Revision: 1.9.12.1 $");
 vtkStandardNewMacro(vtkSlicerCropVolumeLogic);
 
 //----------------------------------------------------------------------------
@@ -116,9 +118,9 @@ int vtkSlicerCropVolumeLogic::Apply(vtkMRMLCropVolumeParametersNode* pnode)
 {
   vtkMRMLScene *scene = this->GetMRMLScene();
 
-  vtkMRMLVolumeNode *inputVolume = 
+  vtkMRMLVolumeNode *inputVolume =
     vtkMRMLVolumeNode::SafeDownCast(scene->GetNodeByID(pnode->GetInputVolumeNodeID()));
-  vtkMRMLAnnotationROINode *inputROI = 
+  vtkMRMLAnnotationROINode *inputROI =
     vtkMRMLAnnotationROINode::SafeDownCast(scene->GetNodeByID(pnode->GetROINodeID()));
 
   if(!inputVolume || !inputROI)
@@ -147,7 +149,7 @@ int vtkSlicerCropVolumeLogic::Apply(vtkMRMLCropVolumeParametersNode* pnode)
       std::cerr << "CropVolume: ERROR: failed to get hold of Volumes logic" << std::endl;
       return -2;
     }
-  
+
   std::ostringstream outSS;
   double outputSpacing[3], spacingScaleConst = pnode->GetSpacingScalingConst();
   outSS << inputVolume->GetName() << "-subvolume-scale_" << spacingScaleConst;
@@ -178,7 +180,7 @@ int vtkSlicerCropVolumeLogic::Apply(vtkMRMLCropVolumeParametersNode* pnode)
     outputVolume = outputDWVNode.GetPointer();
     }
   else if(vvnode)
-    {    
+    {
     vtkNew<vtkMRMLVectorVolumeNode> outputVVNode;
     outputVVNode->CopyWithScene(dwvnode);
     vtkNew<vtkMRMLVectorVolumeDisplayNode> vvDisplayNode;
@@ -218,7 +220,6 @@ int vtkSlicerCropVolumeLogic::Apply(vtkMRMLCropVolumeParametersNode* pnode)
       vtkMatrix4x4 *inputIJKToRAS = vtkMatrix4x4::New();
       vtkMatrix4x4 *outputRASToIJK = vtkMatrix4x4::New();
       vtkMatrix4x4 *outputIJKToRAS = vtkMatrix4x4::New();
-      vtkMRMLLinearTransformNode *movingVolumeTransform = NULL, *roiTransform = NULL;
 
       refVolume = this->Internal->VolumesLogic->CreateAndAddLabelVolume(
           this->GetMRMLScene(), inputVolume, "CropVolume_ref_volume");
@@ -276,9 +277,8 @@ int vtkSlicerCropVolumeLogic::Apply(vtkMRMLCropVolumeParametersNode* pnode)
           roiXYZ[2] - roiRadius[2] + outputSpacing[2] * .5);
 
       // account for the ROI parent transform, if present
-      roiTransform = vtkMRMLLinearTransformNode::SafeDownCast(
-          inputROI->GetParentTransformNode());
-      if (roiTransform)
+      vtkMRMLTransformNode *roiTransform = inputROI->GetParentTransformNode();
+      if (roiTransform && roiTransform->IsTransformToWorldLinear())
         {
           vtkMatrix4x4 *roiMatrix = vtkMatrix4x4::New();
           roiTransform->GetMatrixTransformToWorld(roiMatrix);
@@ -292,7 +292,7 @@ int vtkSlicerCropVolumeLogic::Apply(vtkMRMLCropVolumeParametersNode* pnode)
       vtkImageData* outputImageData = vtkImageData::New();
       outputImageData->SetDimensions(outputExtent[0], outputExtent[1],
           outputExtent[2]);
-      outputImageData->AllocateScalars();
+      outputImageData->AllocateScalars(VTK_DOUBLE, 1);
 
       refVolume->SetAndObserveImageData(outputImageData);
       outputImageData->Delete();
@@ -319,12 +319,13 @@ int vtkSlicerCropVolumeLogic::Apply(vtkMRMLCropVolumeParametersNode* pnode)
       cmdNode->SetParameterAsString("referenceVolume", refVolume->GetID());
       cmdNode->SetParameterAsString("outputVolume", outputVolume->GetID());
 
-      movingVolumeTransform = vtkMRMLLinearTransformNode::SafeDownCast(
-          inputVolume->GetParentTransformNode());
+      vtkMRMLTransformNode *movingVolumeTransform = inputVolume->GetParentTransformNode();
 
-      if (movingVolumeTransform != NULL)
+      if (movingVolumeTransform != NULL && movingVolumeTransform->IsLinear())
+        {
         cmdNode->SetParameterAsString("transformationFile",
             movingVolumeTransform->GetID());
+        }
 
       std::string interp = "linear";
       switch (pnode->GetInterpolationMode())
@@ -382,9 +383,9 @@ void vtkSlicerCropVolumeLogic::CropVoxelBased(vtkMRMLAnnotationROINode* roi, vtk
   double minXYZRAS[] = {roiXYZ[0]-roiRadius[0], roiXYZ[1]-roiRadius[1],roiXYZ[2]-roiRadius[2],1.};
   double maxXYZRAS[] = {roiXYZ[0]+roiRadius[0], roiXYZ[1]+roiRadius[1],roiXYZ[2]+roiRadius[2],1.};
 
-  vtkSmartPointer<vtkMRMLLinearTransformNode> roiTransform  = vtkMRMLLinearTransformNode::SafeDownCast(roi->GetParentTransformNode());
+  vtkMRMLTransformNode* roiTransform  = roi->GetParentTransformNode();
   // account for the ROI parent transform, if present
-  if (roiTransform.GetPointer())
+  if (roiTransform && roiTransform->IsTransformToWorldLinear())
     {
       vtkNew<vtkMatrix4x4> roiTransformMatrix;
       roiTransform->GetMatrixTransformToWorld(roiTransformMatrix.GetPointer());
@@ -419,16 +420,26 @@ void vtkSlicerCropVolumeLogic::CropVoxelBased(vtkMRMLAnnotationROINode* roi, vtk
   minZ = std::max(minZ,0.);
   maxZ = std::min(maxZ,static_cast<double>(originalImageExtents[5]));
 
-  int outputWholeExtent[6] = {minX,maxX,minY,maxY,minZ,maxZ};
+  int outputWholeExtent[6] = {
+    static_cast<int>(minX),
+    static_cast<int>(maxX),
+    static_cast<int>(minY),
+    static_cast<int>(maxY),
+    static_cast<int>(minZ),
+    static_cast<int>(maxZ)};
 
-  double ijkNewOrigin[] = {outputWholeExtent[0],outputWholeExtent[2],outputWholeExtent[4],1.0};
+  const double ijkNewOrigin[] = {
+    static_cast<double>(outputWholeExtent[0]),
+    static_cast<double>(outputWholeExtent[2]),
+    static_cast<double>(outputWholeExtent[4]),
+    static_cast<double>(1.0)};
 
   double  rasNewOrigin[4];
   inputIJKToRAS->MultiplyPoint(ijkNewOrigin,rasNewOrigin);
 
 
   vtkNew<vtkImageClip> imageClip;
-  imageClip->SetInput(imageDataWorkingCopy.GetPointer());
+  imageClip->SetInputData(imageDataWorkingCopy.GetPointer());
   imageClip->SetOutputWholeExtent(outputWholeExtent);
   imageClip->SetClipData(true);
 

@@ -72,8 +72,7 @@ public:
     Matrix<double, 3, 3>       matcorrect;
     typename DiffusionTensor3DExtended<double>::EigenValuesArrayType eigenValues;
     typename DiffusionTensor3DExtended<double>::EigenVectorsMatrixType eigenVectors;
-    DiffusionTensor3DExtended<double> tensorDouble;
-    tensorDouble = ( DiffusionTensor3DExtended<TInput> )A;
+    DiffusionTensor3DExtended<double> tensorDouble( A );
     tensorDouble.ComputeEigenAnalysis( eigenValues, eigenVectors );
     for( int i = 0; i < 3; i++ )
       {
@@ -108,6 +107,9 @@ public:
                                                                  typename TOutputImage::PixelType> >  Superclass;
   typedef SmartPointer<Self>       Pointer;
   typedef SmartPointer<const Self> ConstPointer;
+
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(DiffusionTensor3DZeroCorrectionFilter, UnaryFunctorImageFilter);
 
   /** Method for creation through the object factory. */
   itkNewMacro( Self );

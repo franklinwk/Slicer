@@ -32,12 +32,12 @@ vtkMRMLGlyphableVolumeSliceDisplayNode::vtkMRMLGlyphableVolumeSliceDisplayNode()
 {
   this->ColorMode = this->colorModeScalar;
 
-  this->SliceImage = NULL;
-  
+  this->SliceImagePort = NULL;
+
   this->SliceToXYTransformer = vtkTransformPolyDataFilter::New();
 
   this->SliceToXYTransform = vtkTransform::New();
-  
+
   this->SliceToXYMatrix = vtkMatrix4x4::New();
   this->SliceToXYMatrix->Identity();
   this->SliceToXYTransform->PreMultiply();
@@ -57,7 +57,7 @@ vtkMRMLGlyphableVolumeSliceDisplayNode::vtkMRMLGlyphableVolumeSliceDisplayNode()
 vtkMRMLGlyphableVolumeSliceDisplayNode::~vtkMRMLGlyphableVolumeSliceDisplayNode()
 {
   this->RemoveObservers ( vtkCommand::ModifiedEvent, this->MRMLCallbackCommand );
-  this->SetSliceImage(NULL);
+  this->SetSliceImagePort(NULL);
   this->SliceToXYMatrix->Delete();
   this->SliceToXYTransform->Delete();
   this->SliceToXYTransformer->Delete();
@@ -68,7 +68,7 @@ void vtkMRMLGlyphableVolumeSliceDisplayNode::WriteXML(ostream& of, int nIndent)
 {
 
   // Write all attributes not equal to their defaults
-  
+
   Superclass::WriteXML(of, nIndent);
 
   vtkIndent indent(nIndent);
@@ -87,19 +87,19 @@ void vtkMRMLGlyphableVolumeSliceDisplayNode::ReadXMLAttributes(const char** atts
 
   const char* attName;
   const char* attValue;
-  while (*atts != NULL) 
+  while (*atts != NULL)
     {
     attName = *(atts++);
     attValue = *(atts++);
 
-    if (!strcmp(attName, "colorMode")) 
+    if (!strcmp(attName, "colorMode"))
       {
       std::stringstream ss;
       ss << attValue;
       ss >> ColorMode;
       }
 
-    }  
+    }
 
   this->EndModify(disabledModify);
 
@@ -125,7 +125,7 @@ void vtkMRMLGlyphableVolumeSliceDisplayNode::Copy(vtkMRMLNode *anode)
 void vtkMRMLGlyphableVolumeSliceDisplayNode::PrintSelf(ostream& os, vtkIndent indent)
 {
  //int idx;
-  
+
   Superclass::PrintSelf(os,indent);
   os << indent << "ColorMode:             " << this->ColorMode << "\n";
 }
@@ -151,14 +151,14 @@ void vtkMRMLGlyphableVolumeSliceDisplayNode::SetSlicePositionMatrix(vtkMatrix4x4
 }
 
 //----------------------------------------------------------------------------
-void vtkMRMLGlyphableVolumeSliceDisplayNode::SetSliceImage(vtkImageData *image)
+void vtkMRMLGlyphableVolumeSliceDisplayNode::SetSliceImagePort(vtkAlgorithmOutput *imagePort)
 {
-   vtkSetObjectBodyMacro(SliceImage,vtkImageData,image); 
+   vtkSetObjectBodyMacro(SliceImagePort,vtkAlgorithmOutput,imagePort);
 }
 
 //----------------------------------------------------------------------------
 void vtkMRMLGlyphableVolumeSliceDisplayNode
-::SetInputToPolyDataPipeline(vtkPolyData *vtkNotUsed(glyphPolyData))
+::SetInputToPolyDataPipeline(vtkAlgorithmOutput *vtkNotUsed(glyphPolyData))
 {
   vtkErrorMacro(<< this->GetClassName() <<" ("<<this
                     <<"): SetInputPolyData method should not be used");
@@ -167,29 +167,34 @@ void vtkMRMLGlyphableVolumeSliceDisplayNode
 //---------------------------------------------------------------------------
 vtkPolyData* vtkMRMLGlyphableVolumeSliceDisplayNode::GetOutputPolyData()
 {
-  if (!this->GetOutputPort())
-    {
-    return 0;
-    }
   // Don't check input polydata as it is not used, but the image data instead.
-  if (!this->GetSliceImage())
+  if (!this->GetOutputPolyDataConnection())
     {
     return 0;
     }
   return vtkPolyData::SafeDownCast(
-    this->GetOutputPort()->GetProducer()->GetOutputDataObject(
-      this->GetOutputPort()->GetIndex()));
+    this->GetOutputPolyDataConnection()->GetProducer()->GetOutputDataObject(
+      this->GetOutputPolyDataConnection()->GetIndex()));
+}
+//----------------------------------------------------------------------------
+vtkAlgorithmOutput* vtkMRMLGlyphableVolumeSliceDisplayNode
+::GetOutputPolyDataConnection()
+{
+  return 0;
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLGlyphableVolumeSliceDisplayNode::UpdatePolyDataPipeline()
+{
+  this->SliceToXYTransformer->SetInputConnection(
+    this->GetOutputPolyDataConnection());
 }
 
 //---------------------------------------------------------------------------
 vtkPolyData* vtkMRMLGlyphableVolumeSliceDisplayNode::GetSliceOutputPolyData()
 {
-  if (!this->GetSliceOutputPort())
-    {
-    return 0;
-    }
   // Don't check input polydata as it is not used, but the image data instead.
-  if (!this->GetSliceImage())
+  if (!this->GetSliceOutputPort())
     {
     return 0;
     }
@@ -199,27 +204,14 @@ vtkPolyData* vtkMRMLGlyphableVolumeSliceDisplayNode::GetSliceOutputPolyData()
 }
 
 //----------------------------------------------------------------------------
-vtkAlgorithmOutput* vtkMRMLGlyphableVolumeSliceDisplayNode::GetOutputPort()
-{
-  return 0;
-}
-
-//----------------------------------------------------------------------------
 vtkAlgorithmOutput* vtkMRMLGlyphableVolumeSliceDisplayNode::GetSliceOutputPort()
 {
   return this->SliceToXYTransformer->GetOutputPort();
 }
 
-//----------------------------------------------------------------------------
-void vtkMRMLGlyphableVolumeSliceDisplayNode::UpdatePolyDataPipeline()
-{
-  this->SliceToXYTransformer->SetInputConnection(
-    this->GetOutputPort());
-}
-
 //---------------------------------------------------------------------------
 void vtkMRMLGlyphableVolumeSliceDisplayNode::ProcessMRMLEvents ( vtkObject *caller,
-                                           unsigned long event, 
+                                           unsigned long event,
                                            void *callData )
 {
   Superclass::ProcessMRMLEvents(caller, event, callData);

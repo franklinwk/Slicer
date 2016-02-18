@@ -17,25 +17,21 @@
 
 // ITK includes
 #include <itkConfigure.h>
-#if ITK_VERSION_MAJOR > 3
-#  include <itkFactoryRegistration.h>
-#endif
+#include <itkFactoryRegistration.h>
 
 //-----------------------------------------------------------------------------
 int vtkSlicerTransformLogicTest1(int argc, char * argv [])
 {
-#if ITK_VERSION_MAJOR > 3
   itk::itkFactoryRegistration();
-#endif
 
   if(argc < 2)
     {
     std::cerr << "Missing transform file name." << std::endl;
     return EXIT_FAILURE;
     }
-    
+
   vtkMRMLScene* scene = vtkMRMLScene::New();
-  
+
   vtkSlicerTransformLogic* transformModuleLogic = vtkSlicerTransformLogic::New();
   transformModuleLogic->SetMRMLScene(scene);
   if (transformModuleLogic->GetMRMLScene() != scene)

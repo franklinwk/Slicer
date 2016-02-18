@@ -4,99 +4,49 @@ project(vtkITK)
 cmake_minimum_required(VERSION 2.8.4)
 #-----------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
-# See http://cmake.org/cmake/help/cmake-2-8-docs.html#section_Policies for details
-#-----------------------------------------------------------------------------
-if(POLICY CMP0017)
-  cmake_policy(SET CMP0017 OLD)
-endif()
-
-find_package(VTK REQUIRED)
-include(${VTK_USE_FILE})
-
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  set(ITK_IO_MODULES_USED
-    ITKIOJPEG
-    ITKIOGDCM
-    ITKIOBMP
-    ITKIOLSM
-    ITKIOPNG
-    ITKIOTIFF
-    ITKIOVTK
-    ITKIOStimulate
-    ITKIOBioRad
-    ITKIOMeta
-    ITKIONIFTI
-    ITKIONRRD
-    ITKIOGIPL
-  )
-  set(${CMAKE_PROJECT_NAME}_ITK_COMPONENTS
-    ITKAnisotropicSmoothing
-    ITKAntiAlias
-    ITKBiasCorrection
-    ITKBinaryMathematicalMorphology
-    ITKCommon
-    ITKConnectedComponents
-    ITKCurvatureFlow
-    ITKDeprecated
-    ITKDiffusionTensorImage
-    ITKDisplacementField
-    ITKDistanceMap
-    ITKFastMarching
-    ITKHDF5
-    ITKIOImageBase
-    ITKIOSpatialObjects
-    ITKIOStimulate
-    ITKIOTransformBase
-    ITKImageAdaptors
-    ITKImageCompare
-    ITKImageCompose
-    ITKImageFeature
-    ITKImageFilterBase
-    ITKImageFunction
-    ITKImageFusion
-    ITKImageGradient
-    ITKImageGrid
-    ITKImageIntensity
-    ITKImageSources
-    ITKImageStatistics
-    ITKLabelVoting
-    ITKLevelSets
-    ITKMathematicalMorphology
-    ITKMesh
-    ITKOptimizers
-    ITKPDEDeformableRegistration
-    ITKPath
-    ITKQuadEdgeMesh
-    ITKQuadEdgeMeshFiltering
-    ITKRegionGrowing
-    ITKRegistrationCommon
-    ITKSmoothing
-    ITKSpatialObjects
-    ITKStatistics
-    ITKTestKernel
-    ITKThresholding
-    ITKTransform
-    ITKV3Compatibility
-    ITKVTK
-    ITKVtkGlue
-    ITKZLIB
-    ${ITK_IO_MODULES_USED}
-    )
-  find_package(ITK COMPONENTS ${${CMAKE_PROJECT_NAME}_ITK_COMPONENTS})
-else()
-  find_package(ITK REQUIRED)
-endif()
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
-  list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
-  list(APPEND ITK_INCLUDE_DIRS ${ITKFactoryRegistration_INCLUDE_DIRS})
-endif()
-include(${ITK_USE_FILE})
-
+# --------------------------------------------------------------------------
+# Options
+# --------------------------------------------------------------------------
 if(NOT DEFINED BUILD_SHARED_LIBS)
   option(BUILD_SHARED_LIBS "Build with shared libraries." ON)
 endif()
+
+# --------------------------------------------------------------------------
+# Dependencies
+# --------------------------------------------------------------------------
+
+#
+# VTK
+#
+#find_package(VTK REQUIRED)
+#include(${VTK_USE_FILE})
+
+#
+# ITK
+#
+set(${PROJECT_NAME}_ITK_COMPONENTS
+  ITKAnisotropicSmoothing
+  ITKCommon
+  ITKConnectedComponents
+  ITKDistanceMap
+  ITKIOGDCM
+  ITKIOGE
+  ITKIOImageBase
+  ITKImageCompose
+  ITKImageFilterBase
+  ITKImageFunction
+  ITKImageGrid
+  ITKLabelMap
+  ITKPath
+  ITKRegionGrowing
+  ITKThresholding
+  ITKVTK
+  )
+find_package(ITK 4.6 COMPONENTS ${${PROJECT_NAME}_ITK_COMPONENTS} REQUIRED)
+set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
+list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
+list(APPEND ITK_INCLUDE_DIRS ${ITKFactoryRegistration_INCLUDE_DIRS})
+include(${ITK_USE_FILE})
 
 # --------------------------------------------------------------------------
 # Include dirs
@@ -149,7 +99,6 @@ set(vtkITK_SRCS
   vtkITKLevelTracing3DImageFilter.cxx
   vtkITKWandImageFilter.cxx
   vtkITKNewOtsuThresholdImageFilter.cxx
-  vtkITKBSplineTransform.cxx
   vtkITKTimeSeriesDatabase.cxx
   vtkITKIslandMath.cxx
   vtkITKGrowCutSegmentationImageFilter.cxx
@@ -188,8 +137,6 @@ set(lib_name ${PROJECT_NAME})
 set(srcs ${vtkITK_SRCS})
 add_library(${lib_name} ${srcs})
 
-set(VTK_LIBRARIES vtkCommon vtkFiltering vtkImaging)
-
 set(libs
   ${ITK_LIBRARIES}
   ${VTK_LIBRARIES}
@@ -199,6 +146,16 @@ target_link_libraries(${lib_name} ${libs})
 # Apply user-defined properties to the library target.
 if(Slicer_LIBRARY_PROPERTIES)
   set_target_properties(${lib_name} PROPERTIES ${Slicer_LIBRARY_PROPERTIES})
+endif()
+
+# --------------------------------------------------------------------------
+# Folder
+# --------------------------------------------------------------------------
+if(NOT DEFINED ${PROJECT_NAME}_FOLDER)
+  set(${PROJECT_NAME}_FOLDER ${PROJECT_NAME})
+endif()
+if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+  set_target_properties(${lib_name} PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
 endif()
 
 # --------------------------------------------------------------------------
@@ -237,6 +194,11 @@ if(VTK_WRAP_PYTHON)
     )
   # Export target
   export(TARGETS ${lib_name}Python ${lib_name}PythonD APPEND FILE ${${PROJECT_NAME}_EXPORT_FILE})
+  # Folder
+  if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+    set_target_properties(${lib_name}Python PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+    set_target_properties(${lib_name}PythonD PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+  endif()
 endif()
 
 # --------------------------------------------------------------------------

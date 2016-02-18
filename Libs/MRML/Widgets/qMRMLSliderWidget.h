@@ -66,7 +66,8 @@ class QMRML_WIDGETS_EXPORT qMRMLSliderWidget : public ctkSliderWidget
   /// Get/Set the properties that will be determined by units.
   /// If a property is aware of units, it will update itself to the unit's
   /// property value automaticaly. Otherwise, this property is left to be
-  /// changed by its accessors. All flags are on by default.
+  /// changed by its accessors. All flags except MinimumValue and MaximumValue
+  /// are on by default.
   /// \sa setQuantity(), quantity()
   // \sa setUnitAwareProperties(), unitAwareProperties()
   Q_FLAGS(UnitAwareProperty UnitAwareProperties)
@@ -96,9 +97,20 @@ public:
   /// \sa setMRMLScene()
   Q_INVOKABLE vtkMRMLScene* mrmlScene()const;
 
+  /// Get the quantity property value.
+  /// \sa quantity
   QString quantity()const;
 
+  /// Get the unitAwareProperties property value.
+  /// \sa unitAwareProperties
   UnitAwareProperties unitAwareProperties()const;
+
+  /// Reimplemented for internal reasons.
+  /// \sa ctkSliderWidget::setMinimum(), ctkSliderWidget::setMaximum(),
+  /// ctkSliderWidget::setRange()
+  virtual void setMinimum(double);
+  virtual void setMaximum(double);
+  virtual void setRange(double, double);
 
 public slots:
   void setQuantity(const QString& baseName);

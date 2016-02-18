@@ -25,30 +25,32 @@
      PURPOSE.  See the above copyright notice for more information.
 
 =========================================================================*/
+// vtkTeem includes
 #include "vtkNRRDReader.h"
 
-
-#include "vtkMath.h"
-#include "vtkObjectFactory.h"
-#include "vtkImageData.h"
-
-
+// VTK includes
 #include "vtkBitArray.h"
-#include "vtkUnsignedCharArray.h"
 #include "vtkCharArray.h"
-#include "vtkUnsignedShortArray.h"
-#include "vtkShortArray.h"
-#include "vtkUnsignedIntArray.h"
-#include "vtkIntArray.h"
-#include "vtkUnsignedLongArray.h"
-#include "vtkLongArray.h"
 #include "vtkDoubleArray.h"
 #include "vtkFloatArray.h"
+#include "vtkImageData.h"
+#include <vtkInformation.h>
+#include <vtkInformationVector.h>
+#include "vtkIntArray.h"
+#include "vtkLongArray.h"
+#include "vtkMath.h"
+#include "vtkObjectFactory.h"
+#include "vtkShortArray.h"
+#include <vtkStreamingDemandDrivenPipeline.h>
+#include "vtkUnsignedCharArray.h"
+#include "vtkUnsignedShortArray.h"
+#include "vtkUnsignedIntArray.h"
+#include "vtkUnsignedLongArray.h"
 #include <vtksys/SystemTools.hxx>
 
+// Teem includes
 #include "teem/ten.h"
 
-vtkCxxRevisionMacro(vtkNRRDReader, "$Revision: 1.7.2.1 $");
 vtkStandardNewMacro(vtkNRRDReader);
 
 vtkNRRDReader::vtkNRRDReader()
@@ -61,6 +63,9 @@ vtkNRRDReader::vtkNRRDReader()
   nrrd = nrrdNew();
   UseNativeOrigin = true;
   ReadStatus = 0;
+  PointDataType = -1;
+  DataType = -1;
+  NumberOfComponents = -1;
 }
 
 vtkNRRDReader::~vtkNRRDReader()
@@ -426,12 +431,13 @@ void vtkNRRDReader::ExecuteInformation()
 
    // Set type information
    this->SetDataType(this->NrrdToVTKScalarType(this->nrrd->type) );
+   this->SetDataScalarType( this->NrrdToVTKScalarType(this->nrrd->type) );
 
    // Set axis information
    int dataExtent[6];
-   vtkFloatingPointType spacings[3];
+   double spacings[3];
    double spacing;
-   vtkFloatingPointType origin[3];
+   double origin[3];
 
    double spaceDir[NRRD_SPACE_DIM_MAX];
    int spacingStatus;
@@ -637,9 +643,7 @@ void vtkNRRDReader::ExecuteInformation()
    nio = nrrdIoStateNix(nio);
 }
 
-
-vtkImageData *vtkNRRDReader::AllocateOutputData(vtkDataObject *out) {
-
+vtkImageData *vtkNRRDReader::AllocateOutputData(vtkDataObject *out, vtkInformation* outInfo){
  vtkImageData *res = vtkImageData::SafeDownCast(out);
   if (!res)
     {
@@ -653,14 +657,14 @@ vtkImageData *vtkNRRDReader::AllocateOutputData(vtkDataObject *out) {
   // before the execute.
   this->ExecuteInformation();
 
-  res->SetExtent(res->GetUpdateExtent());
-  this->AllocatePointData(res);
+  res->SetExtent(this->GetUpdateExtent());
+  this->AllocatePointData(res, outInfo);
 
   return res;
 
 }
 
-void vtkNRRDReader::AllocatePointData(vtkImageData *out) {
+void vtkNRRDReader::AllocatePointData(vtkImageData *out, vtkInformation* outInfo) {
 
  vtkDataArray *pd = NULL;
  int Extent[6];
@@ -745,7 +749,8 @@ void vtkNRRDReader::AllocatePointData(vtkImageData *out) {
       vtkErrorMacro("Could not allocate data type.");
       return;
     }
-  out->SetScalarType(this->DataType);
+  vtkDataObject::SetPointDataActiveScalarInfo(outInfo,
+    this->DataType, this->GetNumberOfComponents());
   pd->SetNumberOfComponents(this->GetNumberOfComponents());
 
   // allocate enough memors
@@ -756,7 +761,8 @@ void vtkNRRDReader::AllocatePointData(vtkImageData *out) {
     switch (this->PointDataType) {
     case vtkDataSetAttributes::SCALARS:
        out->GetPointData()->SetScalars(pd);
-       out->SetNumberOfScalarComponents(this->GetNumberOfComponents());
+       vtkDataObject::SetPointDataActiveScalarInfo(outInfo,
+         this->DataType, this->GetNumberOfComponents());
        break;
     case vtkDataSetAttributes::VECTORS:
        out->GetPointData()->SetVectors(pd);
@@ -849,11 +855,10 @@ vtkNRRDReader::tenSpaceDirectionReduce(Nrrd *nout, const Nrrd *nin, double SD[9]
 //----------------------------------------------------------------------------
 // This function reads a data from a file.  The datas extent/axes
 // are assumed to be the same as the file extent/order.
-void vtkNRRDReader::ExecuteData(vtkDataObject *output)
+void vtkNRRDReader::ExecuteDataWithInformation(vtkDataObject *output, vtkInformation* outInfo)
 {
-
-  output->SetUpdateExtentToWholeExtent();
-  vtkImageData *data = this->AllocateOutputData(output);
+  this->SetUpdateExtentToWholeExtent();
+  vtkImageData *data = this->AllocateOutputData(output, outInfo);
 
   if (this->GetFileName() == NULL)
     {

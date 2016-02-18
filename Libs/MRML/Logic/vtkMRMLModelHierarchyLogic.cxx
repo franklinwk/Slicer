@@ -26,7 +26,6 @@
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
 
-vtkCxxRevisionMacro(vtkMRMLModelHierarchyLogic, "$Revision: 12142 $");
 vtkStandardNewMacro(vtkMRMLModelHierarchyLogic);
 
 // The number should large enough so smaller branches can be shown/hidden
@@ -82,10 +81,10 @@ int vtkMRMLModelHierarchyLogic::UpdateModelToHierarchyMap()
   else if (this->GetMRMLScene()->GetNodes()->GetMTime() > this->ModelHierarchyNodesMTime)
   {
     this->ModelHierarchyNodes.clear();
-    
+
     std::vector<vtkMRMLNode *> nodes;
     int nnodes = this->GetMRMLScene()->GetNodesByClass("vtkMRMLModelHierarchyNode", nodes);
-  
+
     for (int i=0; i<nnodes; i++)
       {
       vtkMRMLModelHierarchyNode *node =  vtkMRMLModelHierarchyNode::SafeDownCast(nodes[i]);
@@ -111,9 +110,9 @@ vtkMRMLModelHierarchyNode* vtkMRMLModelHierarchyLogic::GetModelHierarchyNode(con
     return 0;
     }
   this->UpdateModelToHierarchyMap();
-  
+
   std::map<std::string, vtkMRMLModelHierarchyNode *>::iterator iter;
-  
+
   iter = this->ModelHierarchyNodes.find(modelNodeID);
   if (iter != this->ModelHierarchyNodes.end())
     {
@@ -123,7 +122,6 @@ vtkMRMLModelHierarchyNode* vtkMRMLModelHierarchyLogic::GetModelHierarchyNode(con
     {
     return 0;
     }
-  
 }
 //----------------------------------------------------------------------------
 void vtkMRMLModelHierarchyLogic::GetHierarchyChildrenNodes(
@@ -135,10 +133,10 @@ void vtkMRMLModelHierarchyLogic::GetHierarchyChildrenNodes(
     return;
     }
   this->UpdateHierarchyChildrenMap();
-  
-  HierarchyChildrenNodesType::iterator iter = 
+
+  HierarchyChildrenNodesType::iterator iter =
     this->HierarchyChildrenNodes.find(std::string(parentNode->GetID()));
-  if (iter == this->HierarchyChildrenNodes.end()) 
+  if (iter == this->HierarchyChildrenNodes.end())
     {
     return;
     }
@@ -158,13 +156,13 @@ vtkMRMLModelHierarchyNodeList vtkMRMLModelHierarchyLogic
   if (!parentNode)
     {
     return childrenNodes;
-    } 
+    }
 
   this->UpdateHierarchyChildrenMap();
-  
+
   HierarchyChildrenNodesType::iterator iter =
     this->HierarchyChildrenNodes.find(std::string(parentNode->GetID()));
-  if (iter == this->HierarchyChildrenNodes.end()) 
+  if (iter == this->HierarchyChildrenNodes.end())
     {
     return childrenNodes;
     }
@@ -175,12 +173,12 @@ vtkMRMLModelHierarchyNodeList vtkMRMLModelHierarchyLogic
   return childrenNodes;
 }
 
-
 //----------------------------------------------------------------------------
 void vtkMRMLModelHierarchyLogic::UpdateHierarchyChildrenMap()
 {
+  // Clear cache if scene is invalid
   std::map<std::string, std::vector< vtkMRMLModelHierarchyNode *> >::iterator iter;
-  if (this->GetMRMLScene() == 0)
+  if (!this->GetMRMLScene())
     {
     for (iter  = this->HierarchyChildrenNodes.begin();
          iter != this->HierarchyChildrenNodes.end();
@@ -189,52 +187,57 @@ void vtkMRMLModelHierarchyLogic::UpdateHierarchyChildrenMap()
       iter->second.clear();
       }
     this->HierarchyChildrenNodes.clear();
+    return;
     }
-    
-  if (this->GetMRMLScene() &&
-      (this->GetMRMLScene()->GetNodes()->GetMTime() > this->HierarchyChildrenNodesMTime))
+
+  // Skip update if nodes were not modified since last update
+  if (this->GetMRMLScene()->GetNodes()->GetMTime() <= this->HierarchyChildrenNodesMTime)
     {
-    for (iter  = this->HierarchyChildrenNodes.begin();
-         iter != this->HierarchyChildrenNodes.end();
-         iter++)
+    return;
+    }
+
+  // Clear hierarchy children nodes cache
+  for (iter  = this->HierarchyChildrenNodes.begin();
+       iter != this->HierarchyChildrenNodes.end();
+       iter++)
+    {
+    iter->second.clear();
+    }
+  this->HierarchyChildrenNodes.clear();
+
+  // Update hierarchy children nodes cache
+  std::vector<vtkMRMLNode *> nodes;
+  int nnodes = this->GetMRMLScene()->GetNodesByClass("vtkMRMLModelHierarchyNode", nodes);
+
+  for (int i=0; i<nnodes; i++)
+    {
+    vtkMRMLModelHierarchyNode *node =  vtkMRMLModelHierarchyNode::SafeDownCast(nodes[i]);
+    if (node)
       {
-      iter->second.clear();
-      }
-    this->HierarchyChildrenNodes.clear();
-    
-    std::vector<vtkMRMLNode *> nodes;
-    int nnodes = this->GetMRMLScene()->GetNodesByClass("vtkMRMLModelHierarchyNode", nodes);
-  
-    for (int i=0; i<nnodes; i++)
-      {
-      vtkMRMLModelHierarchyNode *node =  vtkMRMLModelHierarchyNode::SafeDownCast(nodes[i]);
-      if (node)
+      vtkMRMLModelHierarchyNode *pnode = vtkMRMLModelHierarchyNode::SafeDownCast(node->GetParentNode());
+      if (pnode)
         {
-        vtkMRMLModelHierarchyNode *pnode = vtkMRMLModelHierarchyNode::SafeDownCast(node->GetParentNode());
-        if (pnode)
+        iter = this->HierarchyChildrenNodes.find(std::string(pnode->GetID()));
+        if (iter == this->HierarchyChildrenNodes.end())
           {
-          iter = this->HierarchyChildrenNodes.find(std::string(pnode->GetID()));
-          if (iter == this->HierarchyChildrenNodes.end())
-            {
-            std::vector< vtkMRMLModelHierarchyNode *> children;
-            children.push_back(node);
-            this->HierarchyChildrenNodes[std::string(pnode->GetID())] = children;
-            }
-          else
-            {
-            iter->second.push_back(node);
-            }
+          std::vector< vtkMRMLModelHierarchyNode *> children;
+          children.push_back(node);
+          this->HierarchyChildrenNodes[std::string(pnode->GetID())] = children;
+          }
+        else
+          {
+          iter->second.push_back(node);
           }
         }
       }
-    this->HierarchyChildrenNodesMTime = this->GetMRMLScene()->GetNodes()->GetMTime();
     }
+  this->HierarchyChildrenNodesMTime = this->GetMRMLScene()->GetNodes()->GetMTime();
 }
-
 
 //----------------------------------------------------------------------------
 void vtkMRMLModelHierarchyLogic::SetChildrenVisibility(vtkMRMLDisplayableHierarchyNode *displayableHierarchyNode,
-                                                      int visibility)
+                                                       const char *displayableNodeClass, const char *displayNodeClass,
+                                                       int visibility)
 {
   if (displayableHierarchyNode==NULL)
   {
@@ -254,7 +257,7 @@ void vtkMRMLModelHierarchyLogic::SetChildrenVisibility(vtkMRMLDisplayableHierarc
   // When there are many child nodes in a hierarchy then show/hide is much more efficient if batch processing is enabled.
   // However, if there are few nodes only then a full refresh at the end of a batch processing takes longer than doing
   // the update on each node separately.
-  bool batchProcess = (children.size() > vtkMRMLModelHierarchyLogic::ChildrenVisibilitySetBatchUpdateThreshold);
+  bool batchProcess = (static_cast<int>(children.size()) > vtkMRMLModelHierarchyLogic::ChildrenVisibilitySetBatchUpdateThreshold);
   vtkMRMLScene* scene=NULL;
   if (batchProcess)
     {
@@ -280,18 +283,24 @@ void vtkMRMLModelHierarchyLogic::SetChildrenVisibility(vtkMRMLDisplayableHierarc
       model = vtkMRMLModelNode::SafeDownCast(node);
       if (model)
         {
-        displayNode = model->GetDisplayNode();
-        if (displayNode)
+        if (displayableNodeClass && model->IsA(displayableNodeClass))
           {
-          displayNode->SetVisibility(visibility);
+          model->SetDisplayClassVisibility(displayNodeClass, visibility);
+          }
+        else
+          {
+          model->SetDisplayClassVisibility(0, visibility);
           }
         }
       }
     vtkMRMLDisplayableHierarchyNode *dhnode = vtkMRMLDisplayableHierarchyNode::SafeDownCast(children[i]);
-    displayNode = dhnode->GetDisplayNode();
-    if (displayNode)
+    if (dhnode)
       {
-      displayNode->SetVisibility(visibility);
+      displayNode = dhnode->GetDisplayNode();
+      if (displayNode)
+        {
+        displayNode->SetVisibility(visibility);
+        }
       }
     }
   if (batchProcess && scene!=NULL)

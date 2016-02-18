@@ -1,6 +1,6 @@
 import os
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # RSNAQuantTutorial
@@ -144,40 +144,7 @@ class RSNAQuantTutorialWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="RSNAQuantTutorial"):
     self.onReload()
@@ -207,7 +174,7 @@ class RSNAQuantTutorialLogic:
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -245,24 +212,26 @@ class RSNAQuantTutorialTest(unittest.TestCase):
     lm = slicer.app.layoutManager()
     # switch on the type to get the requested window
     widget = 0
-    if type == -1:
-      # full window
-      widget = slicer.util.mainWindow()
-    elif type == slicer.qMRMLScreenShotDialog().FullLayout:
+    if type == slicer.qMRMLScreenShotDialog.FullLayout:
       # full layout
       widget = lm.viewport()
-    elif type == slicer.qMRMLScreenShotDialog().ThreeD:
+    elif type == slicer.qMRMLScreenShotDialog.ThreeD:
       # just the 3D window
       widget = lm.threeDWidget(0).threeDView()
-    elif type == slicer.qMRMLScreenShotDialog().Red:
+    elif type == slicer.qMRMLScreenShotDialog.Red:
       # red slice window
       widget = lm.sliceWidget("Red")
-    elif type == slicer.qMRMLScreenShotDialog().Yellow:
+    elif type == slicer.qMRMLScreenShotDialog.Yellow:
       # yellow slice window
       widget = lm.sliceWidget("Yellow")
-    elif type == slicer.qMRMLScreenShotDialog().Green:
+    elif type == slicer.qMRMLScreenShotDialog.Green:
       # green slice window
       widget = lm.sliceWidget("Green")
+    else:
+      # default to using the full window
+      widget = slicer.util.mainWindow()
+      # reset the type so that the node is set correctly
+      type = slicer.qMRMLScreenShotDialog.FullLayout
 
     # grab and convert to vtk image data
     qpixMap = qt.QPixmap().grabWidget(widget)
@@ -289,7 +258,7 @@ class RSNAQuantTutorialTest(unittest.TestCase):
     modifiers : list containing zero or more of "Shift" or "Control"
     """
     style = widget.interactorStyle()
-    interator = style.GetInteractor()
+    interactor = style.GetInteractor()
     if button == 'Left':
       down = style.OnLeftButtonDown
       up = style.OnLeftButtonUp
@@ -305,20 +274,20 @@ class RSNAQuantTutorialTest(unittest.TestCase):
     else:
       raise Exception("Bad button - should be Left or Right, not %s" % button)
     if 'Shift' in modifiers:
-      interator.SetShiftKey(1)
+      interactor.SetShiftKey(1)
     if 'Control' in modifiers:
-      interator.SetControlKey(1)
-    interator.SetEventPosition(*start)
+      interactor.SetControlKey(1)
+    interactor.SetEventPosition(*start)
     down()
     for step in xrange(steps):
       frac = float(step)/steps
       x = int(start[0] + frac*(end[0]-start[0]))
       y = int(start[1] + frac*(end[1]-start[1]))
-      interator.SetEventPosition(x,y)
+      interactor.SetEventPosition(x,y)
       style.OnMouseMove()
     up()
-    interator.SetShiftKey(0)
-    interator.SetControlKey(0)
+    interactor.SetShiftKey(0)
+    interactor.SetControlKey(0)
 
 
   def runTest(self):
@@ -617,9 +586,9 @@ class RSNAQuantTutorialTest(unittest.TestCase):
       self.delayDisplay('Crosshairs')
       compareWidget = layoutManager.sliceWidget('Compare1')
       style = compareWidget.interactorStyle()
-      interator = style.GetInteractor()
+      interactor = style.GetInteractor()
       for step in xrange(100):
-        interator.SetEventPosition(10,step)
+        interactor.SetEventPosition(10,step)
         style.OnMouseMove()
 
       self.delayDisplay('Zoom')

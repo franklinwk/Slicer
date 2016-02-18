@@ -17,7 +17,7 @@
 
 #include "vtkTeemConfigure.h"
 
-#include "vtkImageToImageFilter.h"
+#include "vtkThreadedImageAlgorithm.h"
 
 /// \brief Six scalar components to tensor.
 ///
@@ -28,19 +28,19 @@
 /// 3 5 6
 ///
 /// \sa vtkImageGetTensorComponents
-class VTK_TEEM_EXPORT vtkImageSetTensorComponents : public vtkImageToImageFilter
+class VTK_TEEM_EXPORT vtkImageSetTensorComponents : public vtkThreadedImageAlgorithm
 {
 public:
   static vtkImageSetTensorComponents *New();
-  vtkTypeMacro(vtkImageSetTensorComponents,vtkImageToImageFilter);
+  vtkTypeMacro(vtkImageSetTensorComponents,vtkThreadedImageAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
 
-  /// 
+  ///
   /// Set/Get the components to extract.
   vtkGetVector3Macro(Components,int);
-  
-  /// 
-  /// Get the number of components to extract. This is set implicitly by the 
+
+  ///
+  /// Get the number of components to extract. This is set implicitly by the
   /// SetComponents() method.
   vtkGetMacro(NumberOfComponents,int);
 
@@ -51,14 +51,14 @@ protected:
   int NumberOfComponents;
   int Components[3];
 
-  void ExecuteInformation(vtkImageData *inData, vtkImageData *outData);
-  void ExecuteInformation(){this->vtkImageToImageFilter::ExecuteInformation();};
-  void ThreadedExecute(vtkImageData *inData, vtkImageData *outData, 
+  virtual int RequestInformation(vtkInformation *, vtkInformationVector **, vtkInformationVector *);
+
+  void ThreadedExecute(vtkImageData *inData, vtkImageData *outData,
                        int ext[6], int id);
 
   /// We override this in order to allocate output tensors
-  /// before threading happens.  This replaces the superclass 
-  /// vtkImageMultipleInputFilter's Execute function.
+  /// before threading happens.  This replaces the superclass
+  /// vtkImageAlgorithm's Execute function.
   void ExecuteData(vtkDataObject *out);
 
 //private:

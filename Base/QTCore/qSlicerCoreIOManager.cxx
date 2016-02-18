@@ -35,10 +35,13 @@
 #include <vtkMRMLNode.h>
 #include <vtkMRMLScene.h>
 #include <vtkMRMLStorableNode.h>
+#include <vtkMRMLStorageNode.h>
 
 // VTK includes
 #include <vtkCollection.h>
+#include <vtkDataFileFormatHelper.h> // for GetFileExtensionFromFormatString()
 #include <vtkNew.h>
+#include <vtkStringArray.h>
 
 //-----------------------------------------------------------------------------
 class qSlicerCoreIOManagerPrivate
@@ -303,6 +306,80 @@ QStringList qSlicerCoreIOManager::fileWriterExtensions(
 }
 
 //-----------------------------------------------------------------------------
+QStringList qSlicerCoreIOManager::allWritableFileExtensions()const
+{
+  Q_D(const qSlicerCoreIOManager);
+
+  QStringList extensions;
+
+  if (!d->currentScene())
+    {
+    qWarning() << "allWritableFileExtensions: manager has no scene defined";
+    return extensions;
+    }
+  // check for all extensions that can be used to write storable nodes
+  int numRegisteredNodeClasses = d->currentScene()->GetNumberOfRegisteredNodeClasses();
+  for (int i = 0; i < numRegisteredNodeClasses; ++i)
+    {
+    vtkMRMLNode *mrmlNode = d->currentScene()->GetNthRegisteredNodeClass(i);
+    if (mrmlNode && mrmlNode->IsA("vtkMRMLStorageNode"))
+      {
+      vtkMRMLStorageNode* snode = vtkMRMLStorageNode::SafeDownCast(mrmlNode);
+      if (snode)
+        {
+        const int formatCount = snode->GetSupportedWriteFileTypes()->GetNumberOfValues();
+        for (int formatIt = 0; formatIt < formatCount; ++formatIt)
+          {
+          vtkStdString format = snode->GetSupportedWriteFileTypes()->GetValue(formatIt);
+          QString extension = QString::fromStdString(
+                 vtkDataFileFormatHelper::GetFileExtensionFromFormatString(format));
+          extensions << extension;
+          }
+        }
+      }
+    }
+  extensions.removeDuplicates();
+  return extensions;
+}
+
+//-----------------------------------------------------------------------------
+QStringList qSlicerCoreIOManager::allReadableFileExtensions()const
+{
+  Q_D(const qSlicerCoreIOManager);
+
+  QStringList extensions;
+
+  if (!d->currentScene())
+    {
+    qWarning() << "allReadableFileExtensions: manager has no scene defined";
+    return extensions;
+    }
+  // check for all extensions that can be used to read storable nodes
+  int numRegisteredNodeClasses = d->currentScene()->GetNumberOfRegisteredNodeClasses();
+  for (int i = 0; i < numRegisteredNodeClasses; ++i)
+    {
+    vtkMRMLNode *mrmlNode = d->currentScene()->GetNthRegisteredNodeClass(i);
+    if (mrmlNode && mrmlNode->IsA("vtkMRMLStorageNode"))
+      {
+      vtkMRMLStorageNode* snode = vtkMRMLStorageNode::SafeDownCast(mrmlNode);
+      if (snode)
+        {
+        const int formatCount = snode->GetSupportedReadFileTypes()->GetNumberOfValues();
+        for (int formatIt = 0; formatIt < formatCount; ++formatIt)
+          {
+          vtkStdString format = snode->GetSupportedReadFileTypes()->GetValue(formatIt);
+          QString extension = QString::fromStdString(
+                 vtkDataFileFormatHelper::GetFileExtensionFromFormatString(format));
+          extensions << extension;
+          }
+        }
+      }
+    }
+  extensions.removeDuplicates();
+  return extensions;
+}
+
+//-----------------------------------------------------------------------------
 qSlicerIOOptions* qSlicerCoreIOManager::fileOptions(const QString& readerDescription)const
 {
   Q_D(const qSlicerCoreIOManager);
@@ -333,6 +410,35 @@ qSlicerIOOptions* qSlicerCoreIOManager::fileWriterOptions(
       }
     }
   return bestWriter ? bestWriter->options() : 0;
+}
+
+//-----------------------------------------------------------------------------
+QString qSlicerCoreIOManager::completeSlicerWritableFileNameSuffix(const QString &fileName)const
+{
+  // first get all possible Slicer file extensions
+  QStringList allExtensions = qSlicerCoreIOManager::allWritableFileExtensions();
+  // then iterate through them to find one that matches
+  foreach (QString extension, allExtensions)
+    {
+    // check if this extension is at the end of the file name
+    if (fileName.endsWith(extension))
+      {
+      return extension;
+      }
+    }
+  if (allExtensions.contains(QString(".*")))
+    {
+    // if the .* option is in the valid extensions list,
+    // use the QFileInfo complete suffix. That will return
+    // a string of everything following the first '.', then
+    // prepend the dot to match the extensions returned from above
+    QString suffix = QString (".") + QFileInfo(fileName).completeSuffix();
+    qDebug() << "Slicer extension not found in file name " << fileName
+             << ", returning Qt complete suffix as .* case " << suffix;
+    return suffix;
+    }
+  // otherwise return an empty suffix
+  return QString (".");
 }
 
 //-----------------------------------------------------------------------------
@@ -385,8 +491,8 @@ bool qSlicerCoreIOManager::loadNodes(const qSlicerIO::IOFileType& fileType,
     }
   Q_ASSERT(!parameters["fileName"].toString().isEmpty());
 
-  qSlicerIO::IOProperties parametersWithFileType = parameters;
-  parametersWithFileType.insert("fileType", fileType);
+  qSlicerIO::IOProperties loadedFileParameters = parameters;
+  loadedFileParameters.insert("fileType", fileType);
 
   const QList<qSlicerFileReader*>& readers = this->readers(fileType);
 
@@ -412,7 +518,9 @@ bool qSlicerCoreIOManager::loadNodes(const qSlicerIO::IOFileType& fileType,
     break;
     }
 
-  emit newFileLoaded(parametersWithFileType);
+  loadedFileParameters.insert("nodeIDs", nodes);
+
+  emit newFileLoaded(loadedFileParameters);
 
   if (loadedNodes)
     {
@@ -459,6 +567,30 @@ vtkMRMLNode* qSlicerCoreIOManager::loadNodesAndGetFirst(
 }
 
 //-----------------------------------------------------------------------------
+vtkMRMLStorageNode* qSlicerCoreIOManager::createAndAddDefaultStorageNode(
+    vtkMRMLStorableNode* node)
+{
+  vtkMRMLStorageNode* snode = node ? node->GetStorageNode() : 0;
+  if (snode == 0 && node != 0)
+    {
+    snode = node->CreateDefaultStorageNode();
+    if (snode != 0)
+      {
+      node->GetScene()->AddNode(snode);
+      snode->Delete();
+      node->SetAndObserveStorageNodeID(snode->GetID());
+      }
+    }
+  return snode;
+}
+
+//-----------------------------------------------------------------------------
+void qSlicerCoreIOManager::emitNewFileLoaded(const QVariantMap& loadedFileParameters)
+{
+  emit this->newFileLoaded(loadedFileParameters);
+}
+
+//-----------------------------------------------------------------------------
 bool qSlicerCoreIOManager::saveNodes(qSlicerIO::IOFileType fileType,
                                      const qSlicerIO::IOProperties& parameters)
 {
@@ -469,8 +601,15 @@ bool qSlicerCoreIOManager::saveNodes(qSlicerIO::IOFileType fileType,
   // HACK - See http://www.na-mic.org/Bug/view.php?id=3322
   //        Sort writers to ensure generic ones are last.
   const QList<qSlicerFileWriter*> writers = d->writers(fileType, parameters);
+  if (writers.isEmpty())
+    {
+    qWarning() << "No writer found to write file" << parameters.value("fileName")
+               << "of type" << fileType;
+    return false;
+    }
 
   QStringList nodes;
+  bool writeSuccess=false;
   foreach (qSlicerFileWriter* writer, writers)
     {
     writer->setMRMLScene(d->currentScene());
@@ -479,24 +618,35 @@ bool qSlicerCoreIOManager::saveNodes(qSlicerIO::IOFileType fileType,
       continue;
       }
     nodes << writer->writtenNodes();
+    writeSuccess = true;
     break;
+    }
+
+  if (!writeSuccess)
+    {
+    // no appropriate writer was found
+    return false;
     }
 
   if (nodes.count() == 0 &&
       fileType != QString("SceneFile"))
     {
+    // the writer did not report error
+    // but did not report any successfully written nodes either
     return false;
     }
 
-  //if (savedNodes)
-  //{
-  //foreach(const QString& node, nodes)
-  //{
-  //loadedNodes->AddItem(
-  //d->currentScene()->GetNodeByID(node.toLatin1()));
-  //}
-  //}
   return true;
+}
+
+//-----------------------------------------------------------------------------
+bool qSlicerCoreIOManager::saveScene(const QString& fileName, QImage screenShot)
+{
+  qSlicerIO::IOProperties properties;
+  properties["fileName"] = fileName;
+  properties["screenShot"] = screenShot;
+
+  return this->saveNodes(QString("SceneFile"), properties);
 }
 
 //-----------------------------------------------------------------------------

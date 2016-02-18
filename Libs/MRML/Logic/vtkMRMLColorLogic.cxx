@@ -21,6 +21,7 @@
 #include "vtkMRMLFreeSurferProceduralColorNode.h"
 #include "vtkMRMLdGEMRICProceduralColorNode.h"
 #include "vtkMRMLPETProceduralColorNode.h"
+#include "vtkMRMLProceduralColorStorageNode.h"
 #include "vtkMRMLScene.h"
 
 // VTK sys includes
@@ -33,12 +34,74 @@
 #include <vtkObjectFactory.h>
 
 // STD includes
+#include <algorithm>
 #include <cassert>
+#include <ctype.h> // For isspace
+#include <functional>
+#include <sstream>
 
+//----------------------------------------------------------------------------
 std::string vtkMRMLColorLogic::TempColorNodeID;
 
-vtkCxxRevisionMacro(vtkMRMLColorLogic, "$Revision$");
+//----------------------------------------------------------------------------
 vtkStandardNewMacro(vtkMRMLColorLogic);
+
+//----------------------------------------------------------------------------
+const char * vtkMRMLColorLogic::DEFAULT_TERMINOLOGY_NAME = "GenericAnatomyColors";
+
+//----------------------------------------------------------------------------
+void vtkMRMLColorLogic::StandardTerm::Print(std::ostream& os)
+{
+  vtkIndent indent;
+  this->PrintSelf(os, indent.GetNextIndent());
+}
+
+//----------------------------------------------------------------------------
+std::ostream& vtkMRMLColorLogic::StandardTerm::operator<<(std::ostream& os)
+{
+  this->Print(os);
+  return os;
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLColorLogic::StandardTerm::PrintSelf(std::ostream &os, vtkIndent indent)
+{
+  os << indent << "Code value: " << CodeValue.c_str() << std::endl
+     << indent << "Code scheme designator: " << CodingSchemeDesignator.c_str() << std::endl
+     << indent << "Code meaning: " << CodeMeaning.c_str()
+     << std::endl;
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLColorLogic::ColorLabelCategorization::Print(std::ostream& os)
+{
+  vtkIndent indent;
+  this->PrintSelf(os, indent.GetNextIndent());
+}
+
+//----------------------------------------------------------------------------
+std::ostream& vtkMRMLColorLogic::ColorLabelCategorization::operator<<(std::ostream& os)
+{
+  this->Print(os);
+  return os;
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLColorLogic::ColorLabelCategorization::PrintSelf(ostream &os, vtkIndent indent)
+{
+  os << "Label: " << LabelValue << std::endl;
+  os << "Segmented property category:\n";
+  SegmentedPropertyCategory.PrintSelf(os, indent);
+  os << "Segmented property type:\n";
+  SegmentedPropertyType.PrintSelf(os, indent);
+  os << "Segmented property type modifier:\n";
+  SegmentedPropertyTypeModifier.PrintSelf(os, indent);
+  os << "Anatomic region:\n";
+  AnatomicRegion.PrintSelf(os, indent);
+  os << "Antatomic region modifier:\n";
+  AnatomicRegionModifier.PrintSelf(os, indent);
+  os << std::endl;
+}
 
 //----------------------------------------------------------------------------
 vtkMRMLColorLogic::vtkMRMLColorLogic()
@@ -54,6 +117,7 @@ vtkMRMLColorLogic::~vtkMRMLColorLogic()
 
   // clear out the lists of files
   this->ColorFiles.clear();
+  this->TerminologyColorFiles.clear();
   this->UserColorFiles.clear();
 
   if (this->UserColorFilePaths)
@@ -94,14 +158,20 @@ void vtkMRMLColorLogic::PrintSelf(ostream& os, vtkIndent indent)
 
   os << indent << "UserColorFilePaths: " << this->GetUserColorFilePaths() << "\n";
   os << indent << "Color Files:\n";
-  for (int i = 0; i << this->ColorFiles.size(); i++)
+  for (size_t i = 0; i < this->ColorFiles.size(); i++)
     {
     os << indent.GetNextIndent() << i << " " << this->ColorFiles[i].c_str() << "\n";
     }
   os << indent << "User Color Files:\n";
-  for (int i = 0; i << this->UserColorFiles.size(); i++)
+  for (size_t i = 0; i < this->UserColorFiles.size(); i++)
     {
     os << indent.GetNextIndent() << i << " " << this->UserColorFiles[i].c_str() << "\n";
+    }
+
+  os << indent << "Terminology Color Files:\n";
+  for (size_t i = 0; i < this->TerminologyColorFiles.size(); i++)
+    {
+    os << indent.GetNextIndent() << i << " " << this->TerminologyColorFiles[i].c_str() << "\n";
     }
 }
 
@@ -116,7 +186,7 @@ void vtkMRMLColorLogic::AddDefaultColorNodes()
     vtkWarningMacro("vtkMRMLColorLogic::AddDefaultColorNodes: no scene to which to add nodes\n");
     return;
     }
-  
+
   this->GetMRMLScene()->StartState(vtkMRMLScene::BatchProcessState);
 
   // add the labels first
@@ -129,11 +199,11 @@ void vtkMRMLColorLogic::AddDefaultColorNodes()
   this->AddDefaultProceduralNodes();
 
   // add freesurfer nodes
-  this->AddFreeSurferNodes(); 
-  
+  this->AddFreeSurferNodes();
+
   // add the PET nodes
   this->AddPETNodes();
-    
+
   // add the dGEMRIC nodes
   this->AddDGEMRICNodes();
 
@@ -141,12 +211,16 @@ void vtkMRMLColorLogic::AddDefaultColorNodes()
   // first check for any new ones
 
   // load the one from the default resources directory
-  this->AddDefaultFileNodes();  
+  this->AddDefaultFileNodes();
 
   // now add ones in files that the user pointed to, these ones are not hidden
   // from the editors
   this->AddUserFileNodes();
-   
+
+  // now load in the terminology color files and associate them with the
+  // color nodes
+  this->AddDefaultTerminologyColors();
+
   vtkDebugMacro("Done adding default color nodes");
   this->GetMRMLScene()->EndState(vtkMRMLScene::BatchProcessState);
 }
@@ -213,14 +287,14 @@ void vtkMRMLColorLogic::RemoveDefaultColorNodes()
       this->GetMRMLScene()->RemoveNode(procNode);
       }
     }
-  
+
   // remove the fs lookup table node
   node = vtkMRMLColorTableNode::SafeDownCast(this->GetMRMLScene()->GetNodeByID(this->GetDefaultFreeSurferLabelMapColorNodeID()));
   if (node != NULL)
     {
     this->GetMRMLScene()->RemoveNode(node);
     }
-  
+
   // remove the PET nodes
   vtkMRMLPETProceduralColorNode *basicPETNode = vtkMRMLPETProceduralColorNode::New();
   vtkMRMLPETProceduralColorNode *PETnode;
@@ -236,7 +310,7 @@ void vtkMRMLColorLogic::RemoveDefaultColorNodes()
       }
     }
   basicPETNode->Delete();
-  
+
   // remove the dGEMRIC nodes
   vtkMRMLdGEMRICProceduralColorNode *basicdGEMRICNode = vtkMRMLdGEMRICProceduralColorNode::New();
   vtkMRMLdGEMRICProceduralColorNode *dGEMRICnode;
@@ -415,29 +489,53 @@ void vtkMRMLColorLogic::AddColorFile(const char *fileName, std::vector<std::stri
 //----------------------------------------------------------------------------
 vtkMRMLColorNode* vtkMRMLColorLogic::LoadColorFile(const char *fileName, const char *nodeName)
 {
+  // try loading it as a color table node first
   vtkMRMLColorTableNode* node = this->CreateFileNode(fileName);
-  
-  if (!node)
-    {
-    return 0;
-    }
+  vtkMRMLColorNode * addedNode = NULL;
 
-  node->SetAttribute("Category", "File");  
-  node->SaveWithSceneOn();
-  node->GetStorageNode()->SaveWithSceneOn();
-  node->HideFromEditorsOff();
-
-  if (nodeName != NULL)
+  if (node)
     {
-    std::string uname( this->GetMRMLScene()->GetUniqueNameByString(nodeName));
-    node->SetName(uname.c_str());
-    }
-  vtkMRMLColorNode * singletonNode =
+    node->SetAttribute("Category", "File");
+    node->SaveWithSceneOn();
+    node->GetStorageNode()->SaveWithSceneOn();
+    node->HideFromEditorsOff();
+    node->SetSingletonTag(NULL);
+
+    if (nodeName != NULL)
+      {
+      std::string uname( this->GetMRMLScene()->GetUniqueNameByString(nodeName));
+      node->SetName(uname.c_str());
+      }
+    addedNode =
       vtkMRMLColorNode::SafeDownCast(this->GetMRMLScene()->AddNode(node));
-  vtkDebugMacro("LoadColorFile: Done: Read and added file node: " <<  fileName);
-  node->Delete();  
-  
-  return singletonNode;
+    vtkDebugMacro("LoadColorFile: Done: Read and added file node: " <<  fileName);
+    node->Delete();
+    }
+  else
+    {
+    // try loading it as a procedural node
+    vtkWarningMacro("Trying to read color file as a procedural color node");
+    vtkMRMLProceduralColorNode *procNode = this->CreateProceduralFileNode(fileName);
+    if (procNode)
+      {
+      procNode->SetAttribute("Category", "File");
+      procNode->SaveWithSceneOn();
+      procNode->GetStorageNode()->SaveWithSceneOn();
+      procNode->HideFromEditorsOff();
+      procNode->SetSingletonTag(NULL);
+
+      if (nodeName != NULL)
+        {
+        std::string uname( this->GetMRMLScene()->GetUniqueNameByString(nodeName));
+        procNode->SetName(uname.c_str());
+        }
+      addedNode =
+        vtkMRMLColorNode::SafeDownCast(this->GetMRMLScene()->AddNode(procNode));
+      vtkDebugMacro("LoadColorFile: Done: Read and added file procNode: " <<  fileName);
+      procNode->Delete();
+      }
+    }
+  return addedNode;
 }
 
 //------------------------------------------------------------------------------
@@ -567,7 +665,7 @@ vtkMRMLColorTableNode* vtkMRMLColorLogic::CreateFreeSurferFileNode(const char* f
     }
 
   vtkMRMLColorTableNode* node = this->CreateFileNode(fileName);
-  
+
   if (!node)
     {
     return 0;
@@ -589,7 +687,7 @@ vtkMRMLPETProceduralColorNode* vtkMRMLColorLogic::CreatePETColorNode(int type)
 
   if (nodepcn->GetTypeAsString() == NULL)
     {
-    vtkWarningMacro("Node type as string is null");      
+    vtkWarningMacro("Node type as string is null");
     nodepcn->SetName("NoName");
     }
   else
@@ -612,7 +710,7 @@ vtkMRMLdGEMRICProceduralColorNode* vtkMRMLColorLogic::CreatedGEMRICColorNode(int
   pcnode->SaveWithSceneOff();
   if (pcnode->GetTypeAsString() == NULL)
     {
-    vtkWarningMacro("Node type as string is null");      
+    vtkWarningMacro("Node type as string is null");
     pcnode->SetName("NoName");
     }
   else
@@ -630,13 +728,13 @@ vtkMRMLdGEMRICProceduralColorNode* vtkMRMLColorLogic::CreatedGEMRICColorNode(int
 vtkMRMLColorTableNode* vtkMRMLColorLogic::CreateDefaultFileNode(const std::string& colorFileName)
 {
   vtkMRMLColorTableNode* ctnode = this->CreateFileNode(colorFileName.c_str());
-  
+
   if (!ctnode)
     {
     return 0;
     }
 
-  if (strcmp(ctnode->GetName(),"GenericColors") == 0 || 
+  if (strcmp(ctnode->GetName(),"GenericColors") == 0 ||
       strcmp(ctnode->GetName(),"GenericAnatomyColors") == 0)
     {
     vtkDebugMacro("Found default lut node");
@@ -647,7 +745,7 @@ vtkMRMLColorTableNode* vtkMRMLColorLogic::CreateDefaultFileNode(const std::strin
     {
     ctnode->SetAttribute("Category", "Default Labels from File");
     }
-  
+
   return ctnode;
 }
 
@@ -662,20 +760,26 @@ vtkMRMLColorTableNode* vtkMRMLColorLogic::CreateUserFileNode(const std::string& 
   ctnode->SetAttribute("Category", "Auto Loaded User Color Files");
   ctnode->SaveWithSceneOn();
   ctnode->HideFromEditorsOff();
-  
+
   return ctnode;
 }
 
 //--------------------------------------------------------------------------------
 std::vector<std::string> vtkMRMLColorLogic::FindDefaultColorFiles()
 {
-  return std::vector<std::string>();   
+  return std::vector<std::string>();
+}
+
+//--------------------------------------------------------------------------------
+std::vector<std::string> vtkMRMLColorLogic::FindDefaultTerminologyColorFiles()
+{
+  return std::vector<std::string>();
 }
 
 //--------------------------------------------------------------------------------
 std::vector<std::string> vtkMRMLColorLogic::FindUserColorFiles()
 {
-  return std::vector<std::string>();   
+  return std::vector<std::string>();
 }
 
 //--------------------------------------------------------------------------------
@@ -688,41 +792,85 @@ vtkMRMLColorTableNode* vtkMRMLColorLogic::CreateFileNode(const char* fileName)
   ctnode->SetScene(this->GetMRMLScene());
 
   // make a storage node
-  vtkMRMLColorTableStorageNode *colorStorageNode = vtkMRMLColorTableStorageNode::New();
+  vtkNew<vtkMRMLColorTableStorageNode> colorStorageNode;
   colorStorageNode->SaveWithSceneOff();
   if (this->GetMRMLScene())
     {
-    this->GetMRMLScene()->AddNode(colorStorageNode);
+    this->GetMRMLScene()->AddNode(colorStorageNode.GetPointer());
     ctnode->SetAndObserveStorageNodeID(colorStorageNode->GetID());
     }
-  colorStorageNode->Delete();
-  
+
   ctnode->GetStorageNode()->SetFileName(fileName);
   std::string basename = vtksys::SystemTools::GetFilenameWithoutExtension(fileName);
   std::string uname( this->GetMRMLScene()->GetUniqueNameByString(basename.c_str()));
   ctnode->SetName(uname.c_str());
-  
-  vtkDebugMacro("AddDefaultColorFiles: About to read user file " << fileName);
+
+  vtkDebugMacro("CreateFileNode: About to read user file " << fileName);
 
   if (ctnode->GetStorageNode()->ReadData(ctnode) == 0)
     {
-      vtkErrorMacro("Unable to read freesurfer colour file " << (ctnode->GetFileName() ? ctnode->GetFileName() : ""));
-      
+    vtkErrorMacro("Unable to read file as color table " << (ctnode->GetFileName() ? ctnode->GetFileName() : ""));
+
     if (this->GetMRMLScene())
       {
       ctnode->SetAndObserveStorageNodeID(NULL);
       ctnode->SetScene(NULL);
-      this->GetMRMLScene()->RemoveNode(colorStorageNode);
+      this->GetMRMLScene()->RemoveNode(colorStorageNode.GetPointer());
       }
-      
+
       ctnode->Delete();
       return 0;
     }
-  vtkDebugMacro("AddDefaultColorFiles: finished reading user file " << fileName);
+  vtkDebugMacro("CreateFileNode: finished reading user file " << fileName);
   ctnode->SetSingletonTag(
     this->GetFileColorNodeSingletonTag(fileName).c_str());
 
   return ctnode;
+}
+
+//--------------------------------------------------------------------------------
+vtkMRMLProceduralColorNode* vtkMRMLColorLogic::CreateProceduralFileNode(const char* fileName)
+{
+  vtkMRMLProceduralColorNode * cpnode =  vtkMRMLProceduralColorNode::New();
+  cpnode->SetTypeToFile();
+  cpnode->SaveWithSceneOff();
+  cpnode->HideFromEditorsOn();
+  cpnode->SetScene(this->GetMRMLScene());
+
+  // make a storage node
+  vtkMRMLProceduralColorStorageNode *colorStorageNode = vtkMRMLProceduralColorStorageNode::New();
+  colorStorageNode->SaveWithSceneOff();
+  if (this->GetMRMLScene())
+    {
+    this->GetMRMLScene()->AddNode(colorStorageNode);
+    cpnode->SetAndObserveStorageNodeID(colorStorageNode->GetID());
+    }
+  colorStorageNode->Delete();
+
+  cpnode->GetStorageNode()->SetFileName(fileName);
+  std::string basename = vtksys::SystemTools::GetFilenameWithoutExtension(fileName);
+  std::string uname( this->GetMRMLScene()->GetUniqueNameByString(basename.c_str()));
+  cpnode->SetName(uname.c_str());
+
+  vtkDebugMacro("CreateProceduralFileNode: About to read user file " << fileName);
+
+  if (cpnode->GetStorageNode()->ReadData(cpnode) == 0)
+    {
+    vtkErrorMacro("Unable to read procedural colour file " << (cpnode->GetFileName() ? cpnode->GetFileName() : ""));
+    if (this->GetMRMLScene())
+      {
+      cpnode->SetAndObserveStorageNodeID(NULL);
+      cpnode->SetScene(NULL);
+      this->GetMRMLScene()->RemoveNode(colorStorageNode);
+      }
+      cpnode->Delete();
+      return 0;
+    }
+  vtkDebugMacro("CreateProceduralFileNode: finished reading user procedural color file " << fileName);
+  cpnode->SetSingletonTag(
+    this->GetFileColorNodeSingletonTag(fileName).c_str());
+
+  return cpnode;
 }
 
 //----------------------------------------------------------------------------------------
@@ -818,7 +966,7 @@ void vtkMRMLColorLogic::AddPETNode(int type)
   vtkMRMLPETProceduralColorNode *nodepcn = this->CreatePETColorNode(type);
   //if (this->GetMRMLScene()->GetNodeByID( nodepcn->GetSingletonTag() ) == NULL)
     {
-    //this->GetMRMLScene()->RequestNodeID(nodepcn, nodepcn->GetSingletonTag() );        
+    //this->GetMRMLScene()->RequestNodeID(nodepcn, nodepcn->GetSingletonTag() );
     this->GetMRMLScene()->AddNode(nodepcn);
     }
   nodepcn->Delete();
@@ -831,14 +979,14 @@ void vtkMRMLColorLogic::AddDGEMRICNode(int type)
   vtkMRMLdGEMRICProceduralColorNode *pcnode = this->CreatedGEMRICColorNode(type);
   //if (this->GetMRMLScene()->GetNodeByID(pcnode->GetSingletonTag()) == NULL)
     {
-    //this->GetMRMLScene()->RequestNodeID(pcnode, pcnode->GetSingletonTag());        
+    //this->GetMRMLScene()->RequestNodeID(pcnode, pcnode->GetSingletonTag());
     this->GetMRMLScene()->AddNode(pcnode);
     }
   pcnode->Delete();
 }
 
 //----------------------------------------------------------------------------------------
-void vtkMRMLColorLogic::AddDefaultFileNode(int i) 
+void vtkMRMLColorLogic::AddDefaultFileNode(int i)
 {
   vtkMRMLColorTableNode* ctnode =  this->CreateDefaultFileNode(this->ColorFiles[i]);
   if (ctnode)
@@ -905,7 +1053,7 @@ void vtkMRMLColorLogic::AddDefaultTableNodes()
 
 //----------------------------------------------------------------------------------------
 void vtkMRMLColorLogic::AddFreeSurferNodes()
-{  
+{
   vtkDebugMacro("AddDefaultColorNodes: Adding Freesurfer nodes");
   vtkMRMLFreeSurferProceduralColorNode* basicFSNode = vtkMRMLFreeSurferProceduralColorNode::New();
   vtkDebugMacro("AddDefaultColorNodes: first type = " <<  basicFSNode->GetFirstType() << ", last type = " <<  basicFSNode->GetLastType());
@@ -916,7 +1064,7 @@ void vtkMRMLColorLogic::AddFreeSurferNodes()
 
   // add a regular colour tables holding the freesurfer volume file colours and
   // surface colours
-  this->AddFreeSurferFileNode(basicFSNode);  
+  this->AddFreeSurferFileNode(basicFSNode);
   basicFSNode->Delete();
 }
 
@@ -937,20 +1085,20 @@ void vtkMRMLColorLogic::AddDGEMRICNodes()
   vtkMRMLdGEMRICProceduralColorNode* basicdGEMRICNode = vtkMRMLdGEMRICProceduralColorNode::New();
   for (int type = basicdGEMRICNode->GetFirstType(); type <= basicdGEMRICNode->GetLastType(); ++type)
     {
-    this->AddDGEMRICNode(type);    
+    this->AddDGEMRICNode(type);
     }
   basicdGEMRICNode->Delete();
 }
 
 //----------------------------------------------------------------------------------------
-void vtkMRMLColorLogic::AddDefaultFileNodes()  
+void vtkMRMLColorLogic::AddDefaultFileNodes()
 {
   this->ColorFiles = this->FindDefaultColorFiles();
   vtkDebugMacro("AddDefaultColorNodes: found " <<  this->ColorFiles.size() << " default color files");
   for (unsigned int i = 0; i < this->ColorFiles.size(); i++)
     {
-    this->AddDefaultFileNode(i);    
-    }  
+    this->AddDefaultFileNode(i);
+    }
 }
 
 //----------------------------------------------------------------------------------------
@@ -973,6 +1121,7 @@ vtkMRMLColorTableNode* vtkMRMLColorLogic::CopyNode(vtkMRMLColorNode* nodeToCopy,
   colorNode->SetTypeToUser();
   colorNode->SetAttribute("Category", "User Generated");
   colorNode->SetHideFromEditors(false);
+  colorNode->SetNamesInitialised(nodeToCopy->GetNamesInitialised());
   if (nodeToCopy->GetLookupTable())
     {
     double* range = nodeToCopy->GetLookupTable()->GetRange();
@@ -988,3 +1137,700 @@ vtkMRMLColorTableNode* vtkMRMLColorLogic::CopyNode(vtkMRMLColorNode* nodeToCopy,
   return colorNode;
 }
 
+//----------------------------------------------------------------------------------------
+vtkMRMLProceduralColorNode* vtkMRMLColorLogic::CopyProceduralNode(vtkMRMLColorNode* nodeToCopy, const char* copyName)
+{
+  vtkMRMLProceduralColorNode *colorNode = vtkMRMLProceduralColorNode::New();
+  if (nodeToCopy->IsA("vtkMRMLProceduralColorNode"))
+    {
+    colorNode->Copy(nodeToCopy);
+    // the copy will copy any singleton tag, make sure it's unset
+    colorNode->SetSingletonTag(NULL);
+    }
+
+  colorNode->SetName(copyName);
+  colorNode->SetTypeToUser();
+  colorNode->SetAttribute("Category", "User Generated");
+  colorNode->SetHideFromEditors(false);
+
+  return colorNode;
+}
+
+//------------------------------------------------------------------------------
+void vtkMRMLColorLogic::AddDefaultTerminologyColors()
+{
+  this->TerminologyColorFiles = this->FindDefaultTerminologyColorFiles();
+  vtkDebugMacro("AddDefaultTerminologyColorNodes: found " <<  this->TerminologyColorFiles.size() << " default terminology color files");
+  for (unsigned int i = 0; i < this->TerminologyColorFiles.size(); i++)
+    {
+    this->InitializeTerminologyMappingFromFile(this->TerminologyColorFiles[i]);
+    }
+}
+
+//------------------------------------------------------------------------------
+bool vtkMRMLColorLogic::CreateNewTerminology(std::string lutName)
+{
+  if (lutName.length() == 0)
+    {
+    return false;
+    }
+  if (this->TerminologyExists(lutName))
+    {
+    vtkWarningMacro("Create new terminology: one already exists with name " << lutName);
+    return false;
+    }
+  this->ColorCategorizationMaps[lutName] = ColorCategorizationMapType();
+  return this->AssociateTerminologyWithColorNode(lutName);
+}
+
+//------------------------------------------------------------------------------
+bool vtkMRMLColorLogic::TerminologyExists(std::string lutName)
+{
+  if (lutName.length() == 0)
+    {
+    return false;
+    }
+
+  if (this->ColorCategorizationMaps.find(lutName) !=
+      this->ColorCategorizationMaps.end())
+    {
+    return true;
+    }
+  else
+    {
+    return false;
+    }
+}
+
+//------------------------------------------------------------------------------
+bool vtkMRMLColorLogic
+::AddTermToTerminology(std::string lutName, int labelValue,
+                       std::string categoryValue,
+                       std::string categorySchemeDesignator,
+                       std::string categoryMeaning,
+                       std::string typeValue,
+                       std::string typeSchemeDesignator,
+                       std::string typeMeaning,
+                       std::string modifierValue,
+                       std::string modifierSchemeDesignator,
+                       std::string modifierMeaning,
+                       std::string regionValue,
+                       std::string regionSchemeDesignator,
+                       std::string regionMeaning,
+                       std::string regionModifierValue,
+                       std::string regionModifierSchemeDesignator,
+                       std::string regionModifierMeaning)
+{
+  StandardTerm category(categoryValue, categorySchemeDesignator, categoryMeaning);
+  StandardTerm type(typeValue, typeSchemeDesignator, typeMeaning);
+  StandardTerm modifier(modifierValue, modifierSchemeDesignator, modifierMeaning);
+  StandardTerm region(regionValue, regionSchemeDesignator, regionMeaning);
+  StandardTerm regionModifier(regionModifierValue, regionModifierSchemeDesignator, regionModifierMeaning);
+  return this->AddTermToTerminologyMapping(lutName, labelValue, category, type, modifier, region, regionModifier);
+}
+
+//------------------------------------------------------------------------------
+bool vtkMRMLColorLogic::AddTermToTerminologyMapping(std::string lutName, int labelValue,
+                                                    StandardTerm category, StandardTerm type, StandardTerm modifier,
+                                                    StandardTerm region, StandardTerm regionModifier)
+{
+  if (lutName.length() == 0)
+    {
+    return false;
+    }
+
+ // check if the terminology mapping exists already, if not, create it
+ if (!this->TerminologyExists(lutName))
+   {
+   vtkDebugMacro("Adding a new terminology for " << lutName);
+   bool createFlag = this->CreateNewTerminology(lutName);
+   if (!createFlag)
+     {
+     vtkWarningMacro("Unable to create new terminology for " << lutName.c_str() << " or associate it with a color node.");
+     return false;
+     }
+   }
+
+ ColorLabelCategorization termMapping;
+ termMapping.LabelValue = labelValue;
+ termMapping.SegmentedPropertyCategory = category;
+ termMapping.SegmentedPropertyType = type;
+ termMapping.SegmentedPropertyTypeModifier = modifier;
+ termMapping.AnatomicRegion = region;
+ termMapping.AnatomicRegionModifier = regionModifier;
+
+ this->ColorCategorizationMaps[lutName][termMapping.LabelValue] = termMapping;
+
+ return true;
+}
+
+//------------------------------------------------------------------------------
+bool vtkMRMLColorLogic::AssociateTerminologyWithColorNode(std::string lutName)
+{
+  if (lutName.length() == 0)
+    {
+    return false;
+    }
+
+  vtkMRMLNode *colorNode = this->GetMRMLScene()->GetFirstNodeByName(lutName.c_str());
+  if (!colorNode)
+    {
+    vtkWarningMacro("Unable to associate terminology with named color node: " << lutName);
+    return false;
+    }
+  colorNode->SetAttribute("TerminologyName", lutName.c_str());
+
+  return true;
+}
+//------------------------------------------------------------------------------
+bool vtkMRMLColorLogic::InitializeTerminologyMappingFromFile(std::string mapFileName)
+{
+  std::cout << "Initializing terminology mapping for map file " << mapFileName << std::endl;
+
+  std::ifstream mapFile(mapFileName.c_str());
+  bool status = mapFile.is_open();
+  std::string lutName = "";
+  bool addFlag = true;
+  bool assocFlag = true;
+  bool parseFlag = true;
+  if (status)
+    {
+    while (!mapFile.eof())
+      {
+      std::string lineIn;
+      std::getline(mapFile, lineIn);
+
+      if (lineIn[0] == '#')
+        {
+        continue;
+        }
+      if (lineIn.find("SlicerLUT=") == std::string::npos)
+        {
+        continue;
+        }
+      size_t delim = lineIn.find("=");
+      lutName = lineIn.substr(delim+1,lineIn.length()-delim);
+      assocFlag = this->CreateNewTerminology(lutName);
+      break;
+      }
+
+    while (!mapFile.eof())
+      {
+      std::string lineIn, lineLeft;
+      std::getline(mapFile, lineIn);
+      if (lineIn.length()<30 || lineIn[0] == '#')
+        {
+        continue;
+        }
+      std::vector<std::string> tokens;
+      std::stringstream ss(lineIn);
+      std::string item;
+      while (std::getline(ss,item,','))
+        {
+        tokens.push_back(item);
+        }
+
+      if (tokens.size() < 5)
+        {
+        vtkWarningMacro("InitializeTerminologyMappingFromFile: line has incorrect number of tokens: "
+                        << tokens.size()
+                        << " < 5");
+        parseFlag = false;
+        }
+      else
+        {
+        int labelValue = atoi(tokens[0].c_str());
+        StandardTerm category, type, modifier;
+        if (this->ParseTerm(tokens[2],category) &&
+            this->ParseTerm(tokens[3],type))
+          {
+          // modifier is optional, ParseTerm will return false on an empty string
+          this->ParseTerm(tokens[4],modifier);
+
+          // for now region doesn't appear in the file
+          StandardTerm region, regionModifier;
+          addFlag = addFlag && this->AddTermToTerminologyMapping(lutName, labelValue, category, type, modifier, region, regionModifier);
+          }
+        else
+          {
+          vtkWarningMacro("InitializeTerminologyMappingFromFile: failed to parse category or type: "
+                          << tokens[2].c_str() << "\n"
+                          << tokens[3].c_str() << "\n"
+                          << tokens[4].c_str());
+          parseFlag = false;
+          }
+        }
+     }
+  }
+  std::cout << this->ColorCategorizationMaps[lutName].size()
+            << " terms were read for Slicer LUT " << lutName << std::endl;
+
+  return status && addFlag && assocFlag && parseFlag;
+}
+
+//-------------------------------------------------------------------------------
+bool vtkMRMLColorLogic::
+  LookupCategorizationFromLabel(int label, ColorLabelCategorization& labelCat, const char *lutName)
+{
+  bool success = false;
+
+
+  if (this->TerminologyExists(lutName))
+    {
+    // set the label value so that if it's not found, it's still a valid categorisation
+    labelCat.LabelValue = label;
+    if (this->ColorCategorizationMaps[lutName].find(label) !=
+      this->ColorCategorizationMaps[lutName].end())
+      {
+      labelCat = this->ColorCategorizationMaps[lutName][label];
+      success = true;
+      }
+    }
+  return success;
+}
+
+//---------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::
+  GetTerminologyFromLabel(const std::string& categorization,
+                          const std::string& standardTerm,
+                          int label, const char *lutName)
+{
+  std::string returnString;
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    StandardTerm term;
+    if (categorization.compare("SegmentedPropertyCategory") == 0)
+      {
+      term = labelCat.SegmentedPropertyCategory;
+      }
+    else if (categorization.compare("SegmentedPropertyType") == 0)
+      {
+      term = labelCat.SegmentedPropertyType;
+      }
+    else if (categorization.compare("SegmentedPropertyTypeModifier") == 0)
+      {
+      term = labelCat.SegmentedPropertyTypeModifier;
+      }
+    else if (categorization.compare("AnatomicRegion") == 0)
+      {
+      term = labelCat.AnatomicRegion;
+      }
+    else if (categorization.compare("AnatomicRegionModifier") == 0)
+      {
+      term = labelCat.AnatomicRegionModifier;
+      }
+    // now get the requested coding from the standard term
+    if (standardTerm.compare("CodeValue") == 0)
+      {
+      returnString = term.CodeValue;
+      }
+    else if (standardTerm.compare("CodeMeaning") == 0)
+      {
+      returnString = term.CodeMeaning;
+      }
+    else if (standardTerm.compare("CodingSchemeDesignator") == 0)
+      {
+      returnString = term.CodingSchemeDesignator;
+      }
+    }
+  return returnString;
+}
+
+//---------------------------------------------------------------------------
+bool vtkMRMLColorLogic::PrintCategorizationFromLabel(int label, const char *lutName)
+{
+  ColorLabelCategorization labelCat;
+  if (!this->TerminologyExists(lutName))
+    {
+    return false;
+    }
+  if (this->ColorCategorizationMaps[lutName].find(label) !=
+    this->ColorCategorizationMaps[lutName].end())
+    {
+    labelCat = this->ColorCategorizationMaps[lutName][label];
+    labelCat.Print(std::cout);
+    return true;
+    }
+  return false;
+}
+
+//---------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::RemoveLeadAndTrailSpaces(std::string in)
+{
+  std::string ret = in;
+  ret.erase(ret.begin(), std::find_if(ret.begin(),ret.end(),
+    std::not1(std::ptr_fun<int,int>(isspace))));
+  ret.erase(std::find_if(ret.rbegin(),ret.rend(),
+    std::not1(std::ptr_fun<int,int>(isspace))).base(), ret.end());
+  return ret;
+}
+
+//---------------------------------------------------------------------------
+bool vtkMRMLColorLogic::ParseTerm(const std::string inputStr, StandardTerm& term)
+{
+  std::string str = inputStr;
+  str = this->RemoveLeadAndTrailSpaces(str);
+  if (str.length() < 10)
+    {
+    // can get empty strings for optional modifiers
+    return false;
+    }
+  // format check, should be enclosed in parentheses, have two ;'s
+  if (str.at(0) != '(' ||
+      str.at(str.length()-1) != ')')
+    {
+    vtkWarningMacro(<< __LINE__
+                    << ": ParseTerm: input string doesn't start/end with parentheses "
+                    << str);
+    return false;
+    }
+  size_t n = std::count(str.begin(), str.end(), ';');
+  if (n != 2)
+    {
+    vtkWarningMacro(<< __LINE__
+                    << ": ParseTerm: input string doesn't have 2 semi colons "
+                    << str);
+    return false;
+    }
+  // get rid of parentheses
+  str = str.substr(1,str.length()-2);
+  size_t found = str.find(";");
+  term.CodeValue = str.substr(0,found);
+  str = str.substr(found+1,str.length());
+  found = str.find(";");
+  term.CodingSchemeDesignator = str.substr(0,found);
+  str = str.substr(found+1, str.length());
+  term.CodeMeaning = str;
+  return true;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyCategoryCodeValue(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.SegmentedPropertyCategory.CodeValue;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyCategoryCodeMeaning(int label, const char *lutName)
+{
+ std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.SegmentedPropertyCategory.CodeMeaning;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyCategoryCodingSchemeDesignator(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.SegmentedPropertyCategory.CodingSchemeDesignator;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyCategory(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    std::string sep = std::string(":");
+    returnString = labelCat.SegmentedPropertyCategory.CodeValue
+      + sep
+      + labelCat.SegmentedPropertyCategory.CodingSchemeDesignator
+      + sep
+      + labelCat.SegmentedPropertyCategory.CodeMeaning;
+    if (returnString.compare("::") == 0)
+      {
+      // reset it to an empty string
+      returnString = "";
+      }
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyTypeCodeValue(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.SegmentedPropertyType.CodeValue;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyTypeCodeMeaning(int label, const char *lutName)
+{
+ std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.SegmentedPropertyType.CodeMeaning;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyTypeCodingSchemeDesignator(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.SegmentedPropertyType.CodingSchemeDesignator;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyType(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    std::string sep = std::string(":");
+    returnString = labelCat.SegmentedPropertyType.CodeValue
+      + sep
+      + labelCat.SegmentedPropertyType.CodingSchemeDesignator
+      + sep
+      + labelCat.SegmentedPropertyType.CodeMeaning;
+    if (returnString.compare("::") == 0)
+      {
+      // reset it to an empty string
+      returnString = "";
+      }
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyTypeModifierCodeValue(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.SegmentedPropertyTypeModifier.CodeValue;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyTypeModifierCodeMeaning(int label, const char *lutName)
+{
+ std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.SegmentedPropertyTypeModifier.CodeMeaning;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyTypeModifierCodingSchemeDesignator(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.SegmentedPropertyTypeModifier.CodingSchemeDesignator;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetSegmentedPropertyTypeModifier(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    std::string sep = std::string(":");
+    returnString = labelCat.SegmentedPropertyTypeModifier.CodeValue
+      + sep
+      + labelCat.SegmentedPropertyTypeModifier.CodingSchemeDesignator
+      + sep
+      + labelCat.SegmentedPropertyTypeModifier.CodeMeaning;
+    if (returnString.compare("::") == 0)
+      {
+      // reset it to an empty string
+      returnString = "";
+      }
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetAnatomicRegionCodeValue(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.AnatomicRegion.CodeValue;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetAnatomicRegionCodeMeaning(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.AnatomicRegion.CodeMeaning;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetAnatomicRegionCodingSchemeDesignator(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.AnatomicRegion.CodingSchemeDesignator;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetAnatomicRegion(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    std::string sep = std::string(":");
+    returnString = labelCat.AnatomicRegion.CodeValue
+      + sep
+      + labelCat.AnatomicRegion.CodingSchemeDesignator
+      + sep
+      + labelCat.AnatomicRegion.CodeMeaning;
+    if (returnString.compare("::") == 0)
+      {
+      // reset it to an empty string
+      returnString = "";
+      }
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetAnatomicRegionModifierCodeValue(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.AnatomicRegionModifier.CodeValue;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetAnatomicRegionModifierCodeMeaning(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.AnatomicRegionModifier.CodeMeaning;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetAnatomicRegionModifierCodingSchemeDesignator(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    returnString = labelCat.AnatomicRegionModifier.CodingSchemeDesignator;
+    }
+
+  return returnString;
+}
+
+//----------------------------------------------------------------------------
+std::string vtkMRMLColorLogic::GetAnatomicRegionModifier(int label, const char *lutName)
+{
+  std::string returnString;
+
+  ColorLabelCategorization labelCat;
+  if (this->LookupCategorizationFromLabel(label, labelCat, lutName))
+    {
+    std::string sep = std::string(":");
+    returnString = labelCat.AnatomicRegionModifier.CodeValue
+      + sep
+      + labelCat.AnatomicRegionModifier.CodingSchemeDesignator
+      + sep
+      + labelCat.AnatomicRegionModifier.CodeMeaning;
+    if (returnString.compare("::") == 0)
+      {
+      // reset it to an empty string
+      returnString = "";
+      }
+    }
+
+  return returnString;
+}

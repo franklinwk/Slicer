@@ -19,6 +19,8 @@
 #pragma warning ( disable : 4786 )
 #endif
 
+#include <vtkVersion.h>
+
 #include "itkMRMLIDIOWin32Header.h"
 
 #include "itkImageIOBase.h"
@@ -47,8 +49,8 @@ namespace itk
  * ImageFileReader/ImageFileWriter to read and write the data.
  *
  * The "filename" specified will look like a URI:
- *     slicer:<scene id>#<node id>                  - local slicer
- *     slicer://<hostname>/<scene id>#<node id>     - remote slicer
+ *     <code>slicer:\<scene id\>#\<node id\></code>                    - local slicer
+ *     <code>slicer://\<hostname\>/\<scene id\>#\<node id\></code>     - remote slicer
  *
  * This code was written on the Massachusettes Turnpike with extreme
  * glare on the LCD.
@@ -60,7 +62,7 @@ public:
   typedef MRMLIDImageIO            Self;
   typedef ImageIOBase  Superclass;
   typedef SmartPointer<Self>  Pointer;
-  
+
   /** Method for creation through the object factory. */
   itkNewMacro(Self);
 
@@ -69,58 +71,59 @@ public:
 
   /** Determine the file type. Returns true if this ImageIO can read the
    * file specified. */
-  virtual bool CanReadFile(const char*);
+  virtual bool CanReadFile(const char*) ITK_OVERRIDE;
 
   virtual bool CanUseOwnBuffer();
   virtual void ReadUsingOwnBuffer();
   virtual void * GetOwnBuffer();
-  
+
   /** Set the spacing and dimension information for the set filename. */
-  virtual void ReadImageInformation();
-  
+  virtual void ReadImageInformation() ITK_OVERRIDE;
+
   /** Reads the data from disk into the memory buffer provided. */
-  virtual void Read(void* buffer);
+  virtual void Read(void* buffer) ITK_OVERRIDE;
 
   /*-------- This part of the interfaces deals with writing data. ----- */
 
   /** Determine the file type. Returns true if this ImageIO can read the
    * file specified. */
-  virtual bool CanWriteFile(const char*);
+  virtual bool CanWriteFile(const char*) ITK_OVERRIDE;
 
   /** Writes the header of the image.
    * Assumes SetFileName has been called with a valid file name. */
-  virtual void WriteImageInformation();
+  virtual void WriteImageInformation() ITK_OVERRIDE;
 
   /** Writes the data to disk from the memory buffer provided. Make sure
    * that the IORegion has been set properly. */
-  virtual void Write(const void* buffer);
+  virtual void Write(const void* buffer) ITK_OVERRIDE;
 
 protected:
   MRMLIDImageIO();
   ~MRMLIDImageIO();
-  void PrintSelf(std::ostream& os, Indent indent) const;
+  void PrintSelf(std::ostream& os, Indent indent) const ITK_OVERRIDE;
 
   /** Write the image information to the node and specified image */
-  virtual void WriteImageInformation(vtkMRMLVolumeNode *, vtkImageData*);
-  
+  virtual void WriteImageInformation(vtkMRMLVolumeNode *, vtkImageData*,
+                                     int *scalarType, int *numberOfScalarComponents);
+
   /** Take information in a Slicer node and transfer it the
    *  MetaDataDictionary in ITK */
-  void SetDWDictionaryValues(MetaDataDictionary &dict, 
+  void SetDWDictionaryValues(MetaDataDictionary &dict,
                              vtkMRMLDiffusionWeightedVolumeNode *dw);
 
   /** Take information in a Slicer node and transfer it the
    *  MetaDataDictionary in ITK */
-  void SetDTDictionaryValues(MetaDataDictionary &dict, 
+  void SetDTDictionaryValues(MetaDataDictionary &dict,
                              vtkMRMLDiffusionImageVolumeNode *di);
 
   /** Take information from the MetaDataDictionary that is needed to
    *  transfer this volume to a Slicer node */
-  void SetDWNodeValues(vtkMRMLDiffusionWeightedVolumeNode *dw, 
+  void SetDWNodeValues(vtkMRMLDiffusionWeightedVolumeNode *dw,
                        MetaDataDictionary &dict);
 
   /** Take information from the MetaDataDictionary that is needed to
    *  transfer this volume to a Slicer node */
-  void SetDTNodeValues(vtkMRMLDiffusionImageVolumeNode *di, 
+  void SetDTNodeValues(vtkMRMLDiffusionImageVolumeNode *di,
                        MetaDataDictionary &dict);
 
 private:
@@ -134,7 +137,7 @@ private:
   std::string Authority;
   std::string SceneID;
   std::string NodeID;
-  
+
 };
 
 

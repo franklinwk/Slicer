@@ -269,6 +269,18 @@ bool qSlicerCoreCommandOptions::displayTemporaryPathAndExit() const
 }
 
 //-----------------------------------------------------------------------------
+bool qSlicerCoreCommandOptions::displayMessageAndExit() const
+{
+  return
+      this->displayHelpAndExit()
+      || this->displayVersionAndExit()
+      || this->displayProgramPathAndExit()
+      || this->displayHomePathAndExit()
+      || this->displaySettingsPathAndExit()
+      || this->displayTemporaryPathAndExit();
+}
+
+//-----------------------------------------------------------------------------
 bool qSlicerCoreCommandOptions::verboseModuleDiscovery() const
 {
   Q_D(const qSlicerCoreCommandOptions);
@@ -360,7 +372,7 @@ void qSlicerCoreCommandOptions::addArguments()
                     "List of additional module path to consider when searching for modules to load.");
 
   this->addArgument("disable-modules", "", QVariant::Bool,
-                    "Disables the loading of any odules.");
+                    "Disables the loading of any Modules.");
 
   this->addArgument("disable-builtin-modules", "", QVariant::Bool,
                     "Disables the loading of builtin Modules.");

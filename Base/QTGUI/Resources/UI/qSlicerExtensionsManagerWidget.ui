@@ -24,8 +24,8 @@
      </property>
      <property name="iconSize">
       <size>
-       <width>32</width>
-       <height>32</height>
+       <width>24</width>
+       <height>24</height>
       </size>
      </property>
      <widget class="QWidget" name="ManageExtensionsTab">
@@ -41,7 +41,10 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="qSlicerExtensionsManageWidget" name="ExtensionsManageWidget" native="true"/>
+        <widget class="QStackedWidget" name="ManageExtensionsPager">
+         <widget class="qSlicerExtensionsManageWidget" name="ExtensionsManageWidget"/>
+         <widget class="qSlicerExtensionsInstallWidget" name="ExtensionsManageBrowser"/>
+        </widget>
        </item>
       </layout>
      </widget>

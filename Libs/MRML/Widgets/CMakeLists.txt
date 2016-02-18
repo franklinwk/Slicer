@@ -5,14 +5,9 @@ project(qMRMLWidgets)
 cmake_minimum_required(VERSION 2.8.4)
 #-----------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
-# See http://cmake.org/cmake/help/cmake-2-8-docs.html#section_Policies for details
-#-----------------------------------------------------------------------------
-if(POLICY CMP0017)
-  cmake_policy(SET CMP0017 OLD)
-endif()
-
-
+# --------------------------------------------------------------------------
+# Options
+# --------------------------------------------------------------------------
 if(NOT DEFINED BUILD_SHARED_LIBS)
   option(BUILD_SHARED_LIBS "Build with shared libraries." ON)
 endif(NOT DEFINED BUILD_SHARED_LIBS)
@@ -20,13 +15,36 @@ endif(NOT DEFINED BUILD_SHARED_LIBS)
 include(CheckIncludeFiles)
 check_include_files("stdint.h" HAVE_STDINT_H)
 
+# CMake module
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${MRMLWidgets_SOURCE_DIR}/CMake")
+
+# --------------------------------------------------------------------------
+# Dependencies
+# --------------------------------------------------------------------------
+
+
+#
+# CTK
+#
+set(CTK_LIBRARIES CTKVisualizationVTKWidgets)
+if(Slicer_USE_PYTHONQT)
+  list(APPEND CTK_LIBRARIES
+    CTKScriptingPythonWidgets
+    )
+endif()
+if(Slicer_USE_QtTesting)
+  list(APPEND CTK_LIBRARIES
+    CTKQtTesting
+    )
+endif()
+
+# --------------------------------------------------------------------------
+# Configure headers
+# --------------------------------------------------------------------------
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/qMRMLWidgetsConfigure.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/qMRMLWidgetsConfigure.h
   )
-
-# CMake module
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${MRMLWidgets_SOURCE_DIR}/CMake")
 
 #-----------------------------------------------------------------------------
 # Sources
@@ -81,6 +99,8 @@ set(MRMLWidgets_SRCS
   qMRMLLayoutManager.cxx
   qMRMLLayoutManager.h
   qMRMLLayoutManager_p.h
+  qMRMLLayoutViewFactory.cxx
+  qMRMLLayoutViewFactory.h
   qMRMLLayoutWidget.cxx
   qMRMLLayoutWidget.h
   qMRMLLinearTransformSlider.cxx
@@ -93,6 +113,10 @@ set(MRMLWidgets_SRCS
   qMRMLModelInfoWidget.h
   qMRMLNavigationView.cxx
   qMRMLNavigationView.h
+  qMRMLNodeAttributeTableView.cxx
+  qMRMLNodeAttributeTableView.h
+  qMRMLNodeAttributeTableWidget.cxx
+  qMRMLNodeAttributeTableWidget.h
   qMRMLNodeComboBox.cxx
   qMRMLNodeComboBox.h
   qMRMLNodeComboBoxDelegate.cxx
@@ -149,6 +173,16 @@ set(MRMLWidgets_SRCS
   qMRMLSortFilterProxyModel.h
   qMRMLSpinBox.cxx
   qMRMLSpinBox.h
+  qMRMLTableModel.cxx
+  qMRMLTableModel.h
+  qMRMLTableView.cxx
+  qMRMLTableView.h
+  qMRMLTableView_p.h
+  qMRMLTableViewControllerWidget.cxx
+  qMRMLTableViewControllerWidget.h
+  qMRMLTableViewControllerWidget_p.h
+  qMRMLTableWidget.cxx
+  qMRMLTableWidget.h
   qMRMLThreeDView.cxx
   qMRMLThreeDView.h
   qMRMLThreeDView_p.h
@@ -173,6 +207,9 @@ set(MRMLWidgets_SRCS
   qMRMLVolumeThresholdWidget.h
   qMRMLVolumeWidget.cxx
   qMRMLVolumeWidget.h
+  qMRMLExpandingWebView.cxx
+  qMRMLExpandingWebView.h
+  qMRMLExpandingWebView_p.h
   qMRMLWidget.cxx
   qMRMLWidget.h
   qMRMLWindowLevelWidget.cxx
@@ -206,12 +243,15 @@ set(MRMLWidgets_MOC_SRCS
   qMRMLLabelComboBox.h
   qMRMLLayoutManager.h
   qMRMLLayoutManager_p.h
+  qMRMLLayoutViewFactory.h
   qMRMLLayoutWidget.h
   qMRMLLinearTransformSlider.h
   qMRMLListWidget.h
   qMRMLMatrixWidget.h
   qMRMLModelInfoWidget.h
   qMRMLNavigationView.h
+  qMRMLNodeAttributeTableView.h
+  qMRMLNodeAttributeTableWidget.h
   qMRMLNodeComboBox.h
   qMRMLNodeComboBoxDelegate.h
   qMRMLNodeComboBoxMenuDelegate.h
@@ -242,6 +282,12 @@ set(MRMLWidgets_MOC_SRCS
   qMRMLSortFilterHierarchyProxyModel.h
   qMRMLSortFilterProxyModel.h
   qMRMLSpinBox.h
+  qMRMLTableModel.h
+  qMRMLTableView.h
+  qMRMLTableView_p.h
+  qMRMLTableViewControllerWidget.h
+  qMRMLTableViewControllerWidget_p.h
+  qMRMLTableWidget.h
   qMRMLThreeDView.h
   qMRMLThreeDView_p.h
   qMRMLThreeDViewControllerWidget.h
@@ -255,6 +301,8 @@ set(MRMLWidgets_MOC_SRCS
   qMRMLVolumeThresholdWidget.h
   qMRMLVolumeWidget.h
   qMRMLVolumeWidget_p.h
+  qMRMLExpandingWebView.h
+  qMRMLExpandingWebView_p.h
   qMRMLWidget.h
   qMRMLWindowLevelWidget.h
   )
@@ -267,12 +315,15 @@ set(MRMLWidgets_UI_SRCS
   Resources/UI/qMRMLDisplayNodeWidget.ui
   Resources/UI/qMRMLEventLoggerWidget.ui
   Resources/UI/qMRMLModelInfoWidget.ui
+  Resources/UI/qMRMLNodeAttributeTableView.ui
+  Resources/UI/qMRMLNodeAttributeTableWidget.ui
   Resources/UI/qMRMLROIWidget.ui
   Resources/UI/qMRMLSceneFactoryWidget.ui
   Resources/UI/qMRMLScreenShotDialog.ui
   Resources/UI/qMRMLSliceControllerWidget.ui
   Resources/UI/qMRMLSliceInformationWidget.ui
   Resources/UI/qMRMLSliceWidget.ui
+  Resources/UI/qMRMLTableViewControllerWidget.ui
   Resources/UI/qMRMLThreeDViewControllerWidget.ui
   Resources/UI/qMRMLTransformSliders.ui
   Resources/UI/qMRMLVolumeInfoWidget.ui
@@ -365,10 +416,13 @@ add_library(${lib_name}
 set(MRMLWidgets_LIBRARIES
   ${QT_LIBRARIES}
   ${CTK_LIBRARIES}
-  ${CTK_EXTERNAL_LIBRARIES}
   MRMLLogic
   MRMLDisplayableManager
   )
+list(APPEND MRMLWidgets_LIBRARIES
+  vtkRenderingQt
+  )
+
 
 target_link_libraries(${lib_name} ${MRMLWidgets_LIBRARIES})
 
@@ -377,6 +431,15 @@ if(Slicer_LIBRARY_PROPERTIES)
   set_target_properties(${lib_name} PROPERTIES ${Slicer_LIBRARY_PROPERTIES})
 endif()
 
+# --------------------------------------------------------------------------
+# Folder
+# --------------------------------------------------------------------------
+if(NOT DEFINED ${PROJECT_NAME}_FOLDER)
+  set(${PROJECT_NAME}_FOLDER ${PROJECT_NAME})
+endif()
+if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+  set_target_properties(${lib_name} PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+endif()
 
 # --------------------------------------------------------------------------
 # PythonQt wrapping
@@ -389,6 +452,10 @@ if(MRMLWidgets_WRAP_PYTHON)
     INSTALL_BIN_DIR ${Slicer_INSTALL_BIN_DIR}
     INSTALL_LIB_DIR ${Slicer_INSTALL_LIB_DIR}
     )
+  # Folder
+  if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+    set_target_properties(${lib_name}PythonQt PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+  endif()
 endif()
 
 # --------------------------------------------------------------------------

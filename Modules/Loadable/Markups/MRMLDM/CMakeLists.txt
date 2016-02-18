@@ -38,7 +38,6 @@ set(${KIT}_SRCS
 
 set(${KIT}_TARGET_LIBRARIES
   ${MRML_LIBRARIES}
-  vtkRendering
   vtkSlicer${MODULE_NAME}ModuleLogic
   vtkSlicer${MODULE_NAME}ModuleMRML
   vtkSlicer${MODULE_NAME}ModuleVTKWidgets

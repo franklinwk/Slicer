@@ -72,12 +72,12 @@ public:
   /** Set the image to be read when GenerateData is called.
    * This method selects the image to be returned by an Update
    * call.  By changing the CurrentImage, a pipeline can process
-   * each image in the series one after another. 
+   * each image in the series one after another.
    */
   itkSetMacro ( CurrentImage, unsigned int );
   itkGetMacro ( CurrentImage, unsigned int );
 
-  /** Return information about the TimeSeriesDatabase file */    
+  /** Return information about the TimeSeriesDatabase file */
   int GetNumberOfVolumes() { return this->m_Dimensions[3]; };
   itkGetMacro ( OutputSpacing, typename OutputImageType::SpacingType );
   itkGetMacro ( OutputRegion, typename OutputImageType::RegionType );
@@ -85,18 +85,18 @@ public:
   itkGetMacro ( OutputDirection, typename OutputImageType::DirectionType );
 
   /** Standard method for a ImageSource object */
-  virtual void GenerateOutputInformation(void);
-  virtual void GenerateData(void);
+  virtual void GenerateOutputInformation(void) ITK_OVERRIDE;
+  virtual void GenerateData(void) ITK_OVERRIDE;
 
   /** A convience method for reading a voxel's time course
    * Subsequent calls to voxels in the immediate region of this will be
    * cached for quick access
-   */ 
+   */
   void GetVoxelTimeSeries ( typename OutputImageType::IndexType idx, ArrayType& array );
 
   /** Set the size of the cache in MiB (1 MiB = 2^20 bytes)
    */
-  void SetCacheSizeInMiB ( float sz ); 
+  void SetCacheSizeInMiB ( float sz );
   /** Get the size of the cache in MiB (1 MiB = 2^20 bytes)
    */
   float GetCacheSizeInMiB ();
@@ -105,7 +105,7 @@ public:
 protected:
   TimeSeriesDatabase();
   ~TimeSeriesDatabase();
-  virtual void PrintSelf(std::ostream& os, Indent indent) const;
+  virtual void PrintSelf(std::ostream& os, Indent indent) const ITK_OVERRIDE;
   Array<unsigned int> m_Dimensions;
   Array<unsigned int> m_BlocksPerImage;
 
@@ -123,7 +123,7 @@ protected:
   unsigned long CalculateIndex ( Size<3> Position, int ImageCount );
   static unsigned long CalculateIndex ( Size<3> Position, int ImageCount, unsigned int BlocksPerImage[3] );
   /// Return true if this is a full block, false otherwise.  Assumes there is overlap!
-  bool CalculateIntersection ( Size<3> BlockIndex, typename OutputImageType::RegionType RequestedRegion, 
+  bool CalculateIntersection ( Size<3> BlockIndex, typename OutputImageType::RegionType RequestedRegion,
                                typename OutputImageType::RegionType& BlockRegion,
                                typename OutputImageType::RegionType& ImageRegion );
   bool IsOpen() const;
@@ -138,7 +138,7 @@ protected:
   unsigned long m_BlocksPerFile;
 
   /// our cache
-  struct CacheBlock 
+  struct CacheBlock
   {
     TPixel data[TimeSeriesBlockSize*TimeSeriesBlockSize*TimeSeriesBlockSize];
   };

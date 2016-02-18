@@ -32,7 +32,7 @@ class VTK_MRML_DISPLAYABLEMANAGER_EXPORT vtkMRMLScriptedDisplayableManager :
 
 public:
   static vtkMRMLScriptedDisplayableManager* New();
-  vtkTypeRevisionMacro(vtkMRMLScriptedDisplayableManager,vtkMRMLAbstractDisplayableManager);
+  vtkTypeMacro(vtkMRMLScriptedDisplayableManager,vtkMRMLAbstractDisplayableManager);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   void SetPythonSource(const std::string& pythonSource);
@@ -55,7 +55,7 @@ protected:
   virtual void OnInteractorStyleEvent(int eventid);
 
   virtual void OnMRMLDisplayableNodeModifiedEvent(vtkObject* caller);
-  
+
 private:
   vtkMRMLScriptedDisplayableManager(const vtkMRMLScriptedDisplayableManager&);// Not implemented
   void operator=(const vtkMRMLScriptedDisplayableManager&);                   // Not Implemented

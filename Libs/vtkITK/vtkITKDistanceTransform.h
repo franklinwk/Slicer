@@ -18,7 +18,7 @@ class VTK_ITK_EXPORT vtkITKDistanceTransform : public vtkSimpleImageToImageFilte
 {
 public:
   static vtkITKDistanceTransform *New();
-  vtkTypeRevisionMacro(vtkITKDistanceTransform, vtkSimpleImageToImageFilter);
+  vtkTypeMacro(vtkITKDistanceTransform, vtkSimpleImageToImageFilter);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   /// Output volume contains square of distance or actual distance
@@ -48,7 +48,7 @@ protected:
   int InsideIsPositive;
   int UseImageSpacing;
   double BackgroundValue;
-  
+
 private:
   vtkITKDistanceTransform(const vtkITKDistanceTransform&);  /// Not implemented.
   void operator=(const vtkITKDistanceTransform&);  /// Not implemented.

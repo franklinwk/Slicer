@@ -15,7 +15,6 @@ set(${KIT}_INCLUDE_DIRECTORIES
 
 set(displayable_manager_SRCS
   vtkMRMLVolumeRenderingDisplayableManager.cxx
-  vtkMRMLVolumeRenderingDisplayableManager.h
   )
 
 set(VTK_USE_INSTANTIATOR_NEW 1)
@@ -32,14 +31,19 @@ set(${KIT}_SRCS
   ${displayable_manager_SRCS}
   )
 
+set(${KIT}_VTK_LIBRARIES
+  vtkRenderingVolume
+  vtkRenderingVolume${VTK_RENDERING_BACKEND}
+  )
+
 set(${KIT}_TARGET_LIBRARIES
-  ${ITK_LIBRARIES}
-  ${MRML_LIBRARIES}
-  vtkRendering
   vtkSlicerAnnotationsModuleMRML
   vtkSlicer${MODULE_NAME}ModuleLogic
   vtkSlicer${MODULE_NAME}ModuleMRML
   VolumeRenderingReplacements
+  ${MRML_LIBRARIES}
+  ${ITK_LIBRARIES}
+  ${${KIT}_VTK_LIBRARIES}
   )
 
 #-----------------------------------------------------------------------------

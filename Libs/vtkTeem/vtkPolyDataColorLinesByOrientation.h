@@ -24,10 +24,10 @@ class VTK_Teem_EXPORT vtkPolyDataColorLinesByOrientation : public vtkPolyDataAlg
 {
 public:
   static vtkPolyDataColorLinesByOrientation *New();
-  vtkTypeRevisionMacro(vtkPolyDataColorLinesByOrientation,vtkPolyDataAlgorithm);
+  vtkTypeMacro(vtkPolyDataColorLinesByOrientation,vtkPolyDataAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
 
-  /// 
+  ///
   /// Turn on/off extraction of scalars for color.
   vtkSetMacro(CopyOriginalData,int);
   vtkBooleanMacro(CopyOriginalData,int);
@@ -36,12 +36,12 @@ public:
 
   vtkSetStringMacro(ScalarArrayName);
   vtkGetStringMacro(ScalarArrayName);
-    
+
 
   //--------------------------------------------------------------------------
   /// Display Information: Color Mode
-  /// 0) solid color by group 1) color by scalar invariant 
-  /// 2) color by avg scalar invariant 3) color by other 
+  /// 0) solid color by group 1) color by scalar invariant
+  /// 2) color by avg scalar invariant 3) color by other
   //--------------------------------------------------------------------------
 
   enum

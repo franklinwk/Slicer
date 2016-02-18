@@ -1,6 +1,7 @@
 import os
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
+from DICOMLib import DICOMUtils
 
 #
 # RSNAVisTutorial
@@ -152,40 +153,7 @@ class RSNAVisTutorialWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="RSNAVisTutorial"):
     self.onReload()
@@ -215,7 +183,7 @@ class RSNAVisTutorialLogic:
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -253,24 +221,26 @@ class RSNAVisTutorialTest(unittest.TestCase):
     lm = slicer.app.layoutManager()
     # switch on the type to get the requested window
     widget = 0
-    if type == -1:
-      # full window
-      widget = slicer.util.mainWindow()
-    elif type == slicer.qMRMLScreenShotDialog().FullLayout:
+    if type == slicer.qMRMLScreenShotDialog.FullLayout:
       # full layout
       widget = lm.viewport()
-    elif type == slicer.qMRMLScreenShotDialog().ThreeD:
+    elif type == slicer.qMRMLScreenShotDialog.ThreeD:
       # just the 3D window
       widget = lm.threeDWidget(0).threeDView()
-    elif type == slicer.qMRMLScreenShotDialog().Red:
+    elif type == slicer.qMRMLScreenShotDialog.Red:
       # red slice window
       widget = lm.sliceWidget("Red")
-    elif type == slicer.qMRMLScreenShotDialog().Yellow:
+    elif type == slicer.qMRMLScreenShotDialog.Yellow:
       # yellow slice window
       widget = lm.sliceWidget("Yellow")
-    elif type == slicer.qMRMLScreenShotDialog().Green:
+    elif type == slicer.qMRMLScreenShotDialog.Green:
       # green slice window
       widget = lm.sliceWidget("Green")
+    else:
+      # default to using the full window
+      widget = slicer.util.mainWindow()
+      # reset the type so that the node is set correctly
+      type = slicer.qMRMLScreenShotDialog.FullLayout
 
     # grab and convert to vtk image data
     qpixMap = qt.QPixmap().grabWidget(widget)
@@ -373,16 +343,7 @@ class RSNAVisTutorialTest(unittest.TestCase):
 
     try:
       self.delayDisplay("Switching to temp database directory")
-      tempDatabaseDirectory = slicer.app.temporaryPath + '/tempDICOMDatabase'
-      qt.QDir().mkpath(tempDatabaseDirectory)
-      if slicer.dicomDatabase:
-        originalDatabaseDirectory = os.path.split(slicer.dicomDatabase.databaseFilename)[0]
-      else:
-        originalDatabaseDirectory = None
-        settings = qt.QSettings()
-        settings.setValue('DatabaseDirectory', tempDatabaseDirectory)
-      dicomWidget = slicer.modules.dicom.widgetRepresentation().self()
-      dicomWidget.onDatabaseDirectoryChanged(tempDatabaseDirectory)
+      originalDatabaseDirectory = DICOMUtils.openTemporaryDatabase('tempDICOMDatabase')
 
       self.delayDisplay('Importing DICOM')
       mainWindow = slicer.util.mainWindow()
@@ -484,8 +445,7 @@ class RSNAVisTutorialTest(unittest.TestCase):
       self.delayDisplay('Test caused exception!\n' + str(e))
 
     self.delayDisplay("Restoring original database directory")
-    if originalDatabaseDirectory:
-      dicomWidget.onDatabaseDirectoryChanged(originalDatabaseDirectory)
+    DICOMUtils.closeTemporaryDatabase(originalDatabaseDirectory)
 
   def test_Part2Head(self,enableScreenshotsFlag=0,screenshotScaleFactor=1):
     """ Test using the head atlas - may not be needed - Slicer4Minute is already tested

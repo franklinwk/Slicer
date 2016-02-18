@@ -92,16 +92,16 @@ set(CMAKE_MODULE_PATH
 # --------------------------------------------------------------------------
 if(Slicer_USE_CONFIGUREPREREQUISITES)
   if(NOT Slicer_PREREQUISITES_CONFIGURED)
-    # Note: By setting CMAKE_OSX_* variables before any enable_language() or project() calls,
-    #       we ensure that the bitness will be properly detected.
-    include(SlicerBlockSetCMakeOSXVariables)
-    if(DEFINED CMAKE_C_COMPILER OR DEFINED CMAKE_CXX_COMPILER)
+    if(DEFINED CMAKE_PROJECT_NAME)
       message(FATAL_ERROR
         "To be effective, 'find_package(Slicer COMPONENTS ConfigurePrerequisites)' should "
         "be placed before any calls to 'project()' or 'enable_language()'."
         "Before re-configuring, make sure to clean the build directory: ${CMAKE_CURRENT_BINARY_DIR}"
         )
     endif()
+    # Note: By setting CMAKE_OSX_* variables before any enable_language() or project() calls,
+    #       we ensure that the bitness will be properly detected.
+    include(SlicerBlockSetCMakeOSXVariables)
     set(Slicer_PREREQUISITES_CONFIGURED 1 CACHE INTERNAL "True if component 'ConfigurePrerequisites' has already been included")
   endif()
   return()
@@ -110,8 +110,6 @@ endif()
 # --------------------------------------------------------------------------
 # Slicer options
 # --------------------------------------------------------------------------
-set(Slicer_USE_BatchMake "@Slicer_USE_BatchMake@")
-set(Slicer_USE_MIDAS "@Slicer_USE_MIDAS@")
 set(Slicer_USE_NUMPY "@Slicer_USE_NUMPY@")
 set(Slicer_USE_OpenIGTLink "@Slicer_USE_OpenIGTLink@")
 set(Slicer_USE_PYTHONQT "@Slicer_USE_PYTHONQT@")
@@ -228,9 +226,18 @@ set(MRMLCore_INCLUDE_DIRS "@MRMLCore_INCLUDE_DIRS_CONFIG@"
 set(MRMLLogic_INCLUDE_DIRS "@MRMLLogic_INCLUDE_DIRS_CONFIG@"
   CACHE INTERNAL "MRMLLogic includes" FORCE)
 
+set(MRMLCLI_INCLUDE_DIRS "@MRMLCLI_INCLUDE_DIRS_CONFIG@"
+  CACHE INTERNAL "MRMLCLI includes" FORCE)
+
+set(qMRMLWidgets_INCLUDE_DIRS "@qMRMLWidgets_INCLUDE_DIRS_CONFIG@"
+  CACHE INTERNAL "qMRMLWidgets includes" FORCE)
+
 set(RemoteIO_INCLUDE_DIRS "@RemoteIO_INCLUDE_DIRS_CONFIG@"
   CACHE INTERNAL "RemoteIO includes" FORCE)
 
+set(vtkAddon_INCLUDE_DIRS "@vtkAddon_INCLUDE_DIRS_CONFIG@"
+  CACHE INTERNAL "vtkAddon includes" FORCE)
+  
 set(vtkITK_INCLUDE_DIRS "@vtkITK_INCLUDE_DIRS_CONFIG@"
   CACHE INTERNAL "vtkITK includes" FORCE)
 
@@ -421,9 +428,15 @@ endif()
 set(Slicer_EXTERNAL_PROJECTS @Slicer_EXTERNAL_PROJECTS_CONFIG@)
 set(Slicer_EXTERNAL_PROJECTS_NO_USEFILE @Slicer_EXTERNAL_PROJECTS_NO_USEFILE_CONFIG@)
 
+@Slicer_EP_COMPONENT_VARS_CONFIG@
+
 # Include external projects
 foreach(proj ${Slicer_EXTERNAL_PROJECTS})
-  find_package(${proj} REQUIRED)
+  set(_component_args)
+  if(DEFINED Slicer_${proj}_COMPONENTS)
+    set(_component_args COMPONENTS ${Slicer_${proj}_COMPONENTS})
+  endif()
+  find_package(${proj} ${_component_args} REQUIRED)
   # Add project CMake dir to module path
   if(DEFINED ${proj}_CMAKE_DIR)
     set(CMAKE_MODULE_PATH

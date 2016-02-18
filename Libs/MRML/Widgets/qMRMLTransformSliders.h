@@ -23,20 +23,19 @@
 
 // Qt includes
 #include <QPair>
-#include <QWidget>
 
 // CTK includes
-#include <ctkPimpl.h>
 #include <ctkVTKObject.h>
 
-#include "qMRMLWidgetsExport.h"
+// MRML includes
+#include "qMRMLWidget.h"
 
 class vtkMRMLNode;
-class vtkMRMLLinearTransformNode;
+class vtkMRMLTransformNode;
 class vtkMatrix4x4;
 class qMRMLTransformSlidersPrivate;
 
-class QMRML_WIDGETS_EXPORT qMRMLTransformSliders : public QWidget
+class QMRML_WIDGETS_EXPORT qMRMLTransformSliders : public qMRMLWidget
 {
   Q_OBJECT
   QVTK_OBJECT
@@ -57,25 +56,25 @@ class QMRML_WIDGETS_EXPORT qMRMLTransformSliders : public QWidget
 
 public:
   /// Constructors
-  typedef QWidget Superclass;
+  typedef qMRMLWidget Superclass;
   explicit qMRMLTransformSliders(QWidget* parent);
   virtual ~qMRMLTransformSliders();
 
-  /// 
+  ///
   /// Set/Get Coordinate system
   /// By default, the selector coordinate system will be set to GLOBAL
   enum CoordinateReferenceType { GLOBAL, LOCAL };
   void setCoordinateReference(CoordinateReferenceType coordinateReference);
   CoordinateReferenceType coordinateReference() const;
 
-  /// 
+  ///
   /// Set/Get TypeOfTransform
   /// By default, the selector coordinate system will be set to TRANSLATION
   enum TransformType { ROTATION, TRANSLATION };
   void setTypeOfTransform(TransformType typeOfTransform);
   TransformType typeOfTransform() const;
 
-  /// 
+  ///
   /// Set/Get Title of the group box
   void setTitle(const QString& title);
   QString title()const;
@@ -84,32 +83,32 @@ public:
   /// \sa decimals
   int decimals()const;
 
-  /// 
+  ///
   /// Get sliders range
   double minimum()const;
   double maximum()const;
 
-  /// 
+  ///
   /// Set sliders range
   void setMinimum(double min);
   void setMaximum(double max);
-  /// 
+  ///
   /// Utility function that set min/max in once
   void setRange(double min, double max);
 
-  /// 
+  ///
   /// Set the visibility property of the minimum QSpinBox and maximum QSpinBox.
   /// Note: If the QSpinBoxes are hidden, you can still can setMinimum() and
   /// setMaximum() manually
   void setMinMaxVisible(bool visible);
   bool isMinMaxVisible()const;
 
-  /// 
+  ///
   /// Set sliders single step
   double singleStep()const;
   void setSingleStep(double step);
 
-  /// 
+  ///
   /// Get/Set slider's label
   QString lrLabel()const;
   QString paLabel()const;
@@ -118,12 +117,12 @@ public:
   void setPALabel(const QString& label);
   void setISLabel(const QString& label);
 
-  /// 
+  ///
   /// Return the current MRML node of interest
-  vtkMRMLLinearTransformNode* mrmlTransformNode()const;
+  vtkMRMLTransformNode* mrmlTransformNode()const;
 
 signals:
-  /// 
+  ///
   /// Signal sent if at least one of the slider's value is updated
   void valuesChanged();
 
@@ -135,12 +134,12 @@ signals:
   void decimalsChanged(int newDecimals);
 
 public slots:
-  /// 
+  ///
   /// Set the MRML node of interest
-  void setMRMLTransformNode(vtkMRMLLinearTransformNode* transformNode);
+  void setMRMLTransformNode(vtkMRMLTransformNode* transformNode);
   void setMRMLTransformNode(vtkMRMLNode* node);
 
-  /// 
+  ///
   /// Reset all sliders to their 0 position and value.
   /// Note that it can change the transform node values.
   void reset();
@@ -167,6 +166,11 @@ protected slots:
 
 protected:
   QScopedPointer<qMRMLTransformSlidersPrivate> d_ptr;
+
+  /// Extract the min/max values from the matrix and
+  /// change the slider min/max values accordingly.
+  /// Needed if the matrix changed externally (python, cli, etc.)
+  void updateRangeFromTransform(vtkMRMLTransformNode* transformNode);
 
   ///
   /// Extract min/max translation values from the transform matrix.

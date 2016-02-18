@@ -63,7 +63,7 @@ class VTK_SLICER_VOLUMERENDERING_MODULE_LOGIC_EXPORT vtkSlicerVolumeRenderingLog
 public:
 
   static vtkSlicerVolumeRenderingLogic *New();
-  vtkTypeRevisionMacro(vtkSlicerVolumeRenderingLogic,vtkSlicerModuleLogic);
+  vtkTypeMacro(vtkSlicerVolumeRenderingLogic,vtkSlicerModuleLogic);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   /// Inform the logic and observers that a rendering method (class deriving
@@ -153,15 +153,15 @@ public:
     vtkMRMLLabelMapVolumeDisplayNode* labelMapDisplayNode = 0);
 
   /// Applies a threshold to a volume property
-  /// \a scalarRange is the entire range of the transfer function
-  /// \a threshold is the range where the threshold is applied
-  /// \a node is the container of the transfer function to save
-  /// \a linearRamp controls the shape of the threshold:
+  /// \arg \b scalarRange is the entire range of the transfer function
+  /// \arg \b threshold is the range where the threshold is applied
+  /// \arg \b node is the container of the transfer function to save
+  /// \arg \b linearRamp controls the shape of the threshold:
   /// \verbatim
   ///  true:            false:    _
   ///        __/|__            __| |__
   /// \endverbatim
-  /// \a stayUpAtUpperLimit controls whether the threshold not maxed out:
+  /// \arg \b stayUpAtUpperLimit controls whether the threshold not maxed out:
   /// \verbatim
   ///  true:    ______  false:
   ///        __/               __/|_____
@@ -272,6 +272,13 @@ public:
   /// module share directory
   /// \sa vtkMRMLVolumePropertyNode, GetModuleShareDirectory()
   vtkMRMLScene* GetPresetsScene();
+
+  /// Return the preset \a presetName contained in the presets scene
+  /// loaded using \a GetPresetsScene().
+  /// If no presets are found, return 0.
+  /// If multiple presets are found, the first one is returned.
+  /// \sa GetPresetsScene(), vtkMRMLVolumePropertyNode
+  vtkMRMLVolumePropertyNode* GetPresetByName(const char *presetName);
 
   /// Utility function that checks if the piecewise functions are equal
   /// Returns true if different

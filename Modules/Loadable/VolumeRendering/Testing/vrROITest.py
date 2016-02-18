@@ -12,7 +12,7 @@ def load_default_volume():
     vl = slicer.modules.volumes.logic()
     volumeNode = vl.AddArchetypeScalarVolume (fileName, "moving", 0)
     # automatically select the volume to display
-    mrmlLogic = slicer.app.mrmlApplicationLogic()
+    mrmlLogic = slicer.app.applicationLogic()
     selNode = mrmlLogic.GetSelectionNode()
     selNode.SetReferenceActiveVolumeID(volumeNode.GetID())
     mrmlLogic.PropagateVolumeSelection()
@@ -30,7 +30,7 @@ displayNode.AddViewNodeID(viewNode.GetID())
 logic.UpdateDisplayNodeFromVolumeNode(displayNode, volumeNode)
 
 
-# TODO: actually select the module GUI 
+# TODO: actually select the module GUI
 #slicer.modules.volumerendering.widgetRepresentation()
 
 def viewImageData():
@@ -45,7 +45,7 @@ def viewImageData():
   v.SetInput(w2i.GetOutput())
   v.Render()
   return v
-  
+
 
 def moveROI(x,y,z):
   print("move roi to" , x,y,z)

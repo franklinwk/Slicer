@@ -22,6 +22,7 @@
 
 // CTK includes
 #include <ctkLinearValueProxy.h>
+#include <ctkUtils.h>
 
 // MRML includes
 #include <vtkMRMLNode.h>
@@ -63,8 +64,7 @@ qMRMLSliderWidgetPrivate::qMRMLSliderWidgetPrivate(qMRMLSliderWidget& object)
   this->MRMLScene = 0;
   this->SelectionNode = 0;
   this->Flags = qMRMLSliderWidget::Prefix | qMRMLSliderWidget::Suffix
-    | qMRMLSliderWidget::Precision
-    | qMRMLSliderWidget::MinimumValue | qMRMLSliderWidget::MaximumValue;
+    | qMRMLSliderWidget::Precision | qMRMLSliderWidget::Scaling;
   this->Proxy = new ctkLinearValueProxy;
 }
 
@@ -203,8 +203,14 @@ void qMRMLSliderWidget::updateWidgetFromUnitNode()
       {
       if (d->Flags.testFlag(qMRMLSliderWidget::Precision))
         {
-        this->setDecimals(unitNode->GetPrecision());
-        this->setSingleStep(pow(10.0, -unitNode->GetPrecision()));
+        // setDecimals overwrites values therefore it is important
+        // to call it only when it is necessary (without this check,
+        // for example a setValue call may be ineffective if the min/max
+        // value is changing at the same time)
+        if (this->decimals()!=unitNode->GetPrecision())
+          {
+          this->setDecimals(unitNode->GetPrecision());
+          }
         }
       if (d->Flags.testFlag(qMRMLSliderWidget::Prefix))
         {
@@ -226,6 +232,50 @@ void qMRMLSliderWidget::updateWidgetFromUnitNode()
         {
         d->updateValueProxy(unitNode);
         }
+      if (d->Flags.testFlag(qMRMLSliderWidget::Precision))
+        {
+        double range = this->maximum() - this->minimum();
+        if (d->Flags.testFlag(qMRMLSliderWidget::Scaling))
+          {
+          range = unitNode->GetDisplayValueFromValue(this->maximum()) -
+                  unitNode->GetDisplayValueFromValue(this->minimum());
+          }
+        double powerOfTen = ctk::closestPowerOfTen(range);
+        if (powerOfTen != 0.)
+          {
+          this->setSingleStep(powerOfTen / 100);
+          }
+        }
       }
+    }
+}
+
+// --------------------------------------------------------------------------
+void qMRMLSliderWidget::setMinimum(double newMinimumValue)
+{
+  this->Superclass::setMinimum(newMinimumValue);
+  if (this->unitAwareProperties().testFlag(qMRMLSliderWidget::Precision))
+    {
+    this->updateWidgetFromUnitNode();
+    }
+}
+
+// --------------------------------------------------------------------------
+void qMRMLSliderWidget::setMaximum(double newMaximumValue)
+{
+  this->Superclass::setMaximum(newMaximumValue);
+  if (this->unitAwareProperties().testFlag(qMRMLSliderWidget::Precision))
+    {
+    this->updateWidgetFromUnitNode();
+    }
+}
+
+// --------------------------------------------------------------------------
+void qMRMLSliderWidget::setRange(double newMinimumValue, double newMaximumValue)
+{
+  this->Superclass::setRange(newMinimumValue, newMaximumValue);
+  if (this->unitAwareProperties().testFlag(qMRMLSliderWidget::Precision))
+    {
+    this->updateWidgetFromUnitNode();
     }
 }

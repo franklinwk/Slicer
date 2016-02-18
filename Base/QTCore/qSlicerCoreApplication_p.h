@@ -64,6 +64,11 @@ public:
 
   virtual void init();
 
+  /// Set up the local and remote data input/output for this application.
+  /// Use this as a template for creating stand alone scenes, then call
+  /// vtkSlicerApplicationLogic::SetMRMLSceneDataIO to hook it into a scene.
+  virtual void initDataIO();
+
   /// Instanciate settings object
   virtual QSettings* newSettings();
   QSettings* instantiateSettings(bool useTmp);
@@ -130,6 +135,7 @@ public:
   /// Release, RelWithDebInfo, MinSizeRel or any other custom build type.
   QString                                     IntDir;
 
+  QSettings*                                  DefaultSettings;
   QSettings*                                  UserSettings;
   QSettings*                                  RevisionUserSettings;
 
@@ -141,9 +147,6 @@ public:
 
   /// CoreCommandOptions - It should exist only one instance of the CoreCommandOptions
   QSharedPointer<qSlicerCoreCommandOptions>   CoreCommandOptions;
-
-  /// CoreCommandOptions - It should exist only one instance of the CoreCommandOptions
-  QSharedPointer<ctkErrorLogModel>            ErrorLogModel;
 
   /// ReturnCode flag
   int                                         ReturnCode;
@@ -167,6 +170,9 @@ public:
   /// Application-wide database instance
   ctkDICOMDatabase*                           DICOMDatabase;
 #endif
+
+  QHash<int, QByteArray>                      LoadedResources;
+  int                                         NextResourceHandle;
 };
 
 #endif

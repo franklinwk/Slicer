@@ -15,6 +15,8 @@
 #ifndef __vtkPreciseHyperStreamlinePoints_h
 #define __vtkPreciseHyperStreamlinePoints_h
 
+#include <vtkVersion.h>
+
 #include "vtkTeemConfigure.h"
 
 #include "vtkPreciseHyperStreamline.h"
@@ -24,7 +26,7 @@ class VTK_Teem_EXPORT vtkPreciseHyperStreamlinePoints : public vtkPreciseHyperSt
 {
 public:
   static vtkPreciseHyperStreamlinePoints *New();
-  vtkTypeMacro(vtkPreciseHyperStreamlinePoints,vtkDataSetToPolyDataFilter);
+  vtkTypeMacro(vtkPreciseHyperStreamlinePoints,vtkPolyDataAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   vtkGetObjectMacro(PreciseHyperStreamline0,vtkPoints);
@@ -34,11 +36,11 @@ protected:
   vtkPreciseHyperStreamlinePoints();
   ~vtkPreciseHyperStreamlinePoints();
 
-  void Execute();
-  
+  virtual int RequestData(vtkInformation *, vtkInformationVector **, vtkInformationVector *);
+
   /// convenient pointers to PreciseHyperStreamline1 and PreciseHyperStreamline2
   vtkPoints *PreciseHyperStreamlines[2];
-  
+
   /// points calculated for first hyperstreamline
   vtkPoints *PreciseHyperStreamline0;
   /// points calculated for optional second hyperstreamline

@@ -12,16 +12,14 @@
 
 =========================================================================auto=*/
 
+#include "vtkSlicerConfigure.h" // Slicer_VTK_RENDERING_USE_{OpenGL|OpenGL2}_BACKEND
+
 // Volume Rendering includes
-#include "vtkMRMLNCIRayCastVolumeRenderingDisplayNode.h"
 #include "vtkMRMLSliceLogic.h"
 #include "vtkMRMLVolumeRenderingDisplayNode.h"
 #include "vtkMRMLVolumeRenderingScenarioNode.h"
 #include "vtkSlicerVolumeRenderingLogic.h"
 #include "vtkMRMLCPURayCastVolumeRenderingDisplayNode.h"
-#include "vtkMRMLNCIRayCastVolumeRenderingDisplayNode.h"
-#include "vtkMRMLNCIMultiVolumeRayCastVolumeRenderingDisplayNode.h"
-#include "vtkMRMLGPUTextureMappingVolumeRenderingDisplayNode.h"
 #include "vtkMRMLGPURayCastVolumeRenderingDisplayNode.h"
 
 // Annotations includes
@@ -43,7 +41,6 @@
 
 // VTK includes
 #include <vtkColorTransferFunction.h>
-#include <vtkgl.h>
 #include <vtkImageData.h>
 #include <vtkLookupTable.h>
 #include <vtkNew.h>
@@ -52,12 +49,15 @@
 #include <vtkPointData.h>
 #include <vtkVolumeProperty.h>
 
+#if defined(Slicer_VTK_RENDERING_USE_OpenGL_BACKEND)
+#include <vtkgl.h>
+#endif
+
 // STD includes
 #include <algorithm>
 #include <cassert>
 
 //----------------------------------------------------------------------------
-vtkCxxRevisionMacro(vtkSlicerVolumeRenderingLogic, "$Revision: 1.9.12.1 $");
 vtkStandardNewMacro(vtkSlicerVolumeRenderingLogic);
 
 //----------------------------------------------------------------------------
@@ -71,12 +71,6 @@ vtkSlicerVolumeRenderingLogic::vtkSlicerVolumeRenderingLogic()
                                 "vtkMRMLCPURayCastVolumeRenderingDisplayNode");
   this->RegisterRenderingMethod("VTK GPU Ray Casting",
                                 "vtkMRMLGPURayCastVolumeRenderingDisplayNode");
-  this->RegisterRenderingMethod("VTK OpenGL 3D Texture Mapping",
-                                "vtkMRMLGPUTextureMappingVolumeRenderingDisplayNode");
-  this->RegisterRenderingMethod("NCI GPU Ray Casting",
-                                "vtkMRMLNCIRayCastVolumeRenderingDisplayNode");
-  //this->RegisterRenderingMethod("NCI GPU MultiVolume Ray Casting",
-  //                              "vtkMRMLNCIMultiVolumeRayCastVolumeRenderingDisplayNode");
 }
 
 //----------------------------------------------------------------------------
@@ -102,6 +96,7 @@ void vtkSlicerVolumeRenderingLogic::PrintSelf(ostream& os, vtkIndent indent)
     {
     os << indent << this->DisplayNodes[i]->GetID() << std::endl;
     }
+#if defined(Slicer_VTK_RENDERING_USE_OpenGL_BACKEND)
   const char *gl_vendor=reinterpret_cast<const char *>(glGetString(GL_VENDOR));
   os << indent << "Vendor: " << gl_vendor << std::endl;
   const char *gl_version=reinterpret_cast<const char *>(glGetString(GL_VERSION));
@@ -109,6 +104,7 @@ void vtkSlicerVolumeRenderingLogic::PrintSelf(ostream& os, vtkIndent indent)
   const char *glsl_version=
     reinterpret_cast<const char *>(glGetString(vtkgl::SHADING_LANGUAGE_VERSION));
   os << indent << "Shading Language Version: " << glsl_version << std::endl;
+#endif
 }
 
 //----------------------------------------------------------------------------
@@ -133,15 +129,6 @@ void vtkSlicerVolumeRenderingLogic::RegisterNodes()
   this->GetMRMLScene()->RegisterNodeClass( cpuVRNode.GetPointer(),
                                            "VolumeRenderingParameters");
 #endif
-
-  vtkNew<vtkMRMLNCIRayCastVolumeRenderingDisplayNode> nciNode;
-  this->GetMRMLScene()->RegisterNodeClass( nciNode.GetPointer() );
-
-  vtkNew<vtkMRMLNCIMultiVolumeRayCastVolumeRenderingDisplayNode> nciMVNode;
-  this->GetMRMLScene()->RegisterNodeClass( nciMVNode.GetPointer() );
-
-  vtkNew<vtkMRMLGPUTextureMappingVolumeRenderingDisplayNode> tmNode;
-  this->GetMRMLScene()->RegisterNodeClass( tmNode.GetPointer() );
 
   vtkNew<vtkMRMLGPURayCastVolumeRenderingDisplayNode> gpuNode;
   this->GetMRMLScene()->RegisterNodeClass( gpuNode.GetPointer() );
@@ -333,7 +320,7 @@ void vtkSlicerVolumeRenderingLogic
 void vtkSlicerVolumeRenderingLogic
 ::UpdateTranferFunctionRangeFromImage(vtkMRMLVolumeRenderingDisplayNode* vspNode)
 {
-  std::cout << "vtkSlicerVolumeRenderingLogic::UpdateTranferFunctionRangeFromImage()" << std::endl;
+  vtkDebugMacro("vtkSlicerVolumeRenderingLogic::UpdateTranferFunctionRangeFromImage()");
   if (vspNode == 0 || vspNode->GetVolumeNode() == 0 || vspNode->GetVolumePropertyNode() == 0)
   {
     return;
@@ -357,16 +344,12 @@ void vtkSlicerVolumeRenderingLogic
   double rangeNew[2];
   scalars->GetRange(rangeNew);
   functionColor->AdjustRange(rangeNew);
-  std::cout << "Color range: "
-            << functionColor->GetRange()[0] << " " << functionColor->GetRange()[1]
-            << std::endl;
+  vtkDebugMacro("Color range: "<< functionColor->GetRange()[0] << " " << functionColor->GetRange()[1]);
 
   vtkPiecewiseFunction *functionOpacity = prop->GetScalarOpacity();
   functionOpacity->AdjustRange(rangeNew);
 
-  std::cout << "Opacity range: "
-            << functionOpacity->GetRange()[0] << " " << functionOpacity->GetRange()[1]
-            << std::endl;
+  vtkDebugMacro("Opacity range: " << functionOpacity->GetRange()[0] << " " << functionOpacity->GetRange()[1]);
 
   rangeNew[1] = (rangeNew[1] - rangeNew[0])*0.25;
   rangeNew[0] = 0;
@@ -374,9 +357,7 @@ void vtkSlicerVolumeRenderingLogic
   functionOpacity = prop->GetGradientOpacity();
   functionOpacity->RemovePoint(255);//Remove the standard value
   functionOpacity->AdjustRange(rangeNew);
-  std::cout << "Gradient Opacity range: "
-            << functionOpacity->GetRange()[0] << " " << functionOpacity->GetRange()[1]
-            << std::endl;
+  vtkDebugMacro("Gradient Opacity range: " << functionOpacity->GetRange()[0] << " " << functionOpacity->GetRange()[1]);
 }
 
 //----------------------------------------------------------------------------
@@ -391,7 +372,7 @@ void vtkSlicerVolumeRenderingLogic
   // Sanity check
   threshold[0] = std::max(std::min(threshold[0], scalarRange[1]), scalarRange[0]);
   threshold[1] = std::min(std::max(threshold[1], scalarRange[0]), scalarRange[1]);
-  std::cout << "Threshold: " << threshold[0] << " " << threshold[1] << std::endl;
+  vtkDebugMacro("Threshold: " << threshold[0] << " " << threshold[1]);
 
   double previous = VTK_DOUBLE_MIN;
 
@@ -658,13 +639,7 @@ void vtkSlicerVolumeRenderingLogic
   this->SetThresholdToVolumeProp(
     scalarRange, threshold, prop,
     this->UseLinearRamp, ignoreVolumeDisplayNodeThreshold);
-  if (vtkMRMLNCIRayCastVolumeRenderingDisplayNode::SafeDownCast(vspNode))
-    {
-    // NCI raycast mapper applies a second threshold in addition to the opacity
-    // transfer function
-    vtkMRMLNCIRayCastVolumeRenderingDisplayNode::SafeDownCast(vspNode)
-      ->SetDepthPeelingThreshold(scalarRange[0]);
-    }
+
   this->SetWindowLevelToVolumeProp(
     scalarRange, windowLevel, lut, prop);
   this->SetGradientOpacityToVolumeProp(scalarRange, prop);
@@ -976,6 +951,17 @@ void vtkSlicerVolumeRenderingLogic::UpdateDisplayNodeFromVolumeNode(
 vtkMRMLVolumePropertyNode* vtkSlicerVolumeRenderingLogic
 ::AddVolumePropertyFromFile (const char* filename)
 {
+  if (!this->GetMRMLScene())
+    {
+    return NULL;
+    }
+  if (!filename ||
+      !strcmp(filename, ""))
+    {
+    vtkErrorMacro("AddVolumePropertyFromFile: can't load volume properties from empty file name");
+    return NULL;
+    }
+
   vtkMRMLVolumePropertyNode *vpNode = vtkMRMLVolumePropertyNode::New();
   vtkMRMLVolumePropertyStorageNode *vpStorageNode = vtkMRMLVolumePropertyStorageNode::New();
 
@@ -986,7 +972,6 @@ vtkMRMLVolumePropertyNode* vtkSlicerVolumeRenderingLogic
     useURI = this->GetMRMLScene()->GetCacheManager()->IsRemoteReference(filename);
     }
 
-  itksys_stl::string name;
   const char *localFile;
   if (useURI)
     {
@@ -999,13 +984,14 @@ vtkMRMLVolumePropertyNode* vtkSlicerVolumeRenderingLogic
     vpStorageNode->SetFileName(filename);
     localFile = filename;
     }
-  const itksys_stl::string fname(localFile);
-  // the model name is based on the file name (itksys call should work even if
+  const std::string fname(localFile);
+  // the node name is based on the file name (itksys call should work even if
   // file is not on disk yet)
-  name = itksys::SystemTools::GetFilenameName(fname);
+  std::string filenameName = itksys::SystemTools::GetFilenameName(fname);
+  const std::string name = itksys::SystemTools::GetFilenameWithoutExtension(filenameName);
 
   // check to see which node can read this type of file
-  if (!vpStorageNode->SupportedFileType(name.c_str()))
+  if (!vpStorageNode->SupportedFileType(fname.c_str()))
     {
     vpStorageNode->Delete();
     vpStorageNode = NULL;
@@ -1068,6 +1054,25 @@ vtkMRMLScene* vtkSlicerVolumeRenderingLogic::GetPresetsScene()
     this->LoadPresets(this->PresetsScene);
     }
   return this->PresetsScene;
+}
+
+//---------------------------------------------------------------------------
+vtkMRMLVolumePropertyNode* vtkSlicerVolumeRenderingLogic::GetPresetByName(
+    const char* presetName)
+{
+  vtkMRMLScene * presetsScene = this->GetPresetsScene();
+  if (!presetsScene || !presetName)
+    {
+    return 0;
+    }
+  vtkSmartPointer<vtkCollection> presets;
+  presets.TakeReference(presetsScene->GetNodesByClassByName(
+        "vtkMRMLVolumePropertyNode", presetName));
+  if (presets->GetNumberOfItems() == 0)
+    {
+    return 0;
+    }
+  return vtkMRMLVolumePropertyNode::SafeDownCast(presets->GetItemAsObject(0));
 }
 
 //---------------------------------------------------------------------------

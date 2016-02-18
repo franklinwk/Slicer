@@ -33,11 +33,21 @@ int vtkMRMLScalarVolumeNodeTest2(int , char * [] )
 {
   vtkNew<vtkImageData> imageData;
   imageData->SetDimensions(256, 256, 1);
-  imageData->SetScalarTypeToUnsignedShort();
-  imageData->SetNumberOfScalarComponents(1); // image holds one value intensities
-  //imageData->SetSpacing(2., 2., 512.); not used by vtkMRMLVolumeNode
-  //imageData->SetOrigin(0.0,0.0,0.0); not used by vtkMRMLVolumeNode
-  imageData->AllocateScalars(); // allocate storage for image data  
+  imageData->AllocateScalars(VTK_UNSIGNED_SHORT, 1); // allocate storage for image data
+
+  // Fill every entry of the image data with "0"
+  int* dims = imageData->GetDimensions();
+  for (int z = 0; z < dims[2]; z++)
+    {
+    for (int y = 0; y < dims[1]; y++)
+      {
+      for (int x = 0; x < dims[0]; x++)
+        {
+        vtkTypeUInt16* pixel = static_cast<vtkTypeUInt16*>(imageData->GetScalarPointer(x,y,z));
+        pixel[0] = 0;
+        }
+      }
+    }
 
   vtkNew<vtkMRMLScene> scene;
 

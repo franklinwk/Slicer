@@ -22,6 +22,7 @@
 
 // Qt includes
 #include <QDebug>
+#include <QSettings>
 
 // CTK includes
 #include <ctkWidgetsUtils.h>
@@ -87,14 +88,11 @@ qSlicerCLIModule::~qSlicerCLIModule()
 //-----------------------------------------------------------------------------
 void qSlicerCLIModule::setup()
 {
+#ifndef QT_NO_DEBUG
   Q_D(qSlicerCLIModule);
-  
   // Temporary directory should be set before the module is initialized
   Q_ASSERT(!d->TempDirectory.isEmpty());
-
-  // Set temp directory 
-  vtkSlicerCLIModuleLogic* myLogic = vtkSlicerCLIModuleLogic::SafeDownCast(this->logic());
-  myLogic->SetTemporaryDirectory(d->TempDirectory.toLatin1());
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -109,6 +107,15 @@ vtkMRMLAbstractLogic* qSlicerCLIModule::createLogic()
   Q_D(qSlicerCLIModule);
   vtkSlicerCLIModuleLogic* logic = vtkSlicerCLIModuleLogic::New();
   logic->SetDefaultModuleDescription(d->Desc);
+
+  // In developer mode keep the CLI modules input and output files
+  QSettings settings;
+  bool developerModeEnabled = settings.value("Developer/DeveloperMode", false).toBool();
+  if (developerModeEnabled)
+    {
+    logic->DeleteTemporaryFilesOff();
+    }
+
   return logic;
 }
 
@@ -161,7 +168,7 @@ void qSlicerCLIModule::setXmlModuleDescription(const QString& xmlModuleDescripti
 
   QString help =
     "%1<br>"
-    "For more detailed documentation see the online documentation at"
+    "For more detailed documentation see the online documentation at "
     "<a href=\"%2\">%2</a>";
 
   d->Help = help.arg(
@@ -170,14 +177,14 @@ void qSlicerCLIModule::setXmlModuleDescription(const QString& xmlModuleDescripti
 
   // Set module type
   desc.SetType(this->moduleType().toStdString());
-  
+
   // Set module entry point
   desc.SetTarget(this->entryPoint().toStdString());
 
   // Register the module description in the master list
   vtkMRMLCommandLineModuleNode::RegisterModuleDescription(desc);
 
-  d->Desc = desc; 
+  d->Desc = desc;
 }
 
 //-----------------------------------------------------------------------------

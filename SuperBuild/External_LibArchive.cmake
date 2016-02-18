@@ -15,16 +15,13 @@ if(${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj} AND (WIN32 OR APPLE))
 endif()
 
 if(${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
-  unset(LibArchive_DIR CACHE)
+  unset(LibArchive_INCLUDE_DIR CACHE)
+  unset(LibArchive_LIBRARY CACHE)
   find_package(LibArchive REQUIRED MODULE)
 endif()
 
-# Sanity checks
-if(DEFINED LibArchive_DIR AND NOT EXISTS ${LibArchive_DIR})
-  message(FATAL_ERROR "LibArchive_DIR variable is defined but corresponds to non-existing directory")
-endif()
-
-if(NOT DEFINED LibArchive_DIR AND NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
+if((NOT DEFINED LibArchive_INCLUDE_DIR
+   OR NOT DEFINED LibArchive_LIBRARY) AND NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
 
   #
   # NOTE: - a stable, recent release (3.0.4) of LibArchive is now checked out from git
@@ -45,8 +42,8 @@ if(NOT DEFINED LibArchive_DIR AND NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
 
   ExternalProject_Add(${proj}
     ${${proj}_EP_ARGS}
-    GIT_REPOSITORY "${git_protocol}://github.com/libarchive/libarchive.git"
-    GIT_TAG "v3.0.4"
+    GIT_REPOSITORY "${git_protocol}://github.com/Slicer/libarchive.git"
+    GIT_TAG "453b390286a59503f1ed3e2d8382e244cddbc304" # slicer-v3.0.4
     SOURCE_DIR ${CMAKE_BINARY_DIR}/${proj}
     BINARY_DIR ${proj}-build
     INSTALL_DIR LibArchive-install
@@ -91,6 +88,20 @@ if(NOT DEFINED LibArchive_DIR AND NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
   else()
     set(LibArchive_LIBRARY ${LibArchive_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}archive${CMAKE_SHARED_LIBRARY_SUFFIX})
   endif()
+
+  set(_lib_subdir lib)
+  if(WIN32)
+    set(_lib_subdir bin)
+  endif()
+
+  #-----------------------------------------------------------------------------
+  # Launcher setting specific to build tree
+
+  set(${proj}_LIBRARY_PATHS_LAUNCHER_BUILD ${LibArchive_DIR}/${_lib_subdir})
+  mark_as_superbuild(
+    VARS ${proj}_LIBRARY_PATHS_LAUNCHER_BUILD
+    LABELS "LIBRARY_PATHS_LAUNCHER_BUILD"
+    )
 
 else()
   ExternalProject_Add_Empty(${proj} DEPENDS ${${proj}_DEPENDENCIES})

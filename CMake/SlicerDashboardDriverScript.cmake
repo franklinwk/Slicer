@@ -41,8 +41,8 @@ if(NOT DEFINED WITH_TESTING_EXTENSIONS)
   set(WITH_TESTING_EXTENSIONS OFF)
 endif()
 
-if(NOT DEFINED MIDAS_PACKAGE_URL)
-  set(MIDAS_PACKAGE_URL "http://tarsonis.kitwarein.com/Midas3")
+if(WITH_PACKAGES AND NOT DEFINED MIDAS_PACKAGE_URL)
+  list(APPEND expected_variables MIDAS_PACKAGE_URL)
 endif()
 
 if(EXISTS "${CTEST_LOG_FILE}")
@@ -66,11 +66,46 @@ if(WITH_PACKAGES)
   endif()
 endif()
 
+#-----------------------------------------------------------------------------
+# Macro allowing to set a variable to its default value.
+# The default value is set with:
+#  (1) if set, the value environment variable <var>.
+#  (2) if set, the value of local variable variable <var>.
+#  (3) if none of the above, the value passed as a parameter.
+macro(setOnlyIfNotDefined var defaultvalue)
+  if(DEFINED ENV{${var}})
+    message(STATUS "Setting '${var}' variable with environment variable value '$ENV{${var}}'")
+    set(${var} $ENV{${var}})
+  endif()
+  if(NOT DEFINED ${var})
+    set(${var} "${defaultvalue}")
+  endif()
+endmacro()
+
+#-----------------------------------------------------------------------------
+# The following variable can be used while testing the driver scripts
+#-----------------------------------------------------------------------------
+setOnlyIfNotDefined(run_ctest_submit TRUE)
+setOnlyIfNotDefined(run_ctest_with_disable_clean FALSE)
+setOnlyIfNotDefined(run_ctest_with_update TRUE)
+setOnlyIfNotDefined(run_ctest_with_configure TRUE)
+setOnlyIfNotDefined(run_ctest_with_build TRUE)
+setOnlyIfNotDefined(run_ctest_with_test TRUE)
+setOnlyIfNotDefined(run_ctest_with_coverage TRUE)
+setOnlyIfNotDefined(run_ctest_with_memcheck TRUE)
+setOnlyIfNotDefined(run_ctest_with_packages TRUE)
+setOnlyIfNotDefined(run_ctest_with_upload TRUE)
+setOnlyIfNotDefined(run_ctest_with_notes TRUE)
+
+#-----------------------------------------------------------------------------
 if(NOT DEFINED GIT_REPOSITORY)
+  if(NOT DEFINED SVN_REPOSITORY)
+    set(SVN_REPOSITORY "http://svn.slicer.org/${CTEST_PROJECT_NAME}")
+  endif()
   if(NOT DEFINED SVN_BRANCH)
     set(SVN_BRANCH "trunk")
   endif()
-  set(repository http://svn.slicer.org/Slicer4/${SVN_BRANCH})
+  set(repository ${SVN_REPOSITORY}/${SVN_BRANCH})
   set(svn_checkout_option "")
   if(NOT "${SVN_REVISION}" STREQUAL "")
     set(repository "${repository}@${SVN_REVISION}")
@@ -78,7 +113,8 @@ if(NOT DEFINED GIT_REPOSITORY)
   endif()
   message("SVN_BRANCH .............: ${SVN_BRANCH}")
   message("SVN_REVISION ...........: ${SVN_REVISION}")
-  message("SVN_REPOSITORY .........: ${repository}")
+  message("SVN_REPOSITORY .........: ${SVN_REPOSITORY}")
+  message("SVN_URL ................: ${repository}")
 else()
   set(repository ${GIT_REPOSITORY})
   set(git_branch_option "")
@@ -128,7 +164,7 @@ if(NOT "${CTEST_CMAKE_GENERATOR}" MATCHES "Make")
 endif()
 set(ENV{CTEST_USE_LAUNCHERS_DEFAULT} ${CTEST_USE_LAUNCHERS})
 
-if(empty_binary_directory)
+if(empty_binary_directory AND NOT run_ctest_with_disable_clean)
   message("Directory ${CTEST_BINARY_DIRECTORY} cleaned !")
   ctest_empty_binary_directory(${CTEST_BINARY_DIRECTORY})
 endif()
@@ -148,28 +184,6 @@ else()
 endif()
 
 set(CTEST_SOURCE_DIRECTORY "${CTEST_SOURCE_DIRECTORY}")
-
-#-----------------------------------------------------------------------------
-# Macro allowing to set a variable to its default value only if not already defined
-macro(setIfNotDefined var defaultvalue)
-  if(NOT DEFINED ${var})
-    set(${var} "${defaultvalue}")
-  endif()
-endmacro()
-
-#-----------------------------------------------------------------------------
-# The following variable can be used while testing the driver scripts
-#-----------------------------------------------------------------------------
-setIfNotDefined(run_ctest_submit TRUE)
-setIfNotDefined(run_ctest_with_update TRUE)
-setIfNotDefined(run_ctest_with_configure TRUE)
-setIfNotDefined(run_ctest_with_build TRUE)
-setIfNotDefined(run_ctest_with_test TRUE)
-setIfNotDefined(run_ctest_with_coverage TRUE)
-setIfNotDefined(run_ctest_with_memcheck TRUE)
-setIfNotDefined(run_ctest_with_packages TRUE)
-setIfNotDefined(run_ctest_with_upload TRUE)
-setIfNotDefined(run_ctest_with_notes TRUE)
 
 #
 # run_ctest macro
@@ -229,7 +243,7 @@ ${ADDITIONAL_CMAKECACHE_OPTION}
 
       #set(label Slicer)
 
-      set_property(GLOBAL PROPERTY SubProject ${label})
+      #set_property(GLOBAL PROPERTY SubProject ${label})
       set_property(GLOBAL PROPERTY Label ${label})
 
       ctest_configure(BUILD "${CTEST_BINARY_DIRECTORY}")

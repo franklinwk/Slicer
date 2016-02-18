@@ -4,35 +4,36 @@ project(MRMLIDImageIO)
 cmake_minimum_required(VERSION 2.8.4)
 #-----------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
-# See http://cmake.org/cmake/help/cmake-2-8-docs.html#section_Policies for details
-#-----------------------------------------------------------------------------
-if(POLICY CMP0017)
-  cmake_policy(SET CMP0017 OLD)
-endif()
 
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  set(${CMAKE_PROJECT_NAME}_ITK_COMPONENTS
-    ITKCommon
-    ITKIOImageBase
-    )
-  find_package(ITK COMPONENTS ${${CMAKE_PROJECT_NAME}_ITK_COMPONENTS})
-else()
-  find_package(ITK REQUIRED)
-endif()
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
-  list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
-  list(APPEND ITK_INCLUDE_DIRS ${ITKFactoryRegistration_INCLUDE_DIRS})
-endif()
-include(${ITK_USE_FILE})
-
-find_package(VTK REQUIRED)
-include(${VTK_USE_FILE})
-
+# --------------------------------------------------------------------------
+# Options
+# --------------------------------------------------------------------------
 if(NOT DEFINED BUILD_SHARED_LIBS)
   option(BUILD_SHARED_LIBS "Build with shared libraries." ON)
 endif()
+
+# --------------------------------------------------------------------------
+# Dependencies
+# --------------------------------------------------------------------------
+
+#
+# ITK
+#
+set(${PROJECT_NAME}_ITK_COMPONENTS
+  ITKCommon
+  ITKIOImageBase
+  )
+find_package(ITK 4.6 COMPONENTS ${${PROJECT_NAME}_ITK_COMPONENTS} REQUIRED)
+set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
+list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
+list(APPEND ITK_INCLUDE_DIRS ${ITKFactoryRegistration_INCLUDE_DIRS})
+include(${ITK_USE_FILE})
+
+#
+# VTK
+#
+#find_package(VTK REQUIRED)
+#include(${VTK_USE_FILE})
 
 # --------------------------------------------------------------------------
 # Include dirs
@@ -92,6 +93,16 @@ if(Slicer_LIBRARY_PROPERTIES)
 endif()
 
 # --------------------------------------------------------------------------
+# Folder
+# --------------------------------------------------------------------------
+if(NOT DEFINED ${PROJECT_NAME}_FOLDER)
+  set(${PROJECT_NAME}_FOLDER ${PROJECT_NAME})
+endif()
+if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+  set_target_properties(${lib_name} PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+endif()
+
+# --------------------------------------------------------------------------
 # Export target
 # --------------------------------------------------------------------------
 if(NOT DEFINED ${PROJECT_NAME}_EXPORT_FILE)
@@ -138,6 +149,11 @@ set_target_properties(MRMLIDIOPlugin PROPERTIES
   ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${MRMLIDImageIO_ITKFACTORIES_DIR}"
   )
 target_link_libraries(MRMLIDIOPlugin ${lib_name})
+
+# Folder
+if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+  set_target_properties(MRMLIDIOPlugin PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+endif()
 
 # --------------------------------------------------------------------------
 # Install library - MRMLIDIO and MRMLIDOPlugin are installed in different locations

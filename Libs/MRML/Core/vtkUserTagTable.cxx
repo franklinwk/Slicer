@@ -10,7 +10,6 @@
 #include <vtksys/SystemTools.hxx>
 
 vtkStandardNewMacro ( vtkUserTagTable );
-vtkCxxRevisionMacro ( vtkUserTagTable, "$Revision: 1.0 $" );
 
 //----------------------------------------------------------------------------
 vtkUserTagTable::vtkUserTagTable()
@@ -37,7 +36,7 @@ vtkUserTagTable::~vtkUserTagTable()
       {
       this->TagTable->RemoveColumn ( i );
       }
-    
+
     this->TagTable->Delete();
     this->TagTable = NULL;
     }
@@ -179,7 +178,7 @@ int vtkUserTagTable::GetKeywordColumn ( const char* keyword )
       do { *cptr++ = *val++; } while ( --n );
       }
     }
-  return (returnString);      
+  return (returnString);
 }
 
 
@@ -204,7 +203,7 @@ const char * vtkUserTagTable::GetUserTagValue ( const char* keyword)
         //--- if we have a match, return the keyword's value
         d = this->TagTable->GetValue ( 0, i);
         ss = d.ToString();
-        val = ss.c_str();      
+        val = ss.c_str();
         size_t n = strlen(ss.c_str()) + 1;
         val = ss.c_str();
         char *cptr = new char[n];

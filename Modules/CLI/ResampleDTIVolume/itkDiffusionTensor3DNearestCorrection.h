@@ -63,9 +63,7 @@ public:
   inline DiffusionTensor3D<TOutput> operator()
     ( const DiffusionTensor3D<TInput> & tensorA )
   {
-    DiffusionTensor3D<TOutput>        tensor;
-    DiffusionTensor3DExtended<double> tensorDouble;
-    tensorDouble = ( DiffusionTensor3DExtended<TInput> )tensorA;
+    DiffusionTensor3DExtended<double> tensorDouble( tensorA );
     Matrix<double, 3, 3> B;
     Matrix<double, 3, 3> A;
     Matrix<double, 3, 3> transpose;
@@ -98,6 +96,8 @@ public:
       }
     eigenVectors = eigenVectors.GetTranspose();
     tensorDouble.SetTensorFromMatrix<double>( eigenVectors * mat * eigenVectors.GetInverse() );
+
+    DiffusionTensor3D<TOutput>        tensor;
     for( int i = 0; i < 6; i++ )
       {
       tensor[i] = ( TOutput ) tensorDouble[i];
@@ -124,6 +124,9 @@ public:
                                                                     typename TOutputImage::PixelType> >  Superclass;
   typedef SmartPointer<Self>       Pointer;
   typedef SmartPointer<const Self> ConstPointer;
+
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(DiffusionTensor3DNearestCorrectionFilter, UnaryFunctorImageFilter);
 
   /** Method for creation through the object factory. */
   itkNewMacro( Self );

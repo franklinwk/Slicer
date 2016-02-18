@@ -19,6 +19,35 @@ def restart():
   from slicer import app
   app.restart()
 
+def _readCMakeCache(var):
+  import os
+  from slicer import app
+
+  prefix = var + ":"
+
+  try:
+    with open(os.path.join(app.slicerHome, "CMakeCache.txt")) as cache:
+      for line in cache:
+        if line.startswith(prefix):
+          return line.split("=", 1)[1].rstrip()
+
+  except:
+    pass
+
+  return None
+
+def sourceDir():
+  """Location of the Slicer source directory.
+
+  :type: :class:`str` or ``None``
+
+  This provides the location of the Slicer source directory, if Slicer is being
+  run from a CMake build directory. If the Slicer home directory does not
+  contain a ``CMakeCache.txt`` (e.g. for an installed Slicer), the property
+  will have the value ``None``.
+  """
+  return _readCMakeCache('Slicer_SOURCE_DIR')
+
 #
 # Custom Import
 #
@@ -111,26 +140,26 @@ def findChildren(widget=None,name="",text="",title="",className=""):
     if not hasattr(p,'children'):
       continue
     parents += p.children()
-    if name and fnmatch.fnmatch(p.name, name):
+    if name and fnmatch.fnmatchcase(p.name, name):
       children.append(p)
     elif text:
       try:
         p.text
-        if fnmatch.fnmatch(p.text, text):
+        if fnmatch.fnmatchcase(p.text, text):
           children.append(p)
       except (AttributeError, TypeError):
         pass
     elif title:
       try:
         p.title
-        if fnmatch.fnmatch(p.title, title):
+        if fnmatch.fnmatchcase(p.title, title):
           children.append(p)
       except AttributeError:
         pass
     elif className:
       try:
         p.className()
-        if fnmatch.fnmatch(p.className(), className):
+        if fnmatch.fnmatchcase(p.className(), className):
           children.append(p)
       except AttributeError:
         pass
@@ -188,7 +217,7 @@ def loadTransform(filename, returnNode=False):
   filetype = 'TransformFile'
   return loadNodeFromFile(filename, filetype, {}, returnNode)
 
-def loadLabelVolume(filename, properties, returnNode=False):
+def loadLabelVolume(filename, properties={}, returnNode=False):
   filetype = 'VolumeFile'
   properties['labelmap'] = True
   return loadNodeFromFile(filename, filetype, properties, returnNode)
@@ -281,13 +310,32 @@ def saveScene(filename, properties={}):
 # Module
 #
 
+def moduleSelector():
+  w = mainWindow()
+  if not w:
+    import sys
+    print("Could not find main window", file=sys.stderr)
+    return None
+  return w.moduleSelector()
+
 def selectModule(module):
   moduleName = module
   if not isinstance(module, basestring):
     moduleName = module.name
-  w = mainWindow()
-  if not w: return
-  w.moduleSelector().selectModule(moduleName)
+  selector = moduleSelector()
+  if not selector:
+    import sys
+    print("Could not find moduleSelector in the main window", file=sys.stderr)
+    return None
+  moduleSelector().selectModule(moduleName)
+
+def selectedModule():
+  selector = moduleSelector()
+  if not selector:
+    import sys
+    print("Could not find moduleSelector in the main window", file=sys.stderr)
+    return None
+  return selector.selectedModule
 
 def moduleNames():
   from slicer import app
@@ -320,36 +368,136 @@ def getNewModuleGui(module):
     print("Could not find module widget representation with name '%s" % module.name, file=sys.stderr)
   return widgetRepr
 
+def modulePath(moduleName):
+  import slicer
+  return eval('slicer.modules.%s.path' % moduleName.lower())
+
+def reloadScriptedModule(moduleName):
+  """Generic reload method for any scripted module.
+  """
+  import imp, sys, os
+  import slicer
+
+  widgetName = moduleName + "Widget"
+
+  # reload the source code
+  filePath = modulePath(moduleName)
+  p = os.path.dirname(filePath)
+  if not p in sys.path:
+    sys.path.insert(0,p)
+  with open(filePath, "r") as fp:
+    reloaded_module = imp.load_module(
+        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
+
+  # find and hide the existing widget
+  parent = eval('slicer.modules.%s.widgetRepresentation()' % moduleName.lower())
+  for child in parent.children():
+    try:
+      child.hide()
+    except AttributeError:
+      pass
+
+  # remove spacer items
+  item = parent.layout().itemAt(0)
+  while item:
+    parent.layout().removeItem(item)
+    item = parent.layout().itemAt(0)
+
+  # delete the old widget instance
+  if hasattr(slicer.modules, widgetName):
+    w = getattr(slicer.modules, widgetName)
+    if hasattr(w, 'cleanup'):
+      w.cleanup()
+
+  # create new widget inside existing parent
+  widget = eval('reloaded_module.%s(parent)' % widgetName)
+  widget.setup()
+  setattr(slicer.modules, widgetName, widget)
+
+  return reloaded_module
+
+#
+# Layout
+#
+
+def resetThreeDViews():
+  """Reset focal view around volumes
+  """
+  import slicer
+  slicer.app.layoutManager().resetThreeDViews()
+
+def resetSliceViews():
+  """Reset focal view around volumes
+  """
+  import slicer
+  manager = slicer.app.layoutManager().resetSliceViews()
+
 #
 # MRML
 #
 
-def getNodes(pattern = ""):
+def getNodes(pattern = "", scene=None):
     """Return a dictionary of nodes where the name or id matches the 'pattern'.
     Providing an empty 'pattern' string will return all nodes.
     """
     import slicer, fnmatch
     nodes = {}
-    scene = slicer.mrmlScene
+    if scene is None:
+      scene = slicer.mrmlScene
     count = scene.GetNumberOfNodes()
     for idx in range(count):
       node = scene.GetNthNode(idx)
       name = node.GetName()
       id = node.GetID()
-      if fnmatch.fnmatch(name, pattern) or fnmatch.fnmatch(id, pattern):
+      if fnmatch.fnmatchcase(name, pattern) or fnmatch.fnmatchcase(id, pattern):
         nodes[node.GetName()] = node
     return nodes
 
-def getNode(pattern = "", index = 0):
+def getNode(pattern = "", index = 0, scene=None):
     """Return the indexth node where name or id matches 'pattern'.
     Providing an empty 'pattern' string will return all nodes.
     """
-    nodes = getNodes(pattern)
+    nodes = getNodes(pattern, scene)
     try:
       if nodes.keys():
         return nodes.values()[index]
     except IndexError:
       return None
+
+def getFirstNodeByClassByName(className, name, scene=None):
+  import slicer
+  if scene is None:
+      scene = slicer.mrmlScene
+  nodes = scene.GetNodesByClassByName(className, name)
+  nodes.UnRegister(nodes)
+  if nodes.GetNumberOfItems() > 0:
+    return nodes.GetItemAsObject(0)
+  return None
+
+def getFirstNodeByName(name, className=None):
+  """get the first MRML node that has the given name
+  - use a regular expression to match names post-pended with addition characters
+  - optionally specify a classname that must match
+  """
+  nodes = getNodes(name+'*')
+  for nodeName in nodes.keys():
+    if not className:
+      return (nodes[nodeName]) # return the first one
+    else:
+      if nodes[nodeName].IsA(className):
+        return (nodes[nodeName])
+  return None
+
+class NodeModify:
+  """Context manager to conveniently compress mrml node modified event.
+  """
+  def __init__(self, node):
+    self.node = node
+  def __enter__(self):
+    self.wasModifying = self.node.StartModify()
+    return self.node
+  def __exit__(self, type, value, traceback):
+    self.node.EndModify(self.wasModifying)
 
 #
 # MRML-numpy
@@ -361,11 +509,13 @@ def array(pattern = "", index = 0):
   console for quick debugging/testing.  More specific API should be
   used in scripts to be sure you get exactly what you want.
   """
+  scalarTypes = ('vtkMRMLScalarVolumeNode', 'vtkMRMLLabelMapVolumeNode')
   vectorTypes = ('vtkMRMLVectorVolumeNode', 'vtkMRMLMultiVolumeNode')
   tensorTypes = ('vtkMRMLDiffusionTensorVolumeNode',)
+  pointTypes = ('vtkMRMLModelNode',)
   import vtk.util.numpy_support
   n = getNode(pattern=pattern, index=index)
-  if n.GetClassName() == 'vtkMRMLScalarVolumeNode':
+  if n.GetClassName() in scalarTypes:
     i = n.GetImageData()
     shape = list(n.GetImageData().GetDimensions())
     shape.reverse()
@@ -386,5 +536,224 @@ def array(pattern = "", index = 0):
     shape.reverse()
     a = vtk.util.numpy_support.vtk_to_numpy(i.GetPointData().GetTensors()).reshape(shape+[3,3])
     return a
+  elif n.GetClassName() in pointTypes:
+    p = n.GetPolyData().GetPoints().GetData()
+    a = vtk.util.numpy_support.vtk_to_numpy(p)
+    return a
   # TODO: accessors for other node types: polydata (verts, polys...), colors
 
+
+#
+# VTK
+#
+
+class VTKObservationMixin(object):
+  def __init__(self):
+    super(VTKObservationMixin, self).__init__()
+    self.Observations = []
+
+  def removeObservers(self, method=None):
+    for o, e, m, g, t in list(self.Observations):
+      if method == m or method is None:
+        o.RemoveObserver(t)
+        self.Observations.remove([o, e, m, g, t])
+
+  def addObserver(self, object, event, method, group = 'none'):
+    if self.hasObserver(object, event, method):
+      print('already has observer')
+      return
+    tag = object.AddObserver(event, method)
+    self.Observations.append([object, event, method, group, tag])
+
+  def removeObserver(self, object, event, method):
+    for o, e, m, g, t in self.Observations:
+      if o == object and e == event and m == method:
+        o.RemoveObserver(t)
+        self.Observations.remove([o, e, m, g, t])
+
+  def hasObserver(self, object, event, method):
+    for o, e, m, g, t in self.Observations:
+      if o == object and e == event and m == method:
+        return True
+    return False
+
+  def observer(self, event, method):
+    for o, e, m, g, t in self.Observations:
+      if e == event and m == method:
+        return o
+    return None
+
+def toVTKString(str):
+  """Convert unicode string into 8-bit encoded ascii string.
+  Unicode characters without ascii equivalent will be stripped out.
+  """
+  return str.encode('latin1', 'ignore')
+
+
+#
+# File Utlities
+#
+
+def tempDirectory(key='__SlicerTemp__',tempDir=None,includeDateTime=True):
+  """Come up with a unique directory name in the temp dir and make it and return it
+  # TODO: switch to QTemporaryDir in Qt5.
+  Note: this directory is not automatically cleaned up
+  """
+  import qt, slicer
+  if not tempDir:
+    tempDir = qt.QDir(slicer.app.temporaryPath)
+  tempDirName = key
+  if includeDateTime:
+    key += qt.QDateTime().currentDateTime().toString("yyyy-MM-dd_hh+mm+ss.zzz")
+  fileInfo = qt.QFileInfo(qt.QDir(tempDir), tempDirName)
+  dirPath = fileInfo.absoluteFilePath()
+  qt.QDir().mkpath(dirPath)
+  return dirPath
+
+#
+# Misc. Utility methods
+#
+def unicodeify(s):
+  """
+  Avoid UnicodeEncodeErrors using the technique described here:
+  http://stackoverflow.com/questions/9942594/unicodeencodeerror-ascii-codec-cant-encode-character-u-xa0-in-position-20
+  """
+  return u' '.join(s).encode('utf-8').strip()
+
+def delayDisplay(message,autoCloseMsec=1000):
+  """Display an information message in a popup window for a short time.
+  If autoCloseMsec>0 then the window is closed after waiting for autoCloseMsec milliseconds
+  If autoCloseMsec=0 then the window is not closed until the user clicks on it.
+  """
+  import qt, slicer
+  import logging
+  logging.info(message)
+  messagePopup = qt.QDialog()
+  layout = qt.QVBoxLayout()
+  messagePopup.setLayout(layout)
+  label = qt.QLabel(message,messagePopup)
+  layout.addWidget(label)
+  if autoCloseMsec>0:
+    qt.QTimer.singleShot(autoCloseMsec, messagePopup.close)
+  else:
+    okButton = qt.QPushButton("OK")
+    layout.addWidget(okButton)
+    okButton.connect('clicked()', messagePopup.close)
+  messagePopup.exec_()
+
+def infoDisplay(text, windowTitle="Slicer information", parent=None, standardButtons=None, **kwargs):
+  """Display popup with a info message.
+  """
+  import qt
+  import logging
+  logging.info(text)
+  if mainWindow(verbose=False):
+    standardButtons = standardButtons if standardButtons else qt.QMessageBox.Ok
+    messageBox(text, parent, windowTitle=windowTitle, icon=qt.QMessageBox.Information, standardButtons=standardButtons,
+               **kwargs)
+
+def warningDisplay(text, windowTitle="Slicer warning", parent=None, standardButtons=None, **kwargs):
+  """Display popup with a warning message.
+  """
+  import qt
+  import logging
+  logging.warning(text)
+  if mainWindow(verbose=False):
+    standardButtons = standardButtons if standardButtons else qt.QMessageBox.Ok
+    messageBox(text, parent, windowTitle=windowTitle, icon=qt.QMessageBox.Warning, standardButtons=standardButtons,
+               **kwargs)
+
+def errorDisplay(text, windowTitle="Slicer error", parent=None, standardButtons=None, **kwargs):
+  """Display an error popup.
+  """
+  import qt
+  import logging
+  logging.error(text)
+  if mainWindow(verbose=False):
+    standardButtons = standardButtons if standardButtons else qt.QMessageBox.Ok
+    messageBox(text, parent, windowTitle=windowTitle, icon=qt.QMessageBox.Critical, standardButtons=standardButtons,
+               **kwargs)
+
+def confirmOkCancelDisplay(text, windowTitle="Slicer confirmation", parent=None, **kwargs):
+  """Display an confirmation popup. Return if confirmed with OK.
+  """
+  import qt
+  result = messageBox(text, parent=parent, windowTitle=windowTitle, icon=qt.QMessageBox.Question,
+                       standardButtons=qt.QMessageBox.Ok | qt.QMessageBox.Cancel, **kwargs)
+  return result == qt.QMessageBox.Ok
+
+def confirmYesNoDisplay(text, windowTitle="Slicer confirmation", parent=None, **kwargs):
+  """Display an confirmation popup. Return if confirmed with Yes.
+  """
+  import qt
+  result = messageBox(text, parent=parent, windowTitle=windowTitle, icon=qt.QMessageBox.Question,
+                       standardButtons=qt.QMessageBox.Yes | qt.QMessageBox.No, **kwargs)
+  return result == qt.QMessageBox.Yes
+
+def confirmRetryCloseDisplay(text, windowTitle="Slicer error", parent=None, **kwargs):
+  """Display an confirmation popup. Return if confirmed with Retry.
+  """
+  import qt
+  result = messageBox(text, parent=parent, windowTitle=windowTitle, icon=qt.QMessageBox.Critical,
+                       standardButtons=qt.QMessageBox.Retry | qt.QMessageBox.Close, **kwargs)
+  return result == qt.QMessageBox.Retry
+
+def messageBox(text, parent=None, **kwargs):
+  import qt
+  mbox = qt.QMessageBox(parent if parent else mainWindow())
+  mbox.text = text
+  for key, value in kwargs.iteritems():
+    if hasattr(mbox, key):
+      setattr(mbox, key, value)
+  return mbox.exec_()
+
+def createProgressDialog(parent=None, value=0, maximum=100, labelText="", windowTitle="Processing...", **kwargs):
+  """Display a modal QProgressDialog. Go to QProgressDialog documentation
+  http://pyqt.sourceforge.net/Docs/PyQt4/qprogressdialog.html for more keyword arguments, that could be used.
+  E.g. progressbar = createProgressIndicator(autoClose=False) if you don't want the progress dialog to automatically
+  close.
+  Updating progress value with progressbar.value = 50
+  Updating label text with progressbar.labelText = "processing XYZ"
+  """
+  import qt
+  progressIndicator = qt.QProgressDialog(parent if parent else mainWindow())
+  progressIndicator.minimumDuration = 0
+  progressIndicator.maximum = maximum
+  progressIndicator.value = value
+  progressIndicator.windowTitle = windowTitle
+  progressIndicator.labelText = labelText
+  for key, value in kwargs.iteritems():
+    if hasattr(progressIndicator, key):
+      setattr(progressIndicator, key, value)
+  return progressIndicator
+
+def toBool(value):
+  """Convert any type of value to a boolean.
+  The function uses the following heuristic:
+  1) If the value can be converted to an integer, the integer is then
+  converted to a boolean.
+  2) If the value is a string, return True if it is equal to 'true'. False otherwise.
+  Note that the comparison is case insensitive.
+  3) If the value is neither an integer or a string, the bool() function is applied.
+
+  >>> [toBool(x) for x in range(-2, 2)]
+  [True, True, False, True]
+  >>> [toBool(x) for x in ['-2', '-1', '0', '1', '2', 'Hello']]
+  [True, True, False, True, True, False]
+  >>> toBool(object())
+  True
+  >>> toBool(None)
+  False
+  """
+  try:
+    return bool(int(value))
+  except (ValueError, TypeError):
+    return value.lower() in ['true'] if isinstance(value, basestring) else bool(value)
+
+def settingsValue(key, default, converter=lambda v: v, settings=None):
+  """Return settings value associated with key if it exists or the provided default otherwise.
+  ``settings`` parameter is expected to be a valid ``qt.Settings`` object.
+  """
+  import qt
+  settings = qt.QSettings() if settings is None else settings
+  return converter(settings.value(key)) if settings.contains(key) else default

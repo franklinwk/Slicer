@@ -13,14 +13,14 @@
 /// seed point.  The pixels on this level curve "boundary" are labeled
 /// as 1. Does nothing if seed is in uniform area.
 ///
-/// This filter is specialized to volumes. If you are interested in 
+/// This filter is specialized to volumes. If you are interested in
 /// contouring other types of data, use the general vtkContourFilter. If you
 /// want to contour an image (i.e., a volume slice), use vtkMarchingSquares.
 class VTK_ITK_EXPORT vtkITKLevelTracingImageFilter : public vtkPolyDataAlgorithm
 {
 public:
   static vtkITKLevelTracingImageFilter *New();
-  vtkTypeRevisionMacro(vtkITKLevelTracingImageFilter, vtkPolyDataAlgorithm);
+  vtkTypeMacro(vtkITKLevelTracingImageFilter, vtkPolyDataAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   /// Methods to set/get seeds.  Seeds are specified in IJK (not XYZ).

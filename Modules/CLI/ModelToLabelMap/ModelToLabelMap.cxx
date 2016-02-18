@@ -26,9 +26,6 @@
 #include "itkFloodFilledImageFunctionConditionalIterator.h"
 #include "itkImageFileWriter.h"
 #include "itkPluginUtilities.h"
-#ifdef ITKV3_COMPATIBILITY
-#include "itkAnalyzeImageIOFactory.h"
-#endif
 #include <itksys/SystemTools.hxx>
 
 // VTK includes
@@ -38,6 +35,7 @@
 #include <vtkPolyDataPointSampler.h>
 #include <vtkPolyDataReader.h>
 #include <vtkXMLPolyDataReader.h>
+#include <vtkVersion.h>
 
 typedef itk::Image<unsigned char, 3> LabelImageType;
 
@@ -171,7 +169,7 @@ int DoIt( int argc, char * argv[])
   // do it
   vtkNew<vtkPolyDataPointSampler> sampler;
 
-  sampler->SetInput( polyData );
+  sampler->SetInputData( polyData );
   sampler->SetDistance( sampleDistance );
   sampler->GenerateEdgePointsOn();
   sampler->GenerateInteriorPointsOn();
@@ -258,9 +256,7 @@ int main( int argc, char * argv[] )
 
   itk::ImageIOBase::IOPixelType     pixelType;
   itk::ImageIOBase::IOComponentType componentType;
-#ifdef ITKV3_COMPATIBILITY
-  itk::ObjectFactoryBase::RegisterFactory( itk::AnalyzeImageIOFactory::New() );
-#endif
+
   try
     {
     itk::GetImageType(InputVolume, pixelType, componentType);

@@ -1,4 +1,24 @@
 
+# -------------------------------------------------------------------------
+# Disable source generator enabled by default
+# -------------------------------------------------------------------------
+set(CPACK_SOURCE_TBZ2 OFF CACHE BOOL "Enable to build TBZ2 source packages" FORCE)
+set(CPACK_SOURCE_TGZ  OFF CACHE BOOL "Enable to build TGZ source packages" FORCE)
+set(CPACK_SOURCE_TZ   OFF CACHE BOOL "Enable to build TZ source packages" FORCE)
+
+# -------------------------------------------------------------------------
+# Select generator
+# -------------------------------------------------------------------------
+if(UNIX)
+  set(CPACK_GENERATOR "TGZ")
+  if(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
+  endif()
+elseif(WIN32)
+  set(CPACK_GENERATOR "NSIS")
+endif()
+
+# -------------------------------------------------------------------------
 if(Slicer_USE_PYTHONQT AND NOT Slicer_USE_SYSTEM_python)
   # Python install rules are common to both 'bundled' and 'regular' package
   include(${Slicer_CMAKE_DIR}/SlicerBlockInstallPython.cmake)
@@ -9,7 +29,7 @@ if(Slicer_USE_PYTHONQT_WITH_TCL AND NOT Slicer_USE_SYSTEM_tcl)
 endif()
 
 if(NOT Slicer_USE_SYSTEM_QT)
-  set(SlicerBlockInstallQtPlugins_subdirectories imageformats sqldrivers)
+  set(SlicerBlockInstallQtPlugins_subdirectories imageformats sqldrivers designer:qwebview)
   include(${Slicer_CMAKE_DIR}/SlicerBlockInstallQtPlugins.cmake)
 endif()
 
@@ -44,21 +64,36 @@ if(NOT APPLE)
   if(NOT Slicer_USE_SYSTEM_LibArchive)
     include(${Slicer_CMAKE_DIR}/SlicerBlockInstallLibArchive.cmake)
   endif()
+  # XXX Note that installation of OpenMP libraries is available only
+  #     when using msvc compiler.
+  if(NOT DEFINED CMAKE_INSTALL_OPENMP_LIBRARIES)
+    set(CMAKE_INSTALL_OPENMP_LIBRARIES ON)
+  endif()
+  if(MSVC AND CMAKE_VERSION VERSION_LESS "3.1" AND CMAKE_INSTALL_OPENMP_LIBRARIES)
+    message(WARNING "Skipping installation of OpenMP libraries. "
+                    "Upgrade from CMake ${CMAKE_VERSION} to CMake >= 3.1 to install them.")
+  endif()
   include(InstallRequiredSystemLibraries)
+
+  # XXX: Remove this once CMake minimum version has been updated.
+  #      See Slicer issue #3972 and CMake issue #15428
+  if(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+    if(NOT CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP)
+      if(NOT CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION)
+        if(WIN32)
+          set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION bin)
+        else()
+          set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION lib)
+        endif()
+      endif()
+      install(PROGRAMS ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}
+        DESTINATION ${CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION}
+        COMPONENT RuntimeLibraries)
+    endif()
+  endif()
+
   include(${Slicer_CMAKE_DIR}/SlicerBlockInstallCMakeProjects.cmake)
 
-  # Remove development files installed by teem. Ideally, teem project itself should be updated.
-  # See http://na-mic.org/Mantis/view.php?id=3455
-  set(dollar "$")
-  install(CODE "execute_process(COMMAND \"@CMAKE_COMMAND@\" -E remove_directory \"${dollar}{CMAKE_INSTALL_PREFIX}/${Slicer_INSTALL_ROOT}include/teem\")")
-  foreach(file
-    lib/Teem-1.10.0/TeemBuildSettings.cmake
-    lib/Teem-1.10.0/TeemConfig.cmake
-    lib/Teem-1.10.0/TeemLibraryDepends.cmake
-    lib/Teem-1.10.0/TeemUse.cmake
-    )
-    install(CODE "execute_process(COMMAND \"@CMAKE_COMMAND@\" -E remove \"${dollar}{CMAKE_INSTALL_PREFIX}/${Slicer_INSTALL_ROOT}${file}\")")
-  endforeach()
 else()
 
   set(CMAKE_INSTALL_NAME_TOOL "" CACHE FILEPATH "" FORCE)
@@ -67,16 +102,14 @@ else()
     include(${Slicer_CMAKE_DIR}/SlicerBlockInstallExternalPythonModules.cmake)
   endif()
 
-  # Generate qt.conf
-  file(WRITE ${Slicer_BINARY_DIR}/CMake/qt.conf-to-install
-"[Paths]
-Plugins = ${Slicer_QtPlugins_DIR}
-")
-  # .. and install
-  install(FILES ${Slicer_BINARY_DIR}/CMake/qt.conf-to-install
-          DESTINATION ${Slicer_INSTALL_ROOT}Resources
-          COMPONENT Runtime
-          RENAME qt.conf)
+  # Calling find_package will ensure the *_LIBRARY_DIRS expected by the fixup script are set.
+  if(Slicer_USE_OpenIGTLink)
+    find_package(OpenIGTLink REQUIRED)
+  endif()
+  if(Slicer_BUILD_CLI_SUPPORT)
+    find_package(SlicerExecutionModel REQUIRED)
+  endif()
+  set(VTK_LIBRARY_DIRS "${VTK_DIR}/lib")
 
   set(fixup_path @rpath)
   set(slicer_cpack_bundle_fixup_directory ${Slicer_BINARY_DIR}/CMake/SlicerCPackBundleFixup)
@@ -88,7 +121,7 @@ Plugins = ${Slicer_QtPlugins_DIR}
   #        let's make sure the following install rule is evaluated within its own directory.
   #        Otherwise, the associated script will be executed before any other relevant install rules.
   file(WRITE ${slicer_cpack_bundle_fixup_directory}/CMakeLists.txt
-    "install(SCRIPT \"${slicer_cpack_bundle_fixup_directory}/SlicerCPackBundleFixup.cmake\")")
+    "install(SCRIPT \"${slicer_cpack_bundle_fixup_directory}/SlicerCPackBundleFixup.cmake\" COMPONENT Runtime)")
   add_subdirectory(${slicer_cpack_bundle_fixup_directory} ${slicer_cpack_bundle_fixup_directory}-binary)
 
 endif()
@@ -98,7 +131,7 @@ endif()
 set(additional_projects ${Slicer_ADDITIONAL_DEPENDENCIES} ${Slicer_ADDITIONAL_PROJECTS})
 foreach(additional_project ${additional_projects})
   if(NOT Slicer_USE_SYSTEM_${additional_project})
-    find_package(${additional_project})
+    find_package(${additional_project} QUIET)
     if(${additional_project}_FOUND)
       if(${additional_project}_USE_FILE)
         include(${${additional_project}_USE_FILE})
@@ -114,75 +147,112 @@ foreach(additional_project ${additional_projects})
 endforeach()
 
 # Install Slicer
-set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${Slicer_BINARY_DIR};Slicer;ALL;/")
+set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${Slicer_BINARY_DIR};Slicer;RuntimeLibraries;/")
+set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${Slicer_BINARY_DIR};Slicer;RuntimePlugins;/")
+if(NOT Slicer_INSTALL_NO_DEVELOPMENT)
+  set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${Slicer_BINARY_DIR};Slicer;Development;/")
+endif()
+# Installation of 'Runtime' should be last to ensure the 'SlicerCPackBundleFixup.cmake' is executed last.
+set(CPACK_INSTALL_CMAKE_PROJECTS "${CPACK_INSTALL_CMAKE_PROJECTS};${Slicer_BINARY_DIR};Slicer;Runtime;/")
 
 # -------------------------------------------------------------------------
-# Package properties
+# Common package properties
 # -------------------------------------------------------------------------
 set(CPACK_MONOLITHIC_INSTALL ON)
 
 set(Slicer_CPACK_PACKAGE_NAME ${SlicerApp_APPLICATION_NAME})
-set(Slicer_CPACK_PACKAGE_VENDOR "NA-MIC")
-set(Slicer_CPACK_PACKAGE_DESCRIPTION_FILE "${Slicer_SOURCE_DIR}/README.txt")
-set(Slicer_CPACK_PACKAGE_DESCRIPTION_SUMMARY
-  "Medical Visualization and Processing Environment for Research")
+set(Slicer_CPACK_PACKAGE_VENDOR ${Slicer_ORGANIZATION_NAME})
 set(Slicer_CPACK_RESOURCE_FILE_LICENSE "${Slicer_SOURCE_DIR}/License.txt")
 set(Slicer_CPACK_PACKAGE_VERSION_MAJOR "${Slicer_VERSION_MAJOR}")
 set(Slicer_CPACK_PACKAGE_VERSION_MINOR "${Slicer_VERSION_MINOR}")
 set(Slicer_CPACK_PACKAGE_VERSION_PATCH "${Slicer_VERSION_PATCH}")
 set(Slicer_CPACK_PACKAGE_VERSION "${Slicer_VERSION_FULL}")
-set(Slicer_CPACK_PACKAGE_ICON "${Slicer_SOURCE_DIR}/Resources/Slicer.icns")
+set(Slicer_CPACK_PACKAGE_INSTALL_DIRECTORY "${Slicer_CPACK_PACKAGE_NAME} ${Slicer_CPACK_PACKAGE_VERSION}")
 
 set(project ${${Slicer_MAIN_PROJECT}_APPLICATION_NAME})
 
-set(CPACK_PACKAGE_NAME ${${project}_CPACK_PACKAGE_NAME})
-set(CPACK_PACKAGE_VENDOR ${${project}_CPACK_PACKAGE_VENDOR})
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY ${${project}_CPACK_PACKAGE_DESCRIPTION_SUMMARY})
-set(CPACK_PACKAGE_DESCRIPTION_FILE ${${project}_CPACK_PACKAGE_DESCRIPTION_FILE})
-set(CPACK_RESOURCE_FILE_LICENSE ${${project}_CPACK_RESOURCE_FILE_LICENSE})
-set(CPACK_PACKAGE_VERSION_MAJOR ${${project}_CPACK_PACKAGE_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${${project}_CPACK_PACKAGE_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${${project}_CPACK_PACKAGE_VERSION_PATCH})
-set(CPACK_PACKAGE_VERSION ${${project}_CPACK_PACKAGE_VERSION})
+# Get main application properties
+get_property(${project}_CPACK_PACKAGE_DESCRIPTION_FILE GLOBAL PROPERTY ${project}_DESCRIPTION_FILE)
+get_property(${project}_CPACK_PACKAGE_DESCRIPTION_SUMMARY GLOBAL PROPERTY ${project}_DESCRIPTION_SUMMARY)
+get_property(${project}_CPACK_PACKAGE_ICON GLOBAL PROPERTY ${project}_APPLE_ICON_FILE)
+
+function(slicer_verbose_set varname)
+  message(STATUS "Setting ${varname} to '${ARGN}'")
+  set(${varname} "${ARGN}" PARENT_SCOPE)
+endfunction()
+
+macro(slicer_cpack_set varname)
+  if(DEFINED ${project}_${varname})
+    slicer_verbose_set(${varname} ${${project}_${varname}})
+  elseif(DEFINED Slicer_${varname})
+    slicer_verbose_set(${varname} ${Slicer_${varname}})
+  else()
+    if(NOT "Slicer" STREQUAL "${project}")
+      set(_error_msg "Neither Slicer_${varname} or ${project}_${varname} are defined.")
+    else()
+      set(_error_msg "${project}_${varname} is not defined")
+    endif()
+    message(FATAL_ERROR "Failed to set variable ${varname}. ${_error_msg}")
+  endif()
+endmacro()
+
+slicer_cpack_set("CPACK_PACKAGE_NAME")
+slicer_cpack_set("CPACK_PACKAGE_VENDOR")
+slicer_cpack_set("CPACK_PACKAGE_DESCRIPTION_SUMMARY")
+slicer_cpack_set("CPACK_PACKAGE_DESCRIPTION_FILE")
+slicer_cpack_set("CPACK_RESOURCE_FILE_LICENSE")
+slicer_cpack_set("CPACK_PACKAGE_VERSION_MAJOR")
+slicer_cpack_set("CPACK_PACKAGE_VERSION_MINOR")
+slicer_cpack_set("CPACK_PACKAGE_VERSION_PATCH")
+slicer_cpack_set("CPACK_PACKAGE_VERSION")
 set(CPACK_SYSTEM_NAME "${Slicer_OS}-${Slicer_ARCHITECTURE}")
+slicer_cpack_set("CPACK_PACKAGE_INSTALL_DIRECTORY")
 
 if(APPLE)
-  set(CPACK_PACKAGE_ICON ${${project}_CPACK_PACKAGE_ICON})
+  slicer_cpack_set("CPACK_PACKAGE_ICON")
 endif()
 
-set(CPACK_PACKAGE_INSTALL_DIRECTORY "${CPACK_PACKAGE_NAME} ${CPACK_PACKAGE_VERSION}")
-
-# Installers for 32- vs. 64-bit CMake:
-#  - Root install directory (displayed to end user at installer-run time)
-#  - "NSIS package/display name" (text used in the installer GUI)
-#  - Registry key used to store info about the installation
-if(CMAKE_CL_64)
-  set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
-  set(CPACK_NSIS_PACKAGE_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY} (Win64)")
-  set(CPACK_PACKAGE_INSTALL_REGISTRY_KEY "${CPACK_PACKAGE_NAME} ${CPACK_PACKAGE_VERSION} (Win64)")
-else()
-  set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES")
-  set(CPACK_NSIS_PACKAGE_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY}")
-  set(CPACK_PACKAGE_INSTALL_REGISTRY_KEY "${CPACK_PACKAGE_NAME} ${CPACK_PACKAGE_VERSION}")
-endif()
-
-# Slicer does *NOT* require setting the windows path
-set(CPACK_NSIS_MODIFY_PATH OFF)
-
-set(APPLICATION_NAME "${Slicer_MAIN_PROJECT_APPLICATION_NAME}")
-set(EXECUTABLE_NAME "${Slicer_MAIN_PROJECT_APPLICATION_NAME}")
-set(CPACK_PACKAGE_EXECUTABLES "..\\\\${EXECUTABLE_NAME}" "${APPLICATION_NAME}")
-
 # -------------------------------------------------------------------------
-# File extensions
+# NSIS package properties
 # -------------------------------------------------------------------------
-set(FILE_EXTENSIONS .mrml .xcat .mrb)
+if(CPACK_GENERATOR STREQUAL "NSIS")
 
-if(FILE_EXTENSIONS)
+  set(Slicer_CPACK_NSIS_INSTALL_SUBDIRECTORY "")
+  slicer_cpack_set("CPACK_NSIS_INSTALL_SUBDIRECTORY")
 
-  # For NSIS (Win32) now, we will add MacOSX support later (get back to Wes)
+  # Installers for 32- vs. 64-bit CMake:
+  #  - Root install directory (displayed to end user at installer-run time)
+  #  - "NSIS package/display name" (text used in the installer GUI)
+  #  - Registry key used to store info about the installation
+  if(CMAKE_CL_64)
+    set(_nsis_install_root "$PROGRAMFILES64")
+    slicer_verbose_set(CPACK_NSIS_PACKAGE_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY}")
+    slicer_verbose_set(CPACK_PACKAGE_INSTALL_REGISTRY_KEY "${CPACK_PACKAGE_INSTALL_DIRECTORY} (Win64)")
+  else()
+    set(_nsis_install_root "$PROGRAMFILES")
+    slicer_verbose_set(CPACK_NSIS_PACKAGE_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY} (Win32)")
+    slicer_verbose_set(CPACK_PACKAGE_INSTALL_REGISTRY_KEY "${CPACK_PACKAGE_INSTALL_DIRECTORY}")
+  endif()
 
-  if(WIN32 AND NOT UNIX)
+  if(NOT CPACK_NSIS_INSTALL_SUBDIRECTORY STREQUAL "")
+    set(_nsis_install_root "${_nsis_install_root}\\\\${CPACK_NSIS_INSTALL_SUBDIRECTORY}")
+  endif()
+  slicer_verbose_set(CPACK_NSIS_INSTALL_ROOT ${_nsis_install_root})
+
+  # Slicer does *NOT* require setting the windows path
+  set(CPACK_NSIS_MODIFY_PATH OFF)
+
+  set(APPLICATION_NAME "${Slicer_MAIN_PROJECT_APPLICATION_NAME}")
+  set(EXECUTABLE_NAME "${Slicer_MAIN_PROJECT_APPLICATION_NAME}")
+  slicer_verbose_set(CPACK_PACKAGE_EXECUTABLES "..\\\\${EXECUTABLE_NAME}" "${APPLICATION_NAME}")
+
+  # -------------------------------------------------------------------------
+  # File extensions
+  # -------------------------------------------------------------------------
+  set(FILE_EXTENSIONS .mrml .xcat .mrb)
+
+  if(FILE_EXTENSIONS)
+
     set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS)
     set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS)
     foreach(ext ${FILE_EXTENSIONS})
@@ -202,25 +272,7 @@ if(FILE_EXTENSIONS)
           ")
     endforeach()
   endif()
-endif()
 
-# -------------------------------------------------------------------------
-# Disable source generator enabled by default
-# -------------------------------------------------------------------------
-set(CPACK_SOURCE_TBZ2 OFF CACHE BOOL "Enable to build TBZ2 source packages" FORCE)
-set(CPACK_SOURCE_TGZ  OFF CACHE BOOL "Enable to build TGZ source packages" FORCE)
-set(CPACK_SOURCE_TZ   OFF CACHE BOOL "Enable to build TZ source packages" FORCE)
-
-# -------------------------------------------------------------------------
-# Enable generator
-# -------------------------------------------------------------------------
-if(UNIX)
-  set(CPACK_GENERATOR "TGZ")
-  if(APPLE)
-    set(CPACK_GENERATOR "DragNDrop")
-  endif()
-elseif(WIN32)
-  set(CPACK_GENERATOR "NSIS")
 endif()
 
 include(CPack)

@@ -57,6 +57,7 @@ qSlicerAbstractCoreModule* ctkFactoryScriptedItem::instanciator()
 
   qSlicerCoreApplication * app = qSlicerCoreApplication::application();
   module->setInstalled(qSlicerUtils::isPluginInstalled(this->path(), app->slicerHome()));
+  module->setBuiltIn(qSlicerUtils::isPluginBuiltIn(this->path(), app->slicerHome()));
 
 #ifdef Slicer_USE_PYTHONQT
   if (!qSlicerCoreApplication::testAttribute(qSlicerCoreApplication::AA_DisablePython))
@@ -156,8 +157,26 @@ qSlicerScriptedLoadableModuleFactory::~qSlicerScriptedLoadableModuleFactory()
 bool qSlicerScriptedLoadableModuleFactory::isValidFile(const QFileInfo& file)const
 {
   // Skip if current file isn't a python file
-  return ctkAbstractFileBasedFactory<qSlicerAbstractCoreModule>::isValidFile(file) &&
-    file.suffix().compare("py", Qt::CaseInsensitive) == 0;
+  if(!ctkAbstractFileBasedFactory<qSlicerAbstractCoreModule>::isValidFile(file))
+    {
+    return false;
+    }
+  // Accept if current file is a python script
+  if (file.suffix().compare("py", Qt::CaseInsensitive) == 0)
+    {
+    return true;
+    }
+  // Accept if current file is a pyc file and there is no associated py file
+  if (file.suffix().compare("pyc", Qt::CaseInsensitive) == 0)
+    {
+    int length = file.filePath().size();
+    QString pyFilePath = file.filePath().remove(length - 1, 1);
+    if (!QFile::exists(pyFilePath))
+      {
+      return true;
+      }
+    }
+  return false;
 }
 
 //----------------------------------------------------------------------------

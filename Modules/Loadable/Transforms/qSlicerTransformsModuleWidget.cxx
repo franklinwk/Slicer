@@ -19,13 +19,18 @@
 ==============================================================================*/
 
 // Qt includes
+#include <QAction>
 #include <QFileDialog>
+#include <QApplication>
+#include <QClipboard>
+#include <QStringBuilder>
+
+// C++ includes
+#include <cmath>
 
 // SlicerQt includes
 #include "qSlicerTransformsModuleWidget.h"
 #include "ui_qSlicerTransformsModuleWidget.h"
-//#include "qSlicerApplication.h"
-//#include "qSlicerIOManager.h"
 
 // vtkSlicerLogic includes
 #include "vtkSlicerTransformLogic.h"
@@ -34,9 +39,12 @@
 #include <qMRMLUtils.h>
 
 // MRML includes
-#include "vtkMRMLLinearTransformNode.h"
+#include "vtkMRMLTransformNode.h"
+#include "vtkMRMLTransformDisplayNode.h"
+#include "vtkMRMLScene.h"
 
 // VTK includes
+#include <vtkNew.h>
 #include <vtkSmartPointer.h>
 #include <vtkTransform.h>
 
@@ -50,16 +58,18 @@ public:
   qSlicerTransformsModuleWidgetPrivate(qSlicerTransformsModuleWidget& object);
   static QList<vtkSmartPointer<vtkMRMLTransformableNode> > getSelectedNodes(qMRMLTreeView* tree);
   vtkSlicerTransformLogic*      logic()const;
-  QButtonGroup*                 CoordinateReferenceButtonGroup;
-  vtkMRMLLinearTransformNode*   MRMLTransformNode;
+  vtkMRMLTransformNode*         MRMLTransformNode;
+  QAction*                      CopyAction;
+  QAction*                      PasteAction;
 };
 
 //-----------------------------------------------------------------------------
 qSlicerTransformsModuleWidgetPrivate::qSlicerTransformsModuleWidgetPrivate(qSlicerTransformsModuleWidget& object)
   : q_ptr(&object)
 {
-  this->CoordinateReferenceButtonGroup = 0;
   this->MRMLTransformNode = 0;
+  this->CopyAction = 0;
+  this->PasteAction = 0;
 }
 //-----------------------------------------------------------------------------
 vtkSlicerTransformLogic* qSlicerTransformsModuleWidgetPrivate::logic()const
@@ -74,7 +84,7 @@ QList<vtkSmartPointer<vtkMRMLTransformableNode> > qSlicerTransformsModuleWidgetP
   QModelIndexList selectedIndexes =
     tree->selectionModel()->selectedRows();
   selectedIndexes = qMRMLTreeView::removeChildren(selectedIndexes);
-  
+
   // Return the list of nodes
   QList<vtkSmartPointer<vtkMRMLTransformableNode> > selectedNodes;
   foreach(QModelIndex selectedIndex, selectedIndexes)
@@ -107,41 +117,46 @@ void qSlicerTransformsModuleWidget::setup()
   d->setupUi(this);
 
   // Add coordinate reference button to a button group
-  d->CoordinateReferenceButtonGroup =
-    new QButtonGroup(d->CoordinateReferenceGroupBox);
-  d->CoordinateReferenceButtonGroup->addButton(
-    d->GlobalRadioButton, qMRMLTransformSliders::GLOBAL);
-  d->CoordinateReferenceButtonGroup->addButton(
-    d->LocalRadioButton, qMRMLTransformSliders::LOCAL);
+  d->CopyAction = new QAction(this);
+  d->CopyAction->setIcon(QIcon(":Icons/Medium/SlicerEditCopy.png"));
+  d->CopyAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+  d->CopyAction->setShortcuts(QKeySequence::Copy);
+  d->CopyAction->setToolTip(tr("Copy"));
+  this->addAction(d->CopyAction);
+  d->PasteAction = new QAction(this);
+  d->PasteAction->setIcon(QIcon(":Icons/Medium/SlicerEditPaste.png"));
+  d->PasteAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+  d->PasteAction->setShortcuts(QKeySequence::Paste);
+  d->PasteAction->setToolTip(tr("Paste"));
+  this->addAction(d->PasteAction);
 
   // Connect button group
-  this->connect(d->CoordinateReferenceButtonGroup,
-                SIGNAL(buttonPressed(int)),
-                SLOT(onCoordinateReferenceButtonPressed(int)));
+  this->connect(d->TranslateFirstToolButton,
+                SIGNAL(toggled(bool)),
+                SLOT(onTranslateFirstButtonPressed(bool)));
 
   // Connect identity button
   this->connect(d->IdentityPushButton,
                 SIGNAL(clicked()),
                 SLOT(identity()));
 
-  // Connect revert button
+  // Connect invert button
   this->connect(d->InvertPushButton,
                 SIGNAL(clicked()),
                 SLOT(invert()));
+
+  // Connect split button
+  this->connect(d->SplitPushButton,
+                SIGNAL(clicked()),
+                SLOT(split()));
 
   // Connect node selector with module itself
   this->connect(d->TransformNodeSelector,
                 SIGNAL(currentNodeChanged(vtkMRMLNode*)),
                 SLOT(onNodeSelected(vtkMRMLNode*)));
 
-  // Connect minimum and maximum from the translation sliders to the matrix
-  this->connect(d->TranslationSliders,
-               SIGNAL(rangeChanged(double,double)),
-               SLOT(onTranslationRangeChanged(double,double)));
-
-  // Notify the matrix of the current translation min/max values
-  this->onTranslationRangeChanged(d->TranslationSliders->minimum(),
-                                  d->TranslationSliders->maximum());
+  // Set a static min/max range to let users freely enter values
+  d->MatrixWidget->setRange(-1e10, 1e10);
 
   // Transform nodes connection
   this->connect(d->TransformToolButton, SIGNAL(clicked()),
@@ -150,6 +165,28 @@ void qSlicerTransformsModuleWidget::setup()
                 SLOT(untransformSelectedNodes()));
   this->connect(d->HardenToolButton, SIGNAL(clicked()),
                 SLOT(hardenSelectedNodes()));
+
+  // Observe display section, if opened, then add display node
+  this->connect(d->DisplayCollapsibleButton,
+                SIGNAL(clicked(bool)),
+                SLOT(onDisplaySectionClicked(bool)));
+
+  // Observe Apply transform section to maintain a nice layout
+  // even when the section is closed.
+  this->connect(d->TransformedCollapsibleButton,
+                SIGNAL(clicked(bool)),
+                SLOT(onTransformableSectionClicked(bool)));
+
+  // Connect copy and paste actions
+  d->CopyTransformToolButton->setDefaultAction(d->CopyAction);
+  this->connect(d->CopyAction,
+                SIGNAL(triggered()),
+                SLOT(copyTransform()));
+
+  d->PasteTransformToolButton->setDefaultAction(d->PasteAction);
+  this->connect(d->PasteAction,
+                SIGNAL(triggered()),
+                SLOT(pasteTransform()));
 
   // Icons
   QIcon rightIcon =
@@ -164,12 +201,12 @@ void qSlicerTransformsModuleWidget::setup()
 }
 
 //-----------------------------------------------------------------------------
-void qSlicerTransformsModuleWidget::onCoordinateReferenceButtonPressed(int id)
+void qSlicerTransformsModuleWidget::onTranslateFirstButtonPressed(bool checked)
 {
   Q_D(qSlicerTransformsModuleWidget);
-  
+
   qMRMLTransformSliders::CoordinateReferenceType ref =
-    (id == qMRMLTransformSliders::GLOBAL) ? qMRMLTransformSliders::GLOBAL : qMRMLTransformSliders::LOCAL;
+    checked ? qMRMLTransformSliders::LOCAL : qMRMLTransformSliders::GLOBAL;
   d->TranslationSliders->setCoordinateReference(ref);
   d->RotationSliders->setCoordinateReference(ref);
 }
@@ -178,15 +215,30 @@ void qSlicerTransformsModuleWidget::onCoordinateReferenceButtonPressed(int id)
 void qSlicerTransformsModuleWidget::onNodeSelected(vtkMRMLNode* node)
 {
   Q_D(qSlicerTransformsModuleWidget);
-  
-  vtkMRMLLinearTransformNode* transformNode = vtkMRMLLinearTransformNode::SafeDownCast(node);
 
-  // Enable/Disable CoordinateReference, identity buttons, MatrixViewGroupBox,
+  vtkMRMLTransformNode* transformNode = vtkMRMLTransformNode::SafeDownCast(node);
+
+  bool isLinearTransform = (transformNode!=NULL && transformNode->IsLinear());
+  bool isCompositeTransform = (transformNode!=NULL && transformNode->IsComposite());
+
+  // Enable/Disable CoordinateReference, identity, split buttons, MatrixViewGroupBox, and
   // Min/Max translation inputs
-  d->CoordinateReferenceGroupBox->setEnabled(transformNode != 0);
-  d->IdentityPushButton->setEnabled(transformNode != 0);
+
   d->InvertPushButton->setEnabled(transformNode != 0);
-  d->MatrixViewGroupBox->setEnabled(transformNode != 0);
+
+  d->TranslateFirstToolButton->setEnabled(isLinearTransform);
+  d->IdentityPushButton->setEnabled(isLinearTransform);
+  d->MatrixViewGroupBox->setEnabled(isLinearTransform);
+
+  d->TranslateFirstToolButton->setVisible(isLinearTransform);
+  d->MatrixViewGroupBox->setVisible(isLinearTransform);
+  d->TranslationSliders->setVisible(isLinearTransform);
+  d->RotationSliders->setVisible(isLinearTransform);
+
+  d->CopyTransformToolButton->setVisible(isLinearTransform);
+  d->PasteTransformToolButton->setVisible(isLinearTransform);
+
+  d->SplitPushButton->setVisible(isCompositeTransform);
 
   QStringList nodeTypes;
   // If no transform node, it would show the entire scene, lets shown none
@@ -208,7 +260,77 @@ void qSlicerTransformsModuleWidget::onNodeSelected(vtkMRMLNode* node)
     }
   d->TransformableTreeView->sortFilterProxyModel()
     ->setHiddenNodeIDs(hiddenNodeIDs);
+
+  this->qvtkReconnect(d->MRMLTransformNode, transformNode,
+                      vtkMRMLTransformableNode::TransformModifiedEvent,
+                      this, SLOT(onMRMLTransformNodeModified(vtkObject*)));
+
   d->MRMLTransformNode = transformNode;
+
+  // If there is no display node then collapse the display section.
+  // This allows creation of transform display nodes on request:
+  // the display node is created if the user expands the display section.
+  vtkMRMLTransformDisplayNode* dispNode = NULL;
+  if (transformNode)
+    {
+    dispNode = vtkMRMLTransformDisplayNode::SafeDownCast(transformNode->GetDisplayNode());
+    }
+  if (dispNode==NULL)
+    {
+    d->DisplayCollapsibleButton->setCollapsed(true);
+    }
+}
+
+//-----------------------------------------------------------------------------
+void qSlicerTransformsModuleWidget::onMRMLTransformNodeModified(vtkObject* caller)
+{
+  Q_D(qSlicerTransformsModuleWidget);
+
+  vtkMRMLTransformNode* transformNode = vtkMRMLTransformNode::SafeDownCast(caller);
+  if (!transformNode)
+    {
+    return;
+    }
+  Q_ASSERT(d->MRMLTransformNode == transformNode);
+
+  bool isLinearTransform = transformNode->IsLinear();
+  bool isCompositeTransform = transformNode->IsComposite();
+
+  d->TranslateFirstToolButton->setEnabled(isLinearTransform);
+  d->IdentityPushButton->setEnabled(isLinearTransform);
+  d->MatrixViewGroupBox->setEnabled(isLinearTransform);
+
+  // This method may be called very frequently (when transform is changing
+  // in real time). Due to some reason setVisible calls take time,
+  // even if the visibility state does not change.
+  // To save time, only call the set function if the visibility has to be changed.
+  if (isLinearTransform!=d->TranslateFirstToolButton->isVisible())
+    {
+    d->TranslateFirstToolButton->setVisible(isLinearTransform);
+    }
+  if (isLinearTransform!=d->MatrixViewGroupBox->isVisible())
+    {
+    d->MatrixViewGroupBox->setVisible(isLinearTransform);
+    }
+  if (isLinearTransform!=d->TranslationSliders->isVisible())
+    {
+    d->TranslationSliders->setVisible(isLinearTransform);
+    }
+  if (isLinearTransform!=d->RotationSliders->isVisible())
+    {
+    d->RotationSliders->setVisible(isLinearTransform);
+    }
+  if (isLinearTransform!=d->CopyTransformToolButton->isVisible())
+    {
+    d->CopyTransformToolButton->setVisible(isLinearTransform);
+    }
+  if (isLinearTransform!=d->PasteTransformToolButton->isVisible())
+    {
+    d->PasteTransformToolButton->setVisible(isLinearTransform);
+    }
+
+  d->SplitPushButton->setVisible(isCompositeTransform);
+
 }
 
 //-----------------------------------------------------------------------------
@@ -216,40 +338,122 @@ void qSlicerTransformsModuleWidget::identity()
 {
   Q_D(qSlicerTransformsModuleWidget);
 
-  if (!d->MRMLTransformNode)
+  if (d->MRMLTransformNode==NULL || !d->MRMLTransformNode->IsLinear())
     {
     return;
     }
 
   d->TranslationSliders->resetUnactiveSliders();
   d->RotationSliders->resetUnactiveSliders();
-  d->MRMLTransformNode->GetMatrixTransformToParent()->Identity();
+
+  vtkNew<vtkMatrix4x4> matrix; // initialized to identity by default
+  d->MRMLTransformNode->SetMatrixTransformToParent(matrix.GetPointer());
 }
 
 //-----------------------------------------------------------------------------
 void qSlicerTransformsModuleWidget::invert()
 {
   Q_D(qSlicerTransformsModuleWidget);
-  
+
   if (!d->MRMLTransformNode) { return; }
 
+  d->TranslationSliders->resetUnactiveSliders();
   d->RotationSliders->resetUnactiveSliders();
-  d->MRMLTransformNode->GetMatrixTransformToParent()->Invert();
+
+  d->MRMLTransformNode->Inverse();
 }
 
 //-----------------------------------------------------------------------------
-void qSlicerTransformsModuleWidget::onTranslationRangeChanged(double newMin,
-                                                              double newMax)
+void qSlicerTransformsModuleWidget::split()
 {
   Q_D(qSlicerTransformsModuleWidget);
-  d->MatrixWidget->setRange(newMin, newMax);
+
+  if (d->MRMLTransformNode==NULL)
+    {
+    return;
+    }
+
+  d->MRMLTransformNode->Split();
+}
+
+//-----------------------------------------------------------------------------
+void qSlicerTransformsModuleWidget::copyTransform()
+{
+  Q_D(qSlicerTransformsModuleWidget);
+
+  vtkLinearTransform* linearTransform =
+      vtkLinearTransform::SafeDownCast(d->MRMLTransformNode->GetTransformToParent());
+  if (!linearTransform)
+    {
+    // Silent fail, no worries!
+    qDebug() << "Unable to cast parent transform as a vtkLinearTransform";
+    return;
+    }
+
+  vtkMatrix4x4* internalMatrix = linearTransform->GetMatrix();
+  QString output;
+
+  for (int rowIndex = 0; rowIndex < 4; ++rowIndex)
+    {
+    for (int columnIndex = 0; columnIndex < 4; ++columnIndex)
+     {
+      output.append(
+            QString::number(internalMatrix->GetElement(rowIndex, columnIndex)));
+      output.append(" ");
+     }
+    output.append("\n");
+    }
+
+  QApplication::clipboard()->setText(output);
+}
+
+//-----------------------------------------------------------------------------
+void qSlicerTransformsModuleWidget::pasteTransform()
+{
+  Q_D(qSlicerTransformsModuleWidget);
+
+  vtkNew<vtkMatrix4x4> tempMatrix;
+
+  QString text = QApplication::clipboard()->text();
+  QRegExp rx("(\\ |\\,|\\:|\\t|\\n|\\[|\\])");
+  QStringList entries = text.split(rx, QString::SkipEmptyParts);
+
+  if (entries.count() != 4
+      && entries.count() != 9
+      && entries.count() != 16)
+    {
+    // Silent fail, incompatible matrix size
+    qDebug() << "qSlicerTransformsModuleWidget::pasteTransform -- "
+                "Pasted matrix is not a 2x2 or 3x3 or 4x4 matrix.";
+    return;
+    }
+
+  bool ok = true;
+  int index = 0;
+  foreach(const QString& entry, entries)
+    {
+    double numericEntry = entry.toDouble(&ok);
+    if (!ok)
+      {
+      // Silent fail, no problem!
+      qDebug() << "qSlicerTransformsModuleWidget::pasteTransform -- "
+                  "Unable to cast string to double: " << entry;
+      return;
+      }
+    tempMatrix->SetElement(index / static_cast<int>(sqrt(static_cast<double>(entries.count()))),
+                           index % static_cast<int>(sqrt(static_cast<double>(entries.count()))),
+                           numericEntry);
+    ++index;
+  }
+
+  d->MRMLTransformNode->SetMatrixTransformToParent(tempMatrix.GetPointer());
 }
 
 //-----------------------------------------------------------------------------
 int qSlicerTransformsModuleWidget::coordinateReference()const
 {
   Q_D(const qSlicerTransformsModuleWidget);
-  return d->CoordinateReferenceButtonGroup->checkedId();
+  return (d->TranslateFirstToolButton->isChecked() ? qMRMLTransformSliders::LOCAL : qMRMLTransformSliders::GLOBAL);
 }
 
 //-----------------------------------------------------------------------------
@@ -294,8 +498,48 @@ void qSlicerTransformsModuleWidget::hardenSelectedNodes()
   Q_D(qSlicerTransformsModuleWidget);
   QList<vtkSmartPointer<vtkMRMLTransformableNode> > nodesToTransform =
     qSlicerTransformsModuleWidgetPrivate::getSelectedNodes(d->TransformedTreeView);
+  QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));
   foreach(vtkSmartPointer<vtkMRMLTransformableNode> node, nodesToTransform)
     {
     d->logic()->hardenTransform(vtkMRMLTransformableNode::SafeDownCast(node));
+    }
+  QApplication::restoreOverrideCursor();
+}
+
+//-----------------------------------------------------------------------------
+void qSlicerTransformsModuleWidget::onDisplaySectionClicked(bool clicked)
+{
+  Q_D(qSlicerTransformsModuleWidget);
+  // If the display section is opened and there is no display node then create one
+  if (!clicked)
+    {
+    return;
+    }
+  if (d->MRMLTransformNode==NULL)
+    {
+    return;
+    }
+  if (vtkMRMLTransformDisplayNode::SafeDownCast(d->MRMLTransformNode->GetDisplayNode())==NULL)
+    {
+    d->MRMLTransformNode->CreateDefaultDisplayNodes();
+    // Refresh the display node section
+    d->TransformDisplayNodeWidget->setMRMLTransformNode(d->MRMLTransformNode);
+    }
+}
+
+//-----------------------------------------------------------------------------
+void qSlicerTransformsModuleWidget::onTransformableSectionClicked(bool clicked)
+{
+  Q_D(qSlicerTransformsModuleWidget);
+  if (clicked)
+    {
+    // the transformable section is open, so no need for spacer
+    d->BottomSpacer->changeSize(0,0, QSizePolicy::Fixed, QSizePolicy::Fixed);
+    }
+  else
+    {
+    // the transformable section is open, add spacer to prevent stretching of
+    // the remaining sections
+    d->BottomSpacer->changeSize(1,1, QSizePolicy::Fixed, QSizePolicy::Expanding);
     }
 }

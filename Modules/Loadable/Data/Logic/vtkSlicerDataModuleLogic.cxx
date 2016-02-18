@@ -42,9 +42,8 @@ vtkStandardNewMacro(vtkSlicerDataModuleLogic);
 //----------------------------------------------------------------------------
 vtkSlicerDataModuleLogic::vtkSlicerDataModuleLogic()
 {
-  this->SceneChangedOff();
+  this->SceneChanged = false;
   this->AutoRemoveDisplayAndStorageNodes = true;
-
 }
 
 //----------------------------------------------------------------------------
@@ -95,7 +94,7 @@ void vtkSlicerDataModuleLogic::OnMRMLSceneNodeRemoved(vtkMRMLNode* node)
     return;
     }
 
-  // Collect a list of storage and display nodes that are only 
+  // Collect a list of storage and display nodes that are only
   // referenced by the node to be removed.
   std::vector<vtkMRMLNode *> nodesToRemove;
 
@@ -110,7 +109,7 @@ void vtkSlicerDataModuleLogic::OnMRMLSceneNodeRemoved(vtkMRMLNode* node)
     // make sure no other nodes reference this display node
     this->GetMRMLScene()->GetReferencingNodes(dnode, referencingNodes);
 
-    if (referencingNodes.size() == 0 || 
+    if (referencingNodes.size() == 0 ||
         (referencingNodes.size() == 1 && referencingNodes[0] == node) )
       {
       nodesToRemove.push_back(dnode);
@@ -124,28 +123,37 @@ void vtkSlicerDataModuleLogic::OnMRMLSceneNodeRemoved(vtkMRMLNode* node)
     // make sure no other nodes reference this storage node
     this->GetMRMLScene()->GetReferencingNodes(snode, referencingNodes);
 
-    if (referencingNodes.size() == 0 || 
+    if (referencingNodes.size() == 0 ||
         (referencingNodes.size() == 1 && referencingNodes[0] == node) )
       {
       nodesToRemove.push_back(snode);
       }
     }
 
-  // now remove the collected nodes as a batch process
+  // Now remove the collected nodes. Batch process is only used if many nodes will be removed
+  // because entering/exiting batch processing is a very expensive operation (the display flickers,
+  // lots of things are recomputed), so it should be only done if we save time by skipping many small updates.
   int toRemove = nodesToRemove.size();
-  if (toRemove > 0)
+  bool useBatchMode = toRemove > 10; // Switch to batch mode if more than 10 nodes to remove
+  int progress = 0;
+  if (useBatchMode)
     {
     this->GetMRMLScene()->StartState(vtkMRMLScene::BatchProcessState, toRemove);
-    int progress = 0;
+    }
     std::vector<vtkMRMLNode *>::const_iterator nodeIterator;
     nodeIterator = nodesToRemove.begin();
     while (nodeIterator != nodesToRemove.end())
       {
       this->GetMRMLScene()->RemoveNode(*nodeIterator);
+    if (useBatchMode)
+      {
       this->GetMRMLScene()->ProgressState(
               vtkMRMLScene::BatchProcessState, ++progress);
+      }
       ++nodeIterator;
       }
+  if (useBatchMode)
+    {
     this->GetMRMLScene()->EndState(vtkMRMLScene::BatchProcessState);
     }
 }

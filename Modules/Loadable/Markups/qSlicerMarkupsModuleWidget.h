@@ -23,6 +23,7 @@
 
 #include "qSlicerMarkupsModuleExport.h"
 
+class QMenu;
 class QModelIndex;
 class QTableWidgetItem;
 class QShortcut;
@@ -44,6 +45,7 @@ public:
   virtual ~qSlicerMarkupsModuleWidget();
 
   /// Set up the GUI from mrml when entering
+  /// \sa updateMaximumScaleFromVolumes()
   virtual void enter();
   /// Disconnect from scene when exiting
   virtual void exit();
@@ -63,6 +65,12 @@ public:
   /// getting the display node associated with the active markups node.
   /// \sa  updateWidgetFromMRML()
   void updateWidgetFromDisplayNode();
+  /// Check Red volume slice spacing to make sure that the glyph and text scale
+  /// slider maximums allow the glyphs to be scaled so that they can be shown
+  /// on volumes with spacing larger than the default. Find the maximum background
+  /// volume spacing and multiply it by the volume spacing scale facotr
+  /// \sa volumeSpacingScaleFactor
+  void updateMaximumScaleFromVolumes();
   /// Refresh a row of the gui from the mth markup in the currently active
   /// markup node as defined by the selection node combo box
   void updateRow(int m);
@@ -76,6 +84,10 @@ public:
 
   /// Set up the logic default display settings from the appplication settings
   void updateLogicFromSettings();
+
+  /// Query the logic as to the state of the slice intersection visibility on
+  /// the slice composite nodes
+  bool sliceIntersectionsVisible();
 
 public slots:
 
@@ -173,8 +185,13 @@ public slots:
                                              int previousRow, int previousColumn);
   /// Provide a right click menu in the table
   void onRightClickActiveMarkupTableWidget(QPoint pos);
+  /// Add the coordinates of the currently selected markups as strings to the given menu, then add a separator
+  void addSelectedCoordinatesToMenu(QMenu *menu);
   /// Jump slices action slot
   void onJumpSlicesActionTriggered();
+  /// Refocus cameras action slot
+  void onRefocusCamerasActionTriggered();
+
   /// Build a string list of the names of other nodes with the same
   /// class name as thisMarkup. Return an empty string list if no other
   /// markups in the scene
@@ -205,15 +222,33 @@ public slots:
   void onActiveMarkupsNodeNthMarkupModifiedEvent(vtkObject *caller, vtkObject *callData);
   /// Update the display properties widgets when the display node is modified
   void onActiveMarkupsNodeDisplayModifiedEvent();
+  /// Update the transform related elemetns of the gui when the transform node is modified
+  void onActiveMarkupsNodeTransformModifiedEvent();
 
   /// Create a new markups node and copy the display node settings from the
   /// current markups node if set, otherwise just uses the defaults.
   void onNewMarkupWithCurrentDisplayPropertiesTriggered();
 
+  /// Update the slice intersection visibility on all the slice composite
+  /// nodes in the scene
+  /// \sa sliceIntersectionsVisible()
+  void onSliceIntersectionsVisibilityToggled(bool checked);
+
+  /// update visibility of the coordinate columns in the table
+  void onHideCoordinateColumnsToggled(bool checked);
+
+  /// update the coordinates shown in the table to be either the transformed coordiantes (checked) or the untransformed coordiantes (unchecked)
+  void onTransformedCoordinatesToggled(bool checked);
+
 protected:
   QScopedPointer<qSlicerMarkupsModuleWidgetPrivate> d_ptr;
 
   virtual void setup();
+
+  /// A multiplication factor to apply to the maximum volume slice spacing when determining what the maximum value for the scale sliders should be.
+  /// \sa updateMaximumScaleFromVolumes
+  /// Default: 10.0
+  double volumeSpacingScaleFactor;
 
 private:
   Q_DECLARE_PRIVATE(qSlicerMarkupsModuleWidget);

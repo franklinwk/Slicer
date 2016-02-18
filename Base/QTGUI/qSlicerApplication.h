@@ -44,6 +44,7 @@ class qSlicerPythonManager;
 class qSlicerLayoutManager;
 class qSlicerWidget;
 
+class ctkErrorLogModel;
 #ifdef Slicer_USE_QtTesting
 class ctkQtTestingUtility;
 #endif
@@ -76,6 +77,8 @@ public:
   ///
   virtual bool notify(QObject * receiver, QEvent * event);
 
+  /// Get errorLogModel
+  Q_INVOKABLE ctkErrorLogModel* errorLogModel()const;
 
   /// Get commandOptions
   Q_INVOKABLE qSlicerCommandOptions* commandOptions();
@@ -95,7 +98,7 @@ public:
 
   /// Set/Get layout manager
   Q_INVOKABLE qSlicerLayoutManager* layoutManager()const;
-  void setLayoutManager(qSlicerLayoutManager* layoutManager);
+  Q_INVOKABLE void setLayoutManager(qSlicerLayoutManager* layoutManager);
 
   /// Return a pointer on the main window of the application if any.
   QMainWindow* mainWindow()const;
@@ -114,7 +117,20 @@ public:
   /// types/modules
   QString nodeModule(vtkMRMLNode* node)const;
 
-  ctkSettingsDialog* settingsDialog()const;
+  Q_INVOKABLE ctkSettingsDialog* settingsDialog()const;
+
+  /// Display application informations.
+  /// This function will print to standard output the following
+  /// details:
+  ///   - Session start time
+  ///   - Slicer version
+  ///   - Operating system
+  ///   - Memory
+  ///   - CPU
+  ///   - Developer mode enabled
+  ///   - Prefer executable CLI
+  ///   - Additional module paths
+  Q_INVOKABLE virtual void displayApplicationInformations() const;
 
 public slots:
 
@@ -133,10 +149,25 @@ public slots:
   void openExtensionsManagerDialog();
 #endif
 
+  /// Number of recent log files to keep. Older log files are deleted automatically.
+  int numberOfRecentLogFilesToKeep();
+
+  /// Paths of recent log files
+  QStringList recentLogFiles();
+
+  /// Path of the current log file
+  /// \sa recentLogFiles(), setupFileLogging()
+  QString currentLogFile()const;
+
 protected:
   /// Reimplemented from qSlicerCoreApplication
+  virtual void handlePreApplicationCommandLineArguments();
   virtual void handleCommandLineArguments();
   virtual void onSlicerApplicationLogicModified();
+
+  /// Set up file logging. Creates and sets new log file and deletes the oldest
+  /// one from the stored queue
+  void setupFileLogging();
 
 private:
   Q_DECLARE_PRIVATE(qSlicerApplication);

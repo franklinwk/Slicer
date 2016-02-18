@@ -15,7 +15,7 @@
 cmake_minimum_required(VERSION 2.8.7)
 
 #
-# For additional information, see http://http://www.slicer.org/slicerWiki/index.php/Documentation/Snapshot/Developers/Tutorials/DashboardSetup
+# For additional information, see http://http://www.slicer.org/slicerWiki/index.php/Documentation/Nightly/Developers/Tutorials/DashboardSetup
 #
 
 #-----------------------------------------------------------------------------
@@ -90,8 +90,8 @@ find_program(CTEST_MEMORYCHECK_COMMAND NAMES valgrind)
 #-----------------------------------------------------------------------------
 # Git tag
 #-----------------------------------------------------------------------------
-set(EXTENSIONS_TRACK_QUALIFIER "master") # "master", 4.3, ...
-set(EXTENSIONS_INDEX_GIT_TAG "origin/${EXTENSIONS_TRACK_QUALIFIER}") # origin/master, origin/4.3, ...
+set(EXTENSIONS_TRACK_QUALIFIER "master") # "master", 4.4, ...
+set(EXTENSIONS_INDEX_GIT_TAG "origin/${EXTENSIONS_TRACK_QUALIFIER}") # origin/master, origin/4.4, ...
 
 #-----------------------------------------------------------------------------
 # Git repository

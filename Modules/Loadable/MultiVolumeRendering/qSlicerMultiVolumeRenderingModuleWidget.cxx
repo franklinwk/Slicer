@@ -44,18 +44,18 @@
 class qSlicerMultiVolumeRenderingModuleWidgetPrivate: public Ui_qSlicerMultiVolumeRenderingModuleWidget
 {
   Q_DECLARE_PUBLIC(qSlicerMultiVolumeRenderingModuleWidget);
-  
+
 protected:
   qSlicerMultiVolumeRenderingModuleWidget* const q_ptr;
-  
+
 public:
   qSlicerMultiVolumeRenderingModuleWidgetPrivate(qSlicerMultiVolumeRenderingModuleWidget& object);
   virtual void setupUi(qSlicerMultiVolumeRenderingModuleWidget*);
-  
+
   vtkMRMLMultiVolumeRenderingDisplayNode* createNewDisplayNode(vtkMRMLVolumeNode* bg, vtkMRMLVolumeNode* fg, vtkMRMLVolumeNode* label);
-  
+
   vtkMRMLMultiVolumeRenderingDisplayNode* DisplayNode;
-  
+
 };
 
 //-----------------------------------------------------------------------------
@@ -72,9 +72,7 @@ qSlicerMultiVolumeRenderingModuleWidgetPrivate::qSlicerMultiVolumeRenderingModul
 void qSlicerMultiVolumeRenderingModuleWidgetPrivate::setupUi(qSlicerMultiVolumeRenderingModuleWidget* q)
 {
   this->Ui_qSlicerMultiVolumeRenderingModule::setupUi(q);
-  
-  this->MRMLNodeComboBoxLabelmapVolume->addAttribute("vtkMRMLScalarVolumeNode", "LabelMap", "1");
-  
+
   QObject::connect(this->MRMLNodeComboBoxBackgroundVolume,
                     SIGNAL(currentNodeChanged(vtkMRMLNode*)),
                     q, SLOT(onCurrentBgVolumeMRMLImageNodeChanged(vtkMRMLNode*)));
@@ -84,32 +82,32 @@ void qSlicerMultiVolumeRenderingModuleWidgetPrivate::setupUi(qSlicerMultiVolumeR
   QObject::connect(this->MRMLNodeComboBoxLabelmapVolume,
                     SIGNAL(currentNodeChanged(vtkMRMLNode*)),
                     q, SLOT(onCurrentLabelmapVolumeMRMLImageNodeChanged(vtkMRMLNode*)));
-                    
+
   // Inputs
   QObject::connect(this->CheckBoxBgVolume,
                    SIGNAL(toggled(bool)),
                    q, SLOT(onVisibilityBgVolumeChanged(bool)));
-                   
+
   QObject::connect(this->CheckBoxFgVolume,
                    SIGNAL(toggled(bool)),
                    q, SLOT(onVisibilityFgVolumeChanged(bool)));
-                   
+
   QObject::connect(this->CheckBoxLabelmapVolume,
                    SIGNAL(toggled(bool)),
                    q, SLOT(onVisibilityLabelmapVolumeChanged(bool)));
-                   
+
   QObject::connect(this->MRMLNodeComboBoxDisplayNode,
                    SIGNAL(currentNodeChanged(vtkMRMLNode*)),
                    q, SLOT(onCurrentMRMLDisplayNodeChanged(vtkMRMLNode*)));
-                   
-  
+
+
 }
 
 vtkMRMLMultiVolumeRenderingDisplayNode* qSlicerMultiVolumeRenderingModuleWidgetPrivate
 ::createNewDisplayNode(vtkMRMLVolumeNode* bg, vtkMRMLVolumeNode* fg, vtkMRMLVolumeNode* label)
 {
   Q_Q(qSlicerMultiVolumeRenderingModuleWidget);
-  
+
   vtkSlicerMultiVolumeRenderingLogic *logic =
     vtkSlicerMultiVolumeRenderingLogic::SafeDownCast(q->logic());
 
@@ -118,13 +116,13 @@ vtkMRMLMultiVolumeRenderingDisplayNode* qSlicerMultiVolumeRenderingModuleWidgetP
 
   if (bg)
    bg->AddAndObserveDisplayNodeID(displayNode->GetID());
-   
+
   if (fg)
    fg->AddAndObserveDisplayNodeID(displayNode->GetID());
-   
+
   if (label)
    label->AddAndObserveDisplayNodeID(displayNode->GetID());
-  
+
   return displayNode;
 }
 
@@ -198,21 +196,21 @@ void qSlicerMultiVolumeRenderingModuleWidget::onCurrentBgVolumeMRMLImageNodeChan
   {
     return;
   }
-  
+
   vtkMRMLScalarVolumeNode* fgVolumeNode = NULL;
-  vtkMRMLScalarVolumeNode* labelmapVolumeNode = NULL;
-  
+  vtkMRMLLabelMapVolumeNode* labelmapVolumeNode = NULL;
+
   if (d->DisplayNode)
   {
     fgVolumeNode = vtkMRMLScalarVolumeNode::SafeDownCast(d->DisplayNode->GetFgVolumeNode());
-    labelmapVolumeNode = vtkMRMLScalarVolumeNode::SafeDownCast(d->DisplayNode->GetLabelmapVolumeNode());
+    labelmapVolumeNode = vtkMRMLLabelMapVolumeNode::SafeDownCast(d->DisplayNode->GetLabelmapVolumeNode());
   }
-  
+
   vtkSlicerMultiVolumeRenderingLogic *logic =
     vtkSlicerMultiVolumeRenderingLogic::SafeDownCast(this->logic());
-  
+
   vtkMRMLMultiVolumeRenderingDisplayNode *dnode = logic->FindFirstMatchedDisplayNode(bgVolumeNode, fgVolumeNode, labelmapVolumeNode);
-  
+
   if (!this->mrmlScene()->IsClosing())
   {
     if (!dnode)
@@ -220,7 +218,7 @@ void qSlicerMultiVolumeRenderingModuleWidget::onCurrentBgVolumeMRMLImageNodeChan
     else
       dnode->Modified();
   }
-  
+
   this->setMRMLDisplayNode(dnode);
 }
 
@@ -235,21 +233,21 @@ void qSlicerMultiVolumeRenderingModuleWidget::onCurrentFgVolumeMRMLImageNodeChan
   {
     return;
   }
-  
+
   vtkMRMLScalarVolumeNode* bgVolumeNode = NULL;
-  vtkMRMLScalarVolumeNode* labelmapVolumeNode = NULL;
-  
+  vtkMRMLLabelMapVolumeNode* labelmapVolumeNode = NULL;
+
   if (d->DisplayNode)
   {
     bgVolumeNode = vtkMRMLScalarVolumeNode::SafeDownCast(d->DisplayNode->GetBgVolumeNode());
-    labelmapVolumeNode = vtkMRMLScalarVolumeNode::SafeDownCast(d->DisplayNode->GetLabelmapVolumeNode());
+    labelmapVolumeNode = vtkMRMLLabelMapVolumeNode::SafeDownCast(d->DisplayNode->GetLabelmapVolumeNode());
   }
-  
+
   vtkSlicerMultiVolumeRenderingLogic *logic =
     vtkSlicerMultiVolumeRenderingLogic::SafeDownCast(this->logic());
-  
+
   vtkMRMLMultiVolumeRenderingDisplayNode *dnode = logic->FindFirstMatchedDisplayNode(bgVolumeNode, fgVolumeNode, labelmapVolumeNode);
-  
+
   if (!this->mrmlScene()->IsClosing())
   {
     if (!dnode)
@@ -257,7 +255,7 @@ void qSlicerMultiVolumeRenderingModuleWidget::onCurrentFgVolumeMRMLImageNodeChan
     else
       dnode->Modified();
   }
-  
+
   this->setMRMLDisplayNode(dnode);
 }
 
@@ -266,27 +264,27 @@ void qSlicerMultiVolumeRenderingModuleWidget::onCurrentLabelmapVolumeMRMLImageNo
 {
   Q_D(qSlicerMultiVolumeRenderingModuleWidget);
 
-  vtkMRMLScalarVolumeNode* labelmapVolumeNode = vtkMRMLScalarVolumeNode::SafeDownCast(node);
+  vtkMRMLLabelMapVolumeNode* labelmapVolumeNode = vtkMRMLLabelMapVolumeNode::SafeDownCast(node);
 
   if (!labelmapVolumeNode)
   {
     return;
-  }  
-  
+  }
+
   vtkMRMLScalarVolumeNode* fgVolumeNode = NULL;
   vtkMRMLScalarVolumeNode* bgVolumeNode = NULL;
-  
+
   if (d->DisplayNode)
   {
     fgVolumeNode = vtkMRMLScalarVolumeNode::SafeDownCast(d->DisplayNode->GetFgVolumeNode());
     bgVolumeNode = vtkMRMLScalarVolumeNode::SafeDownCast(d->DisplayNode->GetBgVolumeNode());
   }
-  
+
   vtkSlicerMultiVolumeRenderingLogic *logic =
     vtkSlicerMultiVolumeRenderingLogic::SafeDownCast(this->logic());
-    
+
   vtkMRMLMultiVolumeRenderingDisplayNode *dnode = logic->FindFirstMatchedDisplayNode(bgVolumeNode, fgVolumeNode, labelmapVolumeNode);
-  
+
   if (!this->mrmlScene()->IsClosing())
   {
     if (!dnode)
@@ -294,7 +292,7 @@ void qSlicerMultiVolumeRenderingModuleWidget::onCurrentLabelmapVolumeMRMLImageNo
     else
       dnode->Modified();
   }
-  
+
   this->setMRMLDisplayNode(dnode);
 }
 
@@ -316,51 +314,51 @@ void qSlicerMultiVolumeRenderingModuleWidget::onCurrentMRMLDisplayNodeChanged(vt
   // update view node references
   vtkMRMLScalarVolumeNode* bgVolumeNode = this->getCurrentBgVolumeNode();
   vtkMRMLScalarVolumeNode* fgVolumeNode = this->getCurrentFgVolumeNode();
-  vtkMRMLScalarVolumeNode* labelmapVolumeNode = this->getCurrentLabelmapVolumeNode();
+  vtkMRMLLabelMapVolumeNode* labelmapVolumeNode = this->getCurrentLabelmapVolumeNode();
 
   // if display node is not referenced by current volume, add the refrence
   if (bgVolumeNode && displayNode)
   {
     vtkSlicerMultiVolumeRenderingLogic *logic =
       vtkSlicerMultiVolumeRenderingLogic::SafeDownCast(this->logic());
-      
+
     vtkMRMLMultiVolumeRenderingDisplayNode* dnode =
       logic->GetDisplayNodeByID(bgVolumeNode, displayNode->GetID());
-      
+
     if (dnode != displayNode)
     {
       bgVolumeNode->AddAndObserveDisplayNodeID(displayNode->GetID());
     }
   }
-  
+
   if (fgVolumeNode && displayNode)
   {
     vtkSlicerMultiVolumeRenderingLogic *logic =
       vtkSlicerMultiVolumeRenderingLogic::SafeDownCast(this->logic());
-      
+
     vtkMRMLMultiVolumeRenderingDisplayNode* dnode =
       logic->GetDisplayNodeByID(fgVolumeNode, displayNode->GetID());
-      
+
     if (dnode != displayNode)
     {
       fgVolumeNode->AddAndObserveDisplayNodeID(displayNode->GetID());
     }
   }
-  
+
   if (labelmapVolumeNode && displayNode)
   {
     vtkSlicerMultiVolumeRenderingLogic *logic =
       vtkSlicerMultiVolumeRenderingLogic::SafeDownCast(this->logic());
-      
+
     vtkMRMLMultiVolumeRenderingDisplayNode* dnode =
       logic->GetDisplayNodeByID(labelmapVolumeNode, displayNode->GetID());
-      
+
     if (dnode != displayNode)
     {
       labelmapVolumeNode->AddAndObserveDisplayNodeID(displayNode->GetID());
     }
   }
-  
+
   this->qvtkReconnect(d->DisplayNode, displayNode, vtkCommand::ModifiedEvent,
                       this, SLOT(updateRenderingFromMRMLDisplayNode()));
 
@@ -384,10 +382,10 @@ vtkMRMLScalarVolumeNode* qSlicerMultiVolumeRenderingModuleWidget::getCurrentFgVo
 }
 
 // --------------------------------------------------------------------------
-vtkMRMLScalarVolumeNode* qSlicerMultiVolumeRenderingModuleWidget::getCurrentLabelmapVolumeNode()const
+vtkMRMLLabelMapVolumeNode* qSlicerMultiVolumeRenderingModuleWidget::getCurrentLabelmapVolumeNode()const
 {
   Q_D(const qSlicerMultiVolumeRenderingModuleWidget);
-  return vtkMRMLScalarVolumeNode::SafeDownCast(d->MRMLNodeComboBoxLabelmapVolume->currentNode());
+  return vtkMRMLLabelMapVolumeNode::SafeDownCast(d->MRMLNodeComboBoxLabelmapVolume->currentNode());
 }
 
 // --------------------------------------------------------------------------

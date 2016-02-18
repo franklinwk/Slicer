@@ -1,6 +1,6 @@
 /*=auto=========================================================================
 
-  Portions (c) Copyright 2005 Brigham and Women's Hospital (BWH) 
+  Portions (c) Copyright 2005 Brigham and Women's Hospital (BWH)
   All Rights Reserved.
 
   See COPYRIGHT.txt
@@ -19,45 +19,42 @@
 // VTK includes
 #include <vtkMatrix4x4.h>
 #include <vtkNew.h>
+#include <vtkObjectFactory.h>
 
 //---------------------------------------------------------------------------
 class vtkMRMLTransformableNodeTestHelper1 : public vtkMRMLTransformableNode
 {
 public:
   // Provide a concrete New.
-  static vtkMRMLTransformableNodeTestHelper1 *New(){return new vtkMRMLTransformableNodeTestHelper1;};
+  static vtkMRMLTransformableNodeTestHelper1 *New();
 
-  vtkTypeMacro( vtkMRMLTransformableNodeTestHelper1,vtkMRMLTransformableNode);
+  vtkTypeMacro(vtkMRMLTransformableNodeTestHelper1,vtkMRMLTransformableNode);
 
   virtual vtkMRMLNode* CreateNodeInstance()
     {
-    return new vtkMRMLTransformableNodeTestHelper1;
+    return vtkMRMLTransformableNodeTestHelper1::New();
     }
   virtual const char* GetNodeTagName()
     {
     return "vtkMRMLTransformableNodeTestHelper1";
     }
 };
+vtkStandardNewMacro(vtkMRMLTransformableNodeTestHelper1);
 
 //---------------------------------------------------------------------------
-bool TestSetAndObserveTransformNodeID();
+int TestSetAndObserveTransformNodeID();
 
 //---------------------------------------------------------------------------
 int vtkMRMLTransformableNodeTest1(int , char * [] )
 {
-  vtkSmartPointer< vtkMRMLTransformableNodeTestHelper1 > node1 = vtkSmartPointer< vtkMRMLTransformableNodeTestHelper1 >::New();
-
-  EXERCISE_BASIC_OBJECT_METHODS( node1 );
-
-  EXERCISE_BASIC_TRANSFORMABLE_MRML_METHODS(vtkMRMLTransformableNodeTestHelper1, node1);
-
-  bool res = true;
-  res = TestSetAndObserveTransformNodeID() && res;
-  return res ? EXIT_SUCCESS : EXIT_FAILURE;
+  vtkNew<vtkMRMLTransformableNodeTestHelper1> node1;
+  EXERCISE_ALL_BASIC_MRML_METHODS(node1.GetPointer());
+  CHECK_EXIT_SUCCESS(TestSetAndObserveTransformNodeID());
+  return EXIT_SUCCESS;
 }
 
 //---------------------------------------------------------------------------
-bool TestSetAndObserveTransformNodeID()
+int TestSetAndObserveTransformNodeID()
 {
   vtkNew<vtkMRMLScene> scene;
   vtkNew<vtkMRMLTransformableNodeTestHelper1> transformable;
@@ -67,15 +64,10 @@ bool TestSetAndObserveTransformNodeID()
   scene->AddNode(transform.GetPointer());
   vtkNew<vtkMatrix4x4> matrix;
   matrix->SetElement(0,3, 1.);
-  transform->SetAndObserveMatrixTransformToParent(matrix.GetPointer());
+  transform->SetMatrixTransformToParent(matrix.GetPointer());
 
   transformable->SetAndObserveTransformNodeID(transform->GetID());
-  if (transformable->GetParentTransformNode() != transform.GetPointer())
-    {
-    std::cout << __LINE__ << "SetAndObserveTransformNodeID failed"
-              << std::endl;
-    return false;
-    }
+  CHECK_POINTER(transformable->GetParentTransformNode(), transform.GetPointer());
   double point[4] = {0., 0., 0., 1.};
   double res[4] = {-1., -1., -1., -1.};
   transformable->TransformPointToWorld(point, res);
@@ -83,7 +75,7 @@ bool TestSetAndObserveTransformNodeID()
     {
     std::cout << __LINE__ << "TransformPointToWorld failed"
               << std::endl;
-    return false;
+    return EXIT_FAILURE;
     }
-  return true;
+  return EXIT_SUCCESS;
 }

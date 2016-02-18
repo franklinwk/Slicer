@@ -11,10 +11,13 @@
 // VTK includes
 #include <vtkDoubleArray.h>
 #include <vtkGeneralTransform.h>
+#include <vtkHomogeneousTransform.h>
 #include <vtkMath.h>
+#include <vtkNew.h>
 #include <vtkObjectFactory.h>
 #include <vtkPlanes.h>
 #include <vtkPolyData.h>
+#include <vtkSmartPointer.h>
 
 // STD includes
 #include <sstream>
@@ -31,7 +34,7 @@ vtkMRMLAnnotationROINode::vtkMRMLAnnotationROINode()
   this->HideFromEditors = false;
   this->InsideOut = 0;
   this->InteractiveMode = 0;
-  
+
   // default placement of the widget as in Slicer3
   this->SetXYZ(0,0,0);
   this->SetRadiusXYZ(10,10,10);
@@ -70,7 +73,11 @@ void vtkMRMLAnnotationROINode::Initialize(vtkMRMLScene* mrmlScene)
 vtkMRMLAnnotationROINode::~vtkMRMLAnnotationROINode()
 {
   vtkDebugMacro("Destructing...." << (this->GetID() != NULL ? this->GetID() : "null id"));
-
+  if (this->LabelText)
+    {
+    delete [] this->LabelText;
+    this->LabelText = NULL;
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -218,7 +225,7 @@ void vtkMRMLAnnotationROINode::ReadXMLAttributes(const char** atts)
     }
 
   this->EndModify(disabledModify);
-  
+
 }
 
 //----------------------------------------------------------------------------
@@ -250,19 +257,19 @@ void vtkMRMLAnnotationROINode::UpdateScene(vtkMRMLScene *scene)
 {
   Superclass::UpdateScene(scene);
 
-  // Nothing to do at this point  bc vtkMRMLAnnotationDisplayNode is subclass of vtkMRMLModelDisplayNode 
-  // => will be taken care of by vtkMRMLModelDisplayNode  
+  // Nothing to do at this point  bc vtkMRMLAnnotationDisplayNode is subclass of vtkMRMLModelDisplayNode
+  // => will be taken care of by vtkMRMLModelDisplayNode
 
 }
 
 //---------------------------------------------------------------------------
 void vtkMRMLAnnotationROINode::ProcessMRMLEvents ( vtkObject *caller,
-                                           unsigned long event, 
+                                           unsigned long event,
                                            void *callData )
 {
   Superclass::ProcessMRMLEvents(caller, event, callData);
 
-  // Not necessary bc vtkMRMLAnnotationDisplayNode is subclass of vtkMRMLModelDisplayNode 
+  // Not necessary bc vtkMRMLAnnotationDisplayNode is subclass of vtkMRMLModelDisplayNode
   // => will be taken care of  in vtkMRMLModelNode
 }
 
@@ -270,11 +277,11 @@ void vtkMRMLAnnotationROINode::ProcessMRMLEvents ( vtkObject *caller,
 void vtkMRMLAnnotationROINode::PrintAnnotationInfo(ostream& os, vtkIndent indent, int titleFlag)
 {
   //cout << "vtkMRMLAnnotationROINode::PrintAnnotationInfo" << endl;
-  if (titleFlag) 
+  if (titleFlag)
     {
-      
+
       os <<indent << "vtkMRMLAnnotationROINode: Annotation Summary";
-      if (this->GetName()) 
+      if (this->GetName())
     {
       os << " of " << this->GetName();
     }
@@ -324,7 +331,7 @@ double vtkMRMLAnnotationROINode::GetROIAnnotationScale()
 void vtkMRMLAnnotationROINode::SetROIAnnotationScale(double init)
 {
   vtkMRMLAnnotationTextDisplayNode *node = this->GetAnnotationTextDisplayNode();
-  
+
   if (!node)
     {
       vtkErrorMacro("AnnotationROI: "<< this->GetName() << " cannot get AnnotationTextDisplayNode");
@@ -378,11 +385,11 @@ int vtkMRMLAnnotationROINode::SetControlPoint(int id, double newControl[3])
   }
 
   int flag = Superclass::SetControlPoint(id, newControl,1,1);
-  if (!flag) 
+  if (!flag)
     {
       return 0;
     }
-  if (this->GetNumberOfControlPoints() < 2) 
+  if (this->GetNumberOfControlPoints() < 2)
     {
       return 1;
     }
@@ -464,19 +471,25 @@ void vtkMRMLAnnotationROINode::SetLineColor(double initColor[3])
 void vtkMRMLAnnotationROINode::ApplyTransformMatrix(vtkMatrix4x4* transformMatrix)
 {
   double (*matrix)[4] = transformMatrix->Element;
-  double xyzIn[3];
-  double xyzOut[3];
-  double p[3];
 
-  // report warning if transform has rotation
-  double v[] = {1,0,0,0};
-  double *v1 = transformMatrix->MultiplyDoublePoint(v);
-  vtkMath::Normalize(v1);
+  // compute scale
+  double p[] = {0,0,0,0};
+  double p1[] = {1,1,1,0};
+  double p2[4];
+  double *v;
+  double *v1;
   double v2[4];
-  vtkMath::Cross(v, v1, v2);
-  if (vtkMath::Normalize(v2) > 1.0e-9)
+  double scale[3];
+
+  v = transformMatrix->MultiplyDoublePoint(p);
+  v1 = transformMatrix->MultiplyDoublePoint(p1);
+
+  int i;
+  for (i=0; i<3; i++)
     {
-      vtkErrorMacro("AnnotationROINode::ApplyTransformMatrix "<< this->GetName() << ". Matrix has rotation component. ROI does not support rotation.");
+    p2[i] = p1[i] - p[i];
+    v2[i] = v1[i] - v[i];
+    scale[i] = v2[i]/p2[i];
     }
 
   int modify = this->StartModify();
@@ -484,27 +497,19 @@ void vtkMRMLAnnotationROINode::ApplyTransformMatrix(vtkMatrix4x4* transformMatri
   // first point
   if (this->GetXYZ(p))
     {
-    xyzIn[0] = p[0];
-    xyzIn[1] = p[1];
-    xyzIn[2] = p[2];
-  
-    xyzOut[0] = matrix[0][0]*xyzIn[0] + matrix[0][1]*xyzIn[1] + matrix[0][2]*xyzIn[2] + matrix[0][3];
-    xyzOut[1] = matrix[1][0]*xyzIn[0] + matrix[1][1]*xyzIn[1] + matrix[1][2]*xyzIn[2] + matrix[1][3];
-    xyzOut[2] = matrix[2][0]*xyzIn[0] + matrix[2][1]*xyzIn[1] + matrix[2][2]*xyzIn[2] + matrix[2][3];
-    this->SetXYZ(xyzOut);
+    p1[0] = matrix[0][0]*p[0] + matrix[0][1]*p[1] + matrix[0][2]*p[2] + matrix[0][3];
+    p1[1] = matrix[1][0]*p[0] + matrix[1][1]*p[1] + matrix[1][2]*p[2] + matrix[1][3];
+    p1[2] = matrix[2][0]*p[0] + matrix[2][1]*p[1] + matrix[2][2]*p[2] + matrix[2][3];
+    this->SetXYZ(p1);
     }
 
-  // second point
+  // second point radius, only use scale
   if (this->GetRadiusXYZ(p))
     {
-    xyzIn[0] = p[0];
-    xyzIn[1] = p[1];
-    xyzIn[2] = p[2];
-
-    xyzOut[0] = matrix[0][0]*xyzIn[0] + matrix[0][1]*xyzIn[1] + matrix[0][2]*xyzIn[2] + matrix[0][3];
-    xyzOut[1] = matrix[1][0]*xyzIn[0] + matrix[1][1]*xyzIn[1] + matrix[1][2]*xyzIn[2] + matrix[1][3];
-    xyzOut[2] = matrix[2][0]*xyzIn[0] + matrix[2][1]*xyzIn[1] + matrix[2][2]*xyzIn[2] + matrix[2][3];
-    this->SetRadiusXYZ(xyzOut);
+    p[0] *= scale[0];
+    p[1] *= scale[1];
+    p[2] *= scale[2];
+    this->SetRadiusXYZ(p);
     }
   this->EndModify(modify);
 }
@@ -512,47 +517,14 @@ void vtkMRMLAnnotationROINode::ApplyTransformMatrix(vtkMatrix4x4* transformMatri
 //---------------------------------------------------------------------------
 void vtkMRMLAnnotationROINode::ApplyTransform(vtkAbstractTransform* transform)
 {
-  double xyzIn[3];
-  double xyzOut[3];
-  double p[3];
-
-  // report warning if transform has rotation
-  double v[] = {1,0,0,0};
-  double v1[4];
-  transform->TransformPoint(v, v1);
-  vtkMath::Normalize(v1);
-  double v2[4];
-  vtkMath::Cross(v, v1, v2);
-  if (vtkMath::Normalize(v2) > 1.0e-9)
+  vtkHomogeneousTransform* linearTransform = vtkHomogeneousTransform::SafeDownCast(transform);
+  if (linearTransform)
     {
-      vtkErrorMacro("AnnotationROINode::ApplyTransformMatrix "<< this->GetName() << ". Matrix has rotation component. ROI does not support rotation.");
+    this->ApplyTransformMatrix(linearTransform->GetMatrix());
+    return;
     }
 
-  int modify = this->StartModify();
-
-  // first point
-  if (this->GetXYZ(p))
-    {
-    xyzIn[0] = p[0];
-    xyzIn[1] = p[1];
-    xyzIn[2] = p[2];
-    
-    transform->TransformPoint(xyzIn,xyzOut);
-    this->SetXYZ(xyzOut);
-    }
-  
-  // second point
-  if (this->GetRadiusXYZ(p))
-    {
-    xyzIn[0] = p[0];
-    xyzIn[1] = p[1];
-    xyzIn[2] = p[2];
-    
-    transform->TransformPoint(xyzIn,xyzOut);
-    this->SetRadiusXYZ(xyzOut);
-    }
-
-  this->EndModify(modify);
+  vtkErrorMacro("vtkMRMLAnnotationROINode::ApplyTransform is only supported for linear transforms");
 }
 
 #define AVERAGE_ABC(a,b,c) \
@@ -576,7 +548,7 @@ void vtkMRMLAnnotationROINode::GetTransformedPlanes(vtkPlanes *planes)
     bounds[2*i  ] = XYZ[i] - RadiusXYZ[i];
     bounds[2*i+1] = XYZ[i] + RadiusXYZ[i];
     }
-  vtkPoints *boxPoints = vtkPoints::New(VTK_DOUBLE);
+  vtkSmartPointer<vtkPoints> boxPoints = vtkSmartPointer<vtkPoints>::Take(vtkPoints::New(VTK_DOUBLE));
   boxPoints->SetNumberOfPoints(8);
 
   boxPoints->SetPoint(0, bounds[0], bounds[2], bounds[4]);
@@ -588,7 +560,7 @@ void vtkMRMLAnnotationROINode::GetTransformedPlanes(vtkPlanes *planes)
   boxPoints->SetPoint(6, bounds[1], bounds[3], bounds[5]);
   boxPoints->SetPoint(7, bounds[0], bounds[3], bounds[5]);
 
-  vtkPoints *points = vtkPoints::New(VTK_DOUBLE);
+  vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::Take(vtkPoints::New(VTK_DOUBLE));
   points->SetNumberOfPoints(6);
 
   double *pts =
@@ -618,8 +590,8 @@ void vtkMRMLAnnotationROINode::GetTransformedPlanes(vtkPlanes *planes)
 
   planes->SetPoints(points);
 
-    
-  vtkDoubleArray *normals = vtkDoubleArray::New();
+
+  vtkNew<vtkDoubleArray> normals;
   normals->SetNumberOfComponents(3);
   normals->SetNumberOfTuples(6);
 
@@ -651,28 +623,44 @@ void vtkMRMLAnnotationROINode::GetTransformedPlanes(vtkPlanes *planes)
     {
     normals->SetTuple3(i, factor*N[i][0], factor*N[i][1], factor*N[i][2]);
     }
-  planes->SetNormals(normals);
-
-  
-  normals->Delete();
-  boxPoints->Delete();  
-  points->Delete();  
+  planes->SetNormals(normals.GetPointer());
 
   vtkMRMLTransformNode* tnode = this->GetParentTransformNode();
-  if (tnode != NULL) // && tnode->IsLinear())
+  if (tnode != NULL)
     {
-    //vtkMatrix4x4* transformToWorld = vtkMatrix4x4::New();
-    //transformToWorld->Identity();
-    //vtkMRMLLinearTransformNode *lnode = vtkMRMLLinearTransformNode::SafeDownCast(tnode);
-    //lnode->GetMatrixTransformToWorld(transformToWorld);
-
-    vtkGeneralTransform *transform = vtkGeneralTransform::New();
-    tnode->GetTransformToWorld(transform);
-   
-    transform->Inverse();
-    planes->SetTransform(transform);
-    transform->Delete();
+    vtkNew<vtkGeneralTransform> transform;
+    tnode->GetTransformFromWorld(transform.GetPointer());
+    planes->SetTransform(transform.GetPointer());
   }
   planes->Modified();
 
+}
+
+//---------------------------------------------------------------------------
+void vtkMRMLAnnotationROINode::GetRASBounds(double bounds[6])
+{
+  double bounds_Local[6]={0};
+  vtkMath::UninitializeBounds(bounds_Local);
+  if (this->GetPolyData() == NULL)
+    {
+    return;
+    }
+  double centerPoint[3]={0};
+  if (!this->GetXYZ(centerPoint))
+    {
+    return;
+    }
+  double radius[3]={0};
+  if (!this->GetRadiusXYZ(radius))
+    {
+    return;
+    }
+  bounds_Local[0]=centerPoint[0]-radius[0];
+  bounds_Local[1]=centerPoint[0]+radius[0];
+  bounds_Local[2]=centerPoint[1]-radius[1];
+  bounds_Local[3]=centerPoint[1]+radius[1];
+  bounds_Local[4]=centerPoint[2]-radius[2];
+  bounds_Local[5]=centerPoint[2]+radius[2];
+
+  this->TransformBoundsToRAS(bounds_Local, bounds);
 }

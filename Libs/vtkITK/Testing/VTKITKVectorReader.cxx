@@ -6,15 +6,11 @@
 
 // ITK includes
 #include <itkConfigure.h>
-#if ITK_VERSION_MAJOR > 3
-#  include <itkFactoryRegistration.h>
-#endif
+#include <itkFactoryRegistration.h>
 
 int main(int argc, char *argv[])
 {
-#if ITK_VERSION_MAJOR > 3
   itk::itkFactoryRegistration();
-#endif
 
   if (argc < 2)
     {
@@ -38,7 +34,7 @@ int main(int argc, char *argv[])
     vectorReader->Delete();
     return 1;
     }
-  
+
   // now assign it to another image
   vtkImageData *imageData;
 
@@ -53,10 +49,10 @@ int main(int argc, char *argv[])
     vectorReader->Delete();
     return 1;
     }
-  
+
   std::cout << "Deleting vector reader" << std::endl;
-  
+
   vectorReader->Delete();
-  
+
   return 0;
 }

@@ -22,16 +22,17 @@
 #include <vtkMRMLColorNode.h>
 #include <vtkMRMLDisplayNode.h>
 #include <vtkMRMLDisplayableNode.h>
-#include <vtkMRMLLinearTransformNode.h>
 #include <vtkMRMLModelDisplayNode.h>
 #include <vtkMRMLModelNode.h>
 #include <vtkMRMLScene.h>
 #include <vtkMRMLSliceCompositeNode.h>
+#include <vtkMRMLSliceLogic.h>
 #include <vtkMRMLSliceNode.h>
 #include <vtkMRMLTransformNode.h>
 
 // VTK includes
 #include <vtkActor2D.h>
+#include <vtkAlgorithmOutput.h>
 #include <vtkCallbackCommand.h>
 #include <vtkEventBroker.h>
 #include <vtkMatrix4x4.h>
@@ -43,10 +44,11 @@
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
 #include <vtkTransform.h>
+#include <vtkGeneralTransform.h>
 #include <vtkTransformPolyDataFilter.h>
 #include <vtkWeakPointer.h>
 #include <vtkPointLocator.h>
-
+#include <vtkVersion.h>
 
 // VTK includes: customization
 #include <vtkCutter.h>
@@ -59,7 +61,6 @@
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro(vtkMRMLModelSliceDisplayableManager );
-vtkCxxRevisionMacro(vtkMRMLModelSliceDisplayableManager, "$Revision: 13525 $");
 
 //---------------------------------------------------------------------------
 class vtkMRMLModelSliceDisplayableManager::vtkInternal
@@ -67,9 +68,10 @@ class vtkMRMLModelSliceDisplayableManager::vtkInternal
 public:
   struct Pipeline
     {
-    vtkSmartPointer<vtkMatrix4x4> NodeToWorld;
+    vtkSmartPointer<vtkGeneralTransform> NodeToWorld;
     vtkSmartPointer<vtkTransform> TransformToSlice;
     vtkSmartPointer<vtkTransformPolyDataFilter> Transformer;
+    vtkSmartPointer<vtkTransformPolyDataFilter> ModelWarper;
     vtkSmartPointer<vtkPlane> Plane;
     vtkSmartPointer<vtkCutter> Cutter;
     vtkSmartPointer<vtkProp> Actor;
@@ -83,8 +85,7 @@ public:
 
   // Transforms
   void UpdateDisplayableTransforms(vtkMRMLDisplayableNode *node);
-  void GetNodeMatrixToWorld(vtkMRMLTransformableNode* node, vtkMatrix4x4* matrixOut);
-
+  void GetNodeTransformToWorld(vtkMRMLTransformableNode* node, vtkGeneralTransform* transformToWorld);
   // Slice Node
   void SetSliceNode(vtkMRMLSliceNode* sliceNode);
   void UpdateSliceNode();
@@ -149,7 +150,28 @@ bool vtkMRMLModelSliceDisplayableManager::vtkInternal
 bool vtkMRMLModelSliceDisplayableManager::vtkInternal
 ::IsVisible(vtkMRMLDisplayNode* displayNode)
 {
-  return displayNode && (displayNode->GetSliceIntersectionVisibility() != 0);
+  if (!displayNode)
+    {
+    return 0;
+    }
+  bool visibleOnNode = true;
+  // for volume slice model display nodes, don't want to only show the slice
+  // intersection if the slice is visible in 3d, but do want to do the check for
+  // other types of models
+  bool isSliceModel = vtkMRMLSliceLogic::IsSliceModelDisplayNode(displayNode);
+  if (!isSliceModel)
+    {
+    vtkMRMLSliceNode *sliceNode = this->SliceNode;
+    if (sliceNode)
+      {
+      visibleOnNode = displayNode->GetVisibility(sliceNode->GetID());
+      }
+    else
+      {
+      visibleOnNode = (displayNode->GetVisibility() == 1 ? true : false);
+      }
+    }
+  return visibleOnNode && (displayNode->GetSliceIntersectionVisibility() != 0);
 }
 
 //---------------------------------------------------------------------------
@@ -181,7 +203,7 @@ void vtkMRMLModelSliceDisplayableManager::vtkInternal
 
 //---------------------------------------------------------------------------
 void vtkMRMLModelSliceDisplayableManager::vtkInternal
-::SetSlicePlaneFromMatrix(vtkMatrix4x4 *sliceMatrix, vtkPlane* plane)
+::SetSlicePlaneFromMatrix(vtkMatrix4x4* sliceMatrix, vtkPlane* plane)
 {
   double normal[3];
   double origin[3];
@@ -200,24 +222,21 @@ void vtkMRMLModelSliceDisplayableManager::vtkInternal
 
 //---------------------------------------------------------------------------
 void vtkMRMLModelSliceDisplayableManager::vtkInternal
-::GetNodeMatrixToWorld(vtkMRMLTransformableNode* node, vtkMatrix4x4* outMat)
+::GetNodeTransformToWorld(vtkMRMLTransformableNode* node, vtkGeneralTransform* transformToWorld)
 {
-  vtkNew<vtkMatrix4x4> nodeMatrixToWorld;
-  nodeMatrixToWorld->Identity();
-
-  if (!node || !outMat)
+  if (!node || !transformToWorld)
     {
     return;
     }
 
   vtkMRMLTransformNode* tnode =
     node->GetParentTransformNode();
-  if (tnode != 0 && tnode->IsLinear())
+
+  transformToWorld->Identity();
+  if (tnode)
     {
-    vtkMRMLLinearTransformNode *lnode = vtkMRMLLinearTransformNode::SafeDownCast(tnode);
-    lnode->GetMatrixTransformToWorld(nodeMatrixToWorld.GetPointer());
+    tnode->GetTransformToWorld(transformToWorld);
     }
-  outMat->DeepCopy(nodeMatrixToWorld.GetPointer());
 }
 
 //---------------------------------------------------------------------------
@@ -233,7 +252,7 @@ void vtkMRMLModelSliceDisplayableManager::vtkInternal
     {
     if ( ((pipelinesIter = this->DisplayPipelines.find(*dnodesIter)) != this->DisplayPipelines.end()) )
       {
-      this->GetNodeMatrixToWorld( mNode, pipelinesIter->second->NodeToWorld );
+      this->GetNodeTransformToWorld( mNode, pipelinesIter->second->NodeToWorld);
       this->UpdateDisplayNodePipeline(pipelinesIter->first, pipelinesIter->second);
       }
     }
@@ -285,8 +304,9 @@ void vtkMRMLModelSliceDisplayableManager::vtkInternal
   pipeline->Actor = actor.GetPointer();
   pipeline->Cutter = vtkSmartPointer<vtkCutter>::New();
   pipeline->TransformToSlice = vtkSmartPointer<vtkTransform>::New();
-  pipeline->NodeToWorld = vtkSmartPointer<vtkMatrix4x4>::New();
+  pipeline->NodeToWorld = vtkSmartPointer<vtkGeneralTransform>::New();
   pipeline->Transformer = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+  pipeline->ModelWarper = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
   pipeline->Plane = vtkSmartPointer<vtkPlane>::New();
 
   // Set up pipeline
@@ -294,6 +314,7 @@ void vtkMRMLModelSliceDisplayableManager::vtkInternal
   pipeline->Transformer->SetInputConnection(pipeline->Cutter->GetOutputPort());
   pipeline->Cutter->SetCutFunction(pipeline->Plane);
   pipeline->Cutter->SetGenerateCutScalars(0);
+  pipeline->Cutter->SetInputConnection(pipeline->ModelWarper->GetOutputPort());
   pipeline->Actor->SetVisibility(0);
 
   // Add actor to Renderer and local cache
@@ -352,34 +373,21 @@ void vtkMRMLModelSliceDisplayableManager::vtkInternal
       {
       return;
       }
-    pipeline->Cutter->SetInput(polyData);
+    pipeline->ModelWarper->SetInputData(polyData);
+    // need this to update bounds of the locator, to avoid crash in the cutter
+    modelDisplayNode->GetOutputPolyDataConnection()->GetProducer()->Update();
 
-    // need this to update bounds of the locator, to avoid crash in the cutter 
-    polyData->Modified();
+    pipeline->ModelWarper->SetTransform(pipeline->NodeToWorld);
 
-    // Update transform matrices
+    //  Set Plane Transform
+    this->SetSlicePlaneFromMatrix(this->SliceXYToRAS, pipeline->Plane);
+    pipeline->Plane->Modified();
 
-    vtkNew<vtkMatrix4x4> tempMat1;
-    vtkNew<vtkMatrix4x4> tempMat2;
-    tempMat1->Identity();
-    tempMat2->Identity();
+    //  Set PolyData Transform
+    vtkNew<vtkMatrix4x4> rasToSliceXY;
+    vtkMatrix4x4::Invert(this->SliceXYToRAS, rasToSliceXY.GetPointer());
+    pipeline->TransformToSlice->SetMatrix(rasToSliceXY.GetPointer());
 
-    //    Set Plane Transform
-    tempMat1->Identity();
-    tempMat1->DeepCopy(pipeline->NodeToWorld);
-    tempMat1->Invert();
-    vtkMatrix4x4::Multiply4x4(tempMat1.GetPointer(), this->SliceXYToRAS, tempMat2.GetPointer());
-    this->SetSlicePlaneFromMatrix(tempMat2.GetPointer(), pipeline->Plane);
-
-    //    Set PolyData Transform
-    tempMat1->DeepCopy(this->SliceXYToRAS);
-    tempMat1->Invert();
-    vtkMatrix4x4::Multiply4x4(tempMat1.GetPointer(),
-                              pipeline->NodeToWorld, tempMat2.GetPointer());
-    pipeline->TransformToSlice->SetMatrix(tempMat2.GetPointer());
-
-    pipeline->Plane->Modified(); 
-    
     // optimization for slice to slice intersections which are 1 quad polydatas
     // no need for 50^3 default locator divisons
     if (polyData->GetPoints() != NULL && polyData->GetNumberOfPoints() <= 4)
@@ -541,7 +549,7 @@ void vtkMRMLModelSliceDisplayableManager::AddDisplayableNode(
 
   for (int i=0; i<nnodes; i++)
   {
-    vtkMRMLDisplayNode *dnode = node->GetNthDisplayNode(i);    
+    vtkMRMLDisplayNode *dnode = node->GetNthDisplayNode(i);
     if ( this->Internal->UseDisplayNode(dnode) )
       {
       this->Internal->ModelToDisplayNodes[node].insert(dnode);
@@ -580,7 +588,7 @@ void vtkMRMLModelSliceDisplayableManager
 void vtkMRMLModelSliceDisplayableManager
 ::OnMRMLSceneNodeAdded(vtkMRMLNode* node)
 {
-  if ( !node->IsA("vtkMRMLModelNode") )
+  if (!node->IsA("vtkMRMLModelNode"))
     {
     return;
     }
@@ -600,8 +608,8 @@ void vtkMRMLModelSliceDisplayableManager
 void vtkMRMLModelSliceDisplayableManager
 ::OnMRMLSceneNodeRemoved(vtkMRMLNode* node)
 {
-  if ( node && (!node->IsA("vtkMRMLModelNode"))
-       && (!node->IsA("vtkMRMLModelDisplayNode")) )
+  if ( node && !node->IsA("vtkMRMLModelNode")
+       && !node->IsA("vtkMRMLModelDisplayNode") )
     {
     return;
     }

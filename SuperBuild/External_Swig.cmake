@@ -7,21 +7,19 @@ endif()
 
 # Sanity checks
 if(DEFINED Swig_DIR AND NOT EXISTS ${Swig_DIR})
-  message(FATAL_ERROR "Swig_DIR variable is defined but corresponds to non-existing directory")
+  message(FATAL_ERROR "Swig_DIR variable is defined but corresponds to nonexistent directory")
 endif()
 
 if(NOT SWIG_DIR AND NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
 
-  set(SWIG_TARGET_VERSION 2.0.9)
-  set(SWIG_DOWNLOAD_SOURCE_HASH "54d534b14a70badc226129159412ea85")
-  set(SWIG_DOWNLOAD_SOURCE_ID "147969")
-  set(SWIG_DOWNLOAD_WIN_HASH "a1dc34766cf599f49e2092f7973c85f4" )
-  set(SWIG_DOWNLOAD_WIN_ID "147968a")
+  set(SWIG_TARGET_VERSION 3.0.2)
+  set(SWIG_DOWNLOAD_SOURCE_HASH "62f9b0d010cef36a13a010dc530d0d41")
+  set(SWIG_DOWNLOAD_WIN_HASH "3f18de4fc09ab9abb0d3be37c11fbc8f")
 
   if(WIN32)
     # swig.exe available as pre-built binary on Windows:
     ExternalProject_Add(Swig
-      URL  http://midas3.kitware.com/midas/api/rest?method=midas.bitstream.download&id=${SWIG_DOWNLOAD_WIN_ID}&name=swigwin-${SWIG_TARGET_VERSION}.tar.gz
+      URL http://midas3.kitware.com/midas/api/rest?method=midas.bitstream.download&checksum=${SWIG_DOWNLOAD_WIN_HASH}&name=swigwin-${SWIG_TARGET_VERSION}.zip
       URL_MD5 ${SWIG_DOWNLOAD_WIN_HASH}
       SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/swigwin-${SWIG_TARGET_VERSION}"
       CONFIGURE_COMMAND ""
@@ -30,7 +28,7 @@ if(NOT SWIG_DIR AND NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
       UPDATE_COMMAND ""
       )
 
-    set(SWIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/swigwin-${SWIG_TARGET_VERSION}") # ??
+    set(SWIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/swigwin-${SWIG_TARGET_VERSION}") # path specified as source in ep
     set(SWIG_EXECUTABLE "${CMAKE_CURRENT_BINARY_DIR}/swigwin-${SWIG_TARGET_VERSION}/swig.exe")
     set(Swig_DEPEND Swig)
 
@@ -57,16 +55,35 @@ if(NOT SWIG_DIR AND NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
     set(swig_source_dir ${CMAKE_CURRENT_BINARY_DIR}/Swig-prefix/src/Swig)
     set(swig_install_dir ${CMAKE_CURRENT_BINARY_DIR}/Swig)
 
-    configure_file(
-      ${CMAKE_CURRENT_SOURCE_DIR}/SuperBuild/swig_configure_step.cmake.in
-      ${CMAKE_CURRENT_BINARY_DIR}/swig_configure_step.cmake
-      @ONLY)
-    set ( swig_CONFIGURE_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/swig_configure_step.cmake )
+    include(ExternalProjectForNonCMakeProject)
+
+    # environment
+    set(_env_script ${CMAKE_BINARY_DIR}/${proj}_Env.cmake)
+    ExternalProject_Write_SetBuildEnv_Commands(${_env_script})
+    file(APPEND ${_env_script}
+"#------------------------------------------------------------------------------
+# Added by '${CMAKE_CURRENT_LIST_FILE}'
+
+set(ENV{YACC} \"${BISON_EXECUTABLE}\")
+set(ENV{YFLAGS} \"${BISON_FLAGS}\")
+")
+
+    # configure step
+    set(_configure_script ${CMAKE_BINARY_DIR}/${proj}_configure_step.cmake)
+    file(WRITE ${_configure_script}
+"include(\"${_env_script}\")
+set(${proj}_WORKING_DIR \"${swig_binary_dir}\")
+ExternalProject_Execute(${proj} \"configure\" sh ${swig_source_dir}/configure
+    --prefix=${swig_install_dir}
+    --with-pcre-prefix=${pcre_install_dir}
+    --without-octave
+    --with-python=${PYTHON_EXECUTABLE})
+")
 
     ExternalProject_add(Swig
-      URL  http://midas3.kitware.com/midas/api/rest?method=midas.bitstream.download&id=${SWIG_DOWNLOAD_SOURCE_ID}&name=swig-${SWIG_TARGET_VERSION}.tar.gz
+      URL http://midas3.kitware.com/midas/api/rest?method=midas.bitstream.download&checksum=${SWIG_DOWNLOAD_SOURCE_HASH}&name=swig-${SWIG_TARGET_VERSION}.tar.gz
       URL_MD5 ${SWIG_DOWNLOAD_SOURCE_HASH}
-      CONFIGURE_COMMAND ${swig_CONFIGURE_COMMAND}
+      CONFIGURE_COMMAND ${CMAKE_COMMAND} -P ${_configure_script}
       DEPENDS ${${proj}_DEPENDENCIES}
       )
 

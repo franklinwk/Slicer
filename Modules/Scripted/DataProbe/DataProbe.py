@@ -1,7 +1,8 @@
 import os
 import unittest
-import qt, vtk
-from __main__ import slicer
+import qt, vtk, ctk
+import slicer
+import DataProbeLib
 
 #
 # DataProbe
@@ -17,12 +18,13 @@ class DataProbe:
 The DataProbe module is used to get information about the current RAS position being indicated by the mouse position.  See <a href=\"$a/Documentation/$b.$c/Modules/DataProbe\">$a/Documentation/$b.$c/Modules/DataProbe</a> for more information.
     """).substitute({ 'a':parent.slicerWikiUrl, 'b':slicer.app.majorVersion, 'c':slicer.app.minorVersion })
     parent.acknowledgementText = """
-This work is supported by NA-MIC, NAC, NCIGT, and the Slicer Community. See <a>http://www.slicer.org</a> for details.  Module implemented by Steve Pieper.
+This work is supported by NA-MIC, NAC, NCIGT, NIH U24 CA180918 (PIs Kikinis and Fedorov) and the Slicer Community.
+See <a>http://www.slicer.org</a> for details.  Module implemented by Steve Pieper.
     """
     # TODO: need a DataProbe icon
     #parent.icon = qt.QIcon(':Icons/XLarge/SlicerDownloadMRHead.png')
     self.parent = parent
-    self.infoWidget = 0
+    self.infoWidget = None
 
     if slicer.mrmlScene.GetTagByClassName( "vtkMRMLScriptedModuleNode" ) != 'ScriptedModule':
       slicer.mrmlScene.RegisterNodeClass(vtkMRMLScriptedModuleNode())
@@ -60,44 +62,44 @@ This work is supported by NA-MIC, NAC, NCIGT, and the Slicer Community. See <a>h
     except IndexError:
       print("No Data Probe frame - cannot create DataProbe")
       return
-    self.infoWidget = DataProbeInfoWidget(parent,type='small')
+    self.infoWidget = DataProbeInfoWidget(parent)
     parent.layout().insertWidget(0,self.infoWidget.frame)
+
+  def showZoomedSlice(self, value=False):
+    self.showZoomedSlice = value
+    if self.infoWidget:
+      self.infoWidget.onShowImage(value)
 
 class DataProbeInfoWidget(object):
 
-  def __init__(self, parent=None,type='small'):
-    self.type = type
+  def __init__(self, parent=None):
     self.nameSize = 24
-    # the currentLayoutName is tag on the slice node that corresponds
-    # view which should currently be shown in the DataProbe window.
-    # Keeping track of this allows us to respond to non-interactor updates
-    # to the slice (like from an external tracker) but only in the view where
-    # the mouse has most recently entered.
-    self.currentLayoutName = None
 
-    # Default observer priority is 0.0, and the widgets have a 0.5 priority
-    # so we set this to 1 in order to get events that would
-    # otherwise be swallowed.  Since we do not abort the event, this is harmless.
-    self.priority = 2
-
-    # keep list of pairs: [observee,tag] so they can be removed easily
-    self.styleObserverTags = []
-    # keep a map of interactor styles to sliceWidgets so we can easily get sliceLogic
-    self.sliceWidgetsPerStyle = {}
-
-    layoutManager = slicer.app.layoutManager()
-    layoutManager.connect('layoutChanged(int)', self.refreshObservers)
+    self.CrosshairNode = None
+    self.CrosshairNodeObserverTag = None
 
     self.frame = qt.QFrame(parent)
     self.frame.setLayout(qt.QVBoxLayout())
-    if type == 'small':
-      self.createSmall()
+
+    modulePath = slicer.modules.dataprobe.path.replace("DataProbe.py","")
+    self.iconsDIR = modulePath + '/Resources/Icons'
+
+    self.showImage = False
+
+    # Used in _createMagnifiedPixmap()
+    self.imageCrop = vtk.vtkExtractVOI()
+    self.painter = qt.QPainter()
+    self.pen = qt.QPen()
+
+    self._createSmall()
 
     #Helper class to calculate and display tensor scalars
     self.calculateTensorScalars = CalculateTensorScalars()
 
-    # once everything is set up, refresh the observers
-    self.refreshObservers()
+    # Observe the crosshair node to get the current cursor position
+    self.CrosshairNode = slicer.mrmlScene.GetNthNodeByClass(0, 'vtkMRMLCrosshairNode')
+    if self.CrosshairNode:
+      self.CrosshairNodeObserverTag = self.CrosshairNode.AddObserver(slicer.vtkMRMLCrosshairNode.CursorPositionModifiedEvent, self.processEvent)
 
 
   def __del__(self):
@@ -115,33 +117,9 @@ class DataProbeInfoWidget(object):
 
   def removeObservers(self):
     # remove observers and reset
-    for observee,tag in self.styleObserverTags:
-      observee.RemoveObserver(tag)
-    self.styleObserverTags = []
-    self.sliceWidgetsPerStyle = {}
-
-  def refreshObservers(self):
-    """ When the layout changes, drop the observers from
-    all the old widgets and create new observers for the
-    newly created widgets"""
-    self.removeObservers()
-    # get new slice nodes
-    layoutManager = slicer.app.layoutManager()
-    sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLSliceNode')
-    for nodeIndex in xrange(sliceNodeCount):
-      # find the widget for each node in scene
-      sliceNode = slicer.mrmlScene.GetNthNodeByClass(nodeIndex, 'vtkMRMLSliceNode')
-      sliceWidget = layoutManager.sliceWidget(sliceNode.GetLayoutName())
-      if sliceWidget:
-        # add obserservers and keep track of tags
-        style = sliceWidget.sliceView().interactor()
-        self.sliceWidgetsPerStyle[style] = sliceWidget
-        events = ("MouseMoveEvent", "EnterEvent", "LeaveEvent")
-        for event in events:
-          tag = style.AddObserver(event, self.processEvent, self.priority)
-          self.styleObserverTags.append([style,tag])
-        tag = sliceNode.AddObserver("ModifiedEvent", self.processEvent, self.priority)
-        self.styleObserverTags.append([sliceNode,tag])
+    if self.CrosshairNode and self.CrosshairNodeObserverTag:
+      self.CrosshairNode.RemoveObserver(self.CrosshairNodeObserverTag)
+    self.CrosshairNodeObserverTag = None
 
   def getPixelString(self,volumeNode,ijk):
     """Given a volume node, create a human readable
@@ -158,12 +136,14 @@ class DataProbeInfoWidget(object):
       if ijk[ele] < 0 or ijk[ele] >= dims[ele]:
         return "Out of Frame"
     pixel = ""
-    if volumeNode.GetLabelMap():
+    if volumeNode.IsA("vtkMRMLLabelMapVolumeNode"):
       labelIndex = int(imageData.GetScalarComponentAsDouble(ijk[0], ijk[1], ijk[2], 0))
       labelValue = "Unknown"
-      colorNode = volumeNode.GetDisplayNode().GetColorNode()
-      if colorNode:
-        labelValue = colorNode.GetColorName(labelIndex)
+      displayNode = volumeNode.GetDisplayNode()
+      if displayNode:
+        colorNode = displayNode.GetColorNode()
+        if colorNode:
+          labelValue = colorNode.GetColorName(labelIndex)
       return "%s (%d)" % (labelValue, labelIndex)
 
     if volumeNode.IsA("vtkMRMLDiffusionTensorVolumeNode"):
@@ -203,139 +183,255 @@ class DataProbeInfoWidget(object):
         component = int(component)
       # format string according to suggestion here:
       # http://stackoverflow.com/questions/2440692/formatting-floats-in-python-without-superfluous-zeros
-      componentString = ("%f" % component).rstrip('0').rstrip('.')
+      # also set the default field width for each coordinate
+      componentString = ("%4f" % component).rstrip('0').rstrip('.')
       pixel += ("%s, " % componentString)
     return pixel[:-2]
 
 
   def processEvent(self,observee,event):
     # TODO: use a timer to delay calculation and compress events
-    if event == 'LeaveEvent':
-      self.currentLayoutName = None
+    insideView = False
+    ras = [0.0,0.0,0.0]
+    xyz = [0.0,0.0,0.0]
+    sliceNode = None
+    if self.CrosshairNode:
+      insideView = self.CrosshairNode.GetCursorPositionRAS(ras)
+      sliceNode = self.CrosshairNode.GetCursorPositionXYZ(xyz)
+
+    sliceLogic = None
+    if sliceNode:
+      appLogic = slicer.app.applicationLogic()
+      if appLogic:
+        sliceLogic = appLogic.GetSliceLogic(sliceNode)
+
+    if not insideView or not sliceNode or not sliceLogic:
       # reset all the readouts
-      self.viewerColor.setText( "" )
-      self.viewerName.setText( "" )
-      self.viewerRAS.setText( "" )
-      self.viewerOrient.setText( "" )
-      self.viewerSpacing.setText( "" )
+      self.viewerColor.text = ""
+      self.viewInfo.text =  ""
       layers = ('L', 'F', 'B')
       for layer in layers:
         self.layerNames[layer].setText( "" )
         self.layerIJKs[layer].setText( "" )
         self.layerValues[layer].setText( "" )
+      self.imageLabel.hide()
+      self.viewerColor.hide()
+      self.viewInfo.hide()
+      self.viewerFrame.hide()
+      self.showImageBox.show()
       return
-    if event == 'EnterEvent':
-      sliceWidget = self.sliceWidgetsPerStyle[observee]
-      self.currentLayoutName = None
-      sliceLogic = sliceWidget.sliceLogic()
-      sliceNode = sliceWidget.mrmlSliceNode()
-      self.currentLayoutName = sliceNode.GetLayoutName()
-    if observee.IsA('vtkMRMLSliceNode'):
-      # for a slice node, get the corresponding style and
-      # set it as the observee so update is made for that sliceWidget
-      # if it is the current layout name
-      layoutManager = slicer.app.layoutManager()
-      sliceWidget = layoutManager.sliceWidget(observee.GetLayoutName())
-      if sliceWidget and observee.GetLayoutName() == self.currentLayoutName:
-        observee = sliceWidget.sliceView().interactor()
-    if self.sliceWidgetsPerStyle.has_key(observee):
-      sliceWidget = self.sliceWidgetsPerStyle[observee]
-      sliceLogic = sliceWidget.sliceLogic()
-      sliceNode = sliceWidget.mrmlSliceNode()
-      interactor = observee
-      xy = interactor.GetEventPosition()
-      xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
-      # populate the widgets
-      self.viewerColor.setText( " " )
-      rgbColor = sliceNode.GetLayoutColor();
-      color = qt.QColor.fromRgbF(rgbColor[0], rgbColor[1], rgbColor[2])
-      if hasattr(color, 'name'):
-        self.viewerColor.setStyleSheet('QLabel {background-color : %s}' % color.name())
-      self.viewerName.setText( "  " + sliceNode.GetLayoutName() + "  " )
-      # TODO: get z value from lightbox
-      ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
-      self.viewerRAS.setText( "RAS: (%.1f, %.1f, %.1f)" % ras )
-      self.viewerOrient.setText( "  " + sliceWidget.sliceOrientation )
-      self.viewerSpacing.setText( "%.1f" % sliceLogic.GetLowestVolumeSliceSpacing()[2] )
-      if sliceNode.GetSliceSpacingMode() == 1:
-        self.viewerSpacing.setText( "(" + self.viewerSpacing.text + ")" )
-      self.viewerSpacing.setText( " Sp: " + self.viewerSpacing.text )
-      layerLogicCalls = (('L', sliceLogic.GetLabelLayer),
-                         ('F', sliceLogic.GetForegroundLayer),
-                         ('B', sliceLogic.GetBackgroundLayer))
-      for layer,logicCall in layerLogicCalls:
-        layerLogic = logicCall()
-        volumeNode = layerLogic.GetVolumeNode()
-        nameLabel = "None"
-        ijkLabel = ""
-        valueLabel = ""
-        if volumeNode:
-          nameLabel = self.fitName(volumeNode.GetName())
-          xyToIJK = layerLogic.GetXYToIJKTransform().GetMatrix()
-          ijkFloat = xyToIJK.MultiplyPoint(xyz+(1,))[:3]
-          ijk = []
-          for element in ijkFloat:
-            try:
-              index = int(round(element))
-            except ValueError:
-              index = 0
-            ijk.append(index)
-            ijkLabel += "%d, " % index
-          ijkLabel = ijkLabel[:-2]
-          valueLabel = self.getPixelString(volumeNode,ijk)
-        self.layerNames[layer].setText( '<b>' + nameLabel )
-        self.layerIJKs[layer].setText( '(' + ijkLabel + ')' )
-        self.layerValues[layer].setText( '<b>' + valueLabel )
+
+    self.viewerColor.show()
+    self.viewInfo.show()
+    self.viewerFrame.show()
+    self.showImageBox.hide()
+
+    # populate the widgets
+    self.viewerColor.setText( " " )
+    rgbColor = sliceNode.GetLayoutColor();
+    color = qt.QColor.fromRgbF(rgbColor[0], rgbColor[1], rgbColor[2])
+    if hasattr(color, 'name'):
+      self.viewerColor.setStyleSheet('QLabel {background-color : %s}' % color.name())
+
+    self.viewInfo.text = self.generateViewDescription(xyz, ras, sliceNode, sliceLogic)
+
+    def _roundInt(value):
+      try:
+        return int(round(value))
+      except ValueError:
+        return 0
+
+    hasVolume = False
+    layerLogicCalls = (('L', sliceLogic.GetLabelLayer),
+                       ('F', sliceLogic.GetForegroundLayer),
+                       ('B', sliceLogic.GetBackgroundLayer))
+    for layer,logicCall in layerLogicCalls:
+      layerLogic = logicCall()
+      volumeNode = layerLogic.GetVolumeNode()
+      ijk = [0, 0, 0]
+      if volumeNode:
+        hasVolume = True
+        xyToIJK = layerLogic.GetXYToIJKTransform()
+        ijkFloat = xyToIJK.TransformDoublePoint(xyz)
+        ijk = [_roundInt(value) for value in ijkFloat]
+      self.layerNames[layer].setText(self.generateLayerName(layerLogic))
+      self.layerIJKs[layer].setText(self.generateIJKPixelDescription(ijk, layerLogic))
+      self.layerValues[layer].setText(self.generateIJKPixelValueDescription(ijk, layerLogic))
+
+    # set image
+    if (not slicer.mrmlScene.IsBatchProcessing()) and sliceLogic and hasVolume and self.showImage:
+      pixmap = self._createMagnifiedPixmap(
+        xyz, sliceLogic.GetBlend().GetOutputPort(), self.imageLabel.size, color)
+      if pixmap:
+        self.imageLabel.setPixmap(pixmap)
+        self.onShowImage(self.showImage)
+
     sceneName = slicer.mrmlScene.GetURL()
     if sceneName != "":
       self.frame.parent().text = "Data Probe: %s" % self.fitName(sceneName,nameSize=2*self.nameSize)
     else:
       self.frame.parent().text = "Data Probe"
 
-  def createSmall(self):
+  def generateViewDescription(self, xyz, ras, sliceNode, sliceLogic):
+
+    # Note that 'xyz' is unused in the Slicer implementation but could
+    # be used when customizing the behavior of this function in extension.
+
+    # Described below are the details for the ras coordinate width set to 6:
+    #  1: sign
+    #  3: suggested number of digits before decimal point
+    #  1: decimal point:
+    #  1: number of digits after decimal point
+
+    spacing = "%.1f" % sliceLogic.GetLowestVolumeSliceSpacing()[2]
+    if sliceNode.GetSliceSpacingMode() == slicer.vtkMRMLSliceNode.PrescribedSliceSpacingMode:
+      spacing = "(%s)" % spacing
+
+    return \
+      "  {layoutName: <8s}  RAS: ({ras_x:6.1f}, {ras_y:6.1f}, {ras_z:6.1f})  {orient: >8s} Sp: {spacing:s}" \
+      .format(layoutName=sliceNode.GetLayoutName(),
+              ras_x=ras[0],
+              ras_y=ras[1],
+              ras_z=ras[2],
+              orient=sliceNode.GetOrientationString(),
+              spacing=spacing
+              )
+
+  def generateLayerName(self, slicerLayerLogic):
+    volumeNode = slicerLayerLogic.GetVolumeNode()
+    return "<b>%s</b>" % (self.fitName(volumeNode.GetName()) if volumeNode else "None")
+
+  def generateIJKPixelDescription(self, ijk, slicerLayerLogic):
+    volumeNode = slicerLayerLogic.GetVolumeNode()
+    return "({i:4d}, {j:4d}, {k:4d})".format(i=ijk[0], j=ijk[1], k=ijk[2]) if volumeNode else ""
+
+  def generateIJKPixelValueDescription(self, ijk, slicerLayerLogic):
+    volumeNode = slicerLayerLogic.GetVolumeNode()
+    return "<b>%s</b>" % self.getPixelString(volumeNode,ijk) if volumeNode else ""
+
+  def _createMagnifiedPixmap(self, xyz, inputImageDataConnection, outputSize, crosshairColor, imageZoom=10):
+
+    # Use existing instance of objects to avoid instanciating one at each event.
+    imageCrop = self.imageCrop
+    painter = self.painter
+    pen = self.pen
+
+    def _roundInt(value):
+      try:
+        return int(round(value))
+      except ValueError:
+        return 0
+
+    imageCrop.SetInputConnection(inputImageDataConnection)
+    xyzInt = [0, 0, 0]
+    xyzInt = [_roundInt(value) for value in xyz]
+    producer = inputImageDataConnection.GetProducer()
+    dims = producer.GetOutput().GetDimensions()
+    minDim = min(dims[0],dims[1])
+    imageSize = _roundInt(minDim/imageZoom/2.0)
+    imin = max(0,xyzInt[0]-imageSize)
+    imax = min(dims[0]-1,  xyzInt[0]+imageSize)
+    jmin = max(0,xyzInt[1]-imageSize)
+    jmax = min(dims[1]-1,  xyzInt[1]+imageSize)
+    if (imin <= imax) and (jmin <= jmax):
+      imageCrop.SetVOI(imin, imax, jmin, jmax, 0,0)
+      imageCrop.Update()
+      vtkImage = imageCrop.GetOutput()
+      if vtkImage:
+        qImage = qt.QImage()
+        slicer.qMRMLUtils().vtkImageDataToQImage(vtkImage, qImage)
+        imagePixmap = qt.QPixmap.fromImage(qImage)
+        imagePixmap = imagePixmap.scaled(outputSize, qt.Qt.KeepAspectRatio, qt.Qt.FastTransformation)
+
+        # draw crosshair
+        painter.begin(imagePixmap)
+        pen = qt.QPen()
+        pen.setColor(crosshairColor)
+        painter.setPen(pen)
+        painter.drawLine(0, imagePixmap.height()/2, imagePixmap.width(), imagePixmap.height()/2)
+        painter.drawLine(imagePixmap.width()/2,0, imagePixmap.width()/2, imagePixmap.height())
+        painter.end()
+        return imagePixmap
+    return None
+
+  def _createSmall(self):
     """Make the internals of the widget to display in the
     Data Probe frame (lower left of slicer main window by default)"""
+
+    # this method makes SliceView Annotation
+    self.sliceAnnotations = DataProbeLib.SliceAnnotations()
+
+    # goto module button
+    self.goToModule = qt.QPushButton('->', self.frame)
+    self.goToModule.setToolTip('Go to the DataProbe module for more information and options')
+    self.frame.layout().addWidget(self.goToModule)
+    self.goToModule.connect("clicked()", self.onGoToModule)
+    # hide this for now - there's not much to see in the module itself
+    self.goToModule.hide()
+
+    # image view
+    self.showImageBox = qt.QCheckBox('Show Zoomed Slice', self.frame)
+    self.frame.layout().addWidget(self.showImageBox)
+    self.showImageBox.connect("toggled(bool)", self.onShowImage)
+    self.showImageBox.setChecked(False)
+
+    self.imageLabel = qt.QLabel()
+
+    # qt.QSizePolicy(qt.QSizePolicy.Expanding, qt.QSizePolicy.Expanding)
+    # fails on some systems, therefore set the policies using separate method calls
+    qSize = qt.QSizePolicy()
+    qSize.setHorizontalPolicy(qt.QSizePolicy.Expanding)
+    qSize.setVerticalPolicy(qt.QSizePolicy.Expanding)
+    self.imageLabel.setSizePolicy(qSize)
+    #self.imageLabel.setScaledContents(True)
+    self.frame.layout().addWidget(self.imageLabel)
+    self.onShowImage(False)
+
     # top row - things about the viewer itself
     self.viewerFrame = qt.QFrame(self.frame)
     self.viewerFrame.setLayout(qt.QHBoxLayout())
     self.frame.layout().addWidget(self.viewerFrame)
     self.viewerColor = qt.QLabel(self.viewerFrame)
     self.viewerFrame.layout().addWidget(self.viewerColor)
-    self.viewerName = qt.QLabel(self.viewerFrame)
-    self.viewerFrame.layout().addWidget(self.viewerName)
-    self.viewerRAS = qt.QLabel()
-    self.viewerFrame.layout().addWidget(self.viewerRAS)
-    self.viewerOrient = qt.QLabel()
-    self.viewerFrame.layout().addWidget(self.viewerOrient)
-    self.viewerSpacing = qt.QLabel()
-    self.viewerFrame.layout().addWidget(self.viewerSpacing)
+    self.viewInfo = qt.QLabel()
+    self.viewerFrame.layout().addWidget(self.viewInfo)
+
     self.viewerFrame.layout().addStretch(1)
+
+    def _setFixedFontFamily(widget, family='Monospace'):
+      font = widget.font
+      font.setFamily(family)
+      widget.font = font
+
+    _setFixedFontFamily(self.viewInfo)
 
     # the grid - things about the layers
     # this method makes labels
     self.layerGrid = qt.QFrame(self.frame)
-    self.layerGrid.setLayout(qt.QGridLayout())
+    layout = qt.QGridLayout()
+    self.layerGrid.setLayout(layout)
     self.frame.layout().addWidget(self.layerGrid)
     layers = ('L', 'F', 'B')
     self.layerNames = {}
     self.layerIJKs = {}
     self.layerValues = {}
-    row = 0
-    for layer in layers:
+    for (row, layer) in enumerate(layers):
       col = 0
-      self.layerGrid.layout().addWidget(qt.QLabel(layer), row, col)
+      layout.addWidget(qt.QLabel(layer), row, col)
       col += 1
       self.layerNames[layer] = qt.QLabel()
-      self.layerGrid.layout().addWidget(self.layerNames[layer], row, col)
+      layout.addWidget(self.layerNames[layer], row, col)
       col += 1
       self.layerIJKs[layer] = qt.QLabel()
-      self.layerGrid.layout().addWidget(self.layerIJKs[layer], row, col)
+      layout.addWidget(self.layerIJKs[layer], row, col)
       col += 1
       self.layerValues[layer] = qt.QLabel()
-      self.layerGrid.layout().addWidget(self.layerValues[layer], row, col)
-      self.layerGrid.layout().setColumnStretch(col,100)
-      col += 1
-      row += 1
+      layout.addWidget(self.layerValues[layer], row, col)
+      layout.setColumnStretch(col, 100)
+
+      _setFixedFontFamily(self.layerNames[layer])
+      _setFixedFontFamily(self.layerIJKs[layer])
+      _setFixedFontFamily(self.layerValues[layer])
 
     # goto module button
     self.goToModule = qt.QPushButton('->', self.frame)
@@ -349,21 +445,26 @@ class DataProbeInfoWidget(object):
     m = slicer.util.mainWindow()
     m.moduleSelector().selectModule('DataProbe')
 
+  def onShowImage(self, value=False):
+    self.showImage = value
+    if value:
+      self.imageLabel.show()
+    else:
+      self.imageLabel.hide()
+      pixmap = qt.QPixmap()
+      self.imageLabel.setPixmap(pixmap)
+
 #
 # DataProbe widget
 #
 
 class DataProbeWidget:
   """This builds the module contents - nothing here"""
-  # TODO: this could have a more in-depth set of information
-  # about the volumes and layers in the slice views
-  # and possibly other view types as well
   # TODO: Since this is empty for now, it should be hidden
   # from the Modules menu.
 
   def __init__(self, parent=None):
     self.observerTags = []
-
     if not parent:
       self.parent = slicer.qMRMLWidget()
       self.parent.setLayout(qt.QVBoxLayout())
@@ -392,7 +493,7 @@ class DataProbeWidget:
     self.reloadButton = qt.QPushButton("Reload")
     self.reloadButton.toolTip = "Reload this module."
     self.reloadButton.name = "DataProbe Reload"
-    self.layout.addWidget(self.reloadButton)
+    #self.layout.addWidget(self.reloadButton)
     self.reloadButton.connect('clicked()', self.onReload)
 
     # reload and test button
@@ -400,8 +501,17 @@ class DataProbeWidget:
     #  your module to users)
     self.reloadAndTestButton = qt.QPushButton("Reload and Test")
     self.reloadAndTestButton.toolTip = "Reload this module and then run the self tests."
-    self.layout.addWidget(self.reloadAndTestButton)
+    #self.layout.addWidget(self.reloadAndTestButton)
     self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
+
+    settingsCollapsibleButton = ctk.ctkCollapsibleButton()
+    settingsCollapsibleButton.text = "Slice View Annotations Settings"
+    self.layout.addWidget(settingsCollapsibleButton)
+    settingsVBoxLayout = qt.QVBoxLayout(settingsCollapsibleButton)
+    dataProbeInstance = slicer.modules.DataProbeInstance
+    if dataProbeInstance.infoWidget:
+      sliceAnnotationsFrame = dataProbeInstance.infoWidget.sliceAnnotations.window
+      settingsVBoxLayout.addWidget(sliceAnnotationsFrame)
 
     self.parent.layout().addStretch(1)
 
@@ -409,40 +519,7 @@ class DataProbeWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="DataProbe"):
     self.onReload()
@@ -457,14 +534,13 @@ class CalculateTensorScalars:
 
         self.single_pixel_image = vtk.vtkImageData()
         self.single_pixel_image.SetExtent(0, 0, 0, 0, 0, 0)
-        self.single_pixel_image.AllocateScalars()
 
         self.tensor_data = vtk.vtkFloatArray()
         self.tensor_data.SetNumberOfComponents(9)
         self.tensor_data.SetNumberOfTuples(self.single_pixel_image.GetNumberOfPoints())
         self.single_pixel_image.GetPointData().SetTensors(self.tensor_data)
 
-        self.dti_math.SetInput(self.single_pixel_image)
+        self.dti_math.SetInputData(self.single_pixel_image)
 
     def __call__(self, tensor, operation=None):
         if len(tensor) != 9:
@@ -494,8 +570,8 @@ class CalculateTensorScalars:
 #
 
 class DataProbeLogic:
-  """This class should implement all the actual 
-  computation done by your module.  The interface 
+  """This class should implement all the actual
+  computation done by your module.  The interface
   should be such that other python code can import
   this class and make use of the functionality without
   requiring an instance of the Widget
@@ -504,14 +580,14 @@ class DataProbeLogic:
     pass
 
   def hasImageData(self,volumeNode):
-    """This is a dummy logic method that 
+    """This is a dummy logic method that
     returns true if the passed in volume
     node has valid image data
     """
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True

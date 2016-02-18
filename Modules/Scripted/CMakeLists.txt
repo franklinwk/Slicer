@@ -12,6 +12,11 @@ set(modules
   SurfaceToolbox
   VectorToScalarVolume
   )
+if(Slicer_BUILD_EXTENSIONMANAGER_SUPPORT)
+  list(APPEND modules
+    ExtensionWizard
+    )
+endif()
 if(Slicer_USE_NUMPY)
   list(APPEND modules
     Endoscopy
@@ -20,17 +25,8 @@ endif()
 if(Slicer_BUILD_DICOM_SUPPORT)
   list(APPEND modules
     DICOM
+    DICOMLib
     DICOMPlugins
-    )
-  if(Slicer_BUILD_DIFFUSION_SUPPORT)
-    list(APPEND modules
-      DICOM2FullBrainTractography
-      )
-  endif()
-endif()
-if(Slicer_BUILD_DIFFUSION_SUPPORT)
-  list(APPEND modules
-    FiberBundleToLabelMap
     )
 endif()
 foreach(module ${modules})

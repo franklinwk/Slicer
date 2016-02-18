@@ -11,8 +11,10 @@
   Version:   $Revision: 1.6 $
 
 =========================================================================auto=*/
+
 #include "vtkPreciseHyperStreamlinePoints.h"
 #include "vtkObjectFactory.h"
+#include <vtkVersion.h>
 // is there any problem with including a cxx file?
 // this is done for class vtkPreciseHyperPoint which is defined here
 // otherwise we cannot access the points calculated by superclass
@@ -27,18 +29,18 @@ class vtkPreciseHyperPoint { //;prevent man page generation
 public:
     vtkPreciseHyperPoint(); // method sets up storage
     vtkPreciseHyperPoint &operator=(const vtkPreciseHyperPoint& hp); //for resizing
-    
-    float   X[3];    // position 
+
+    float   X[3];    // position
     vtkIdType     CellId;  // cell
     int     SubId; // cell sub id
-    float   P[3];    // parametric coords in cell 
+    float   P[3];    // parametric coords in cell
     float   W[3];    // eigenvalues (sorted in decreasing value)
     float   *V[3];   // pointers to eigenvectors (also sorted)
     float   V0[3];   // storage for eigenvectors
     float   V1[3];
     float   V2[3];
-    float   S;       // scalar value 
-    float   D;       // distance travelled so far 
+    float   S;       // scalar value
+    float   D;       // distance travelled so far
 };
 
 class vtkPreciseHyperArray { //;prevent man page generation
@@ -53,7 +55,7 @@ public:
     };
   vtkIdType GetNumberOfPoints() {return this->MaxId + 1;};
   vtkPreciseHyperPoint *GetPreciseHyperPoint(vtkIdType i) {return this->Array + i;};
-  vtkPreciseHyperPoint *InsertNextPreciseHyperPoint() 
+  vtkPreciseHyperPoint *InsertNextPreciseHyperPoint()
     {
     if ( ++this->MaxId >= this->Size )
       {
@@ -92,7 +94,9 @@ vtkPreciseHyperStreamlinePoints::~vtkPreciseHyperStreamlinePoints()
 }
 
 //------------------------------------------------------------------------------
-void vtkPreciseHyperStreamlinePoints::Execute()
+int vtkPreciseHyperStreamlinePoints::RequestData(vtkInformation* request,
+                                                 vtkInformationVector** inInfoVec,
+                                                 vtkInformationVector* outInfoVec)
 {
   vtkPreciseHyperPoint *sPtr;
   vtkIdType i, npts;
@@ -100,10 +104,9 @@ void vtkPreciseHyperStreamlinePoints::Execute()
   vtkIdType numIntPts;
 
   vtkDebugMacro(<<"Calling superclass execute");
-  
-  // default superclass behavior
-  vtkPreciseHyperStreamline::Execute();
 
+  // default superclass behavior
+  vtkPreciseHyperStreamline::RequestData(request, inInfoVec, outInfoVec);
   vtkDebugMacro(<<"Grabbing superclass output points.");
 
   // just grab points of output to make them available to user
@@ -139,6 +142,7 @@ void vtkPreciseHyperStreamlinePoints::Execute()
     } //for this hyperstreamline
 
   vtkDebugMacro(<<"Done Grabbing superclass output points.");
+  return 1;
 }
 
 //------------------------------------------------------------------------------

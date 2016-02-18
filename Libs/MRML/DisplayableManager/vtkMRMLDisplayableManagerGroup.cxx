@@ -46,7 +46,6 @@
 #include <vector>
 
 //----------------------------------------------------------------------------
-vtkCxxRevisionMacro(vtkMRMLDisplayableManagerGroup, "$Revision: 13859 $");
 vtkStandardNewMacro(vtkMRMLDisplayableManagerGroup);
 
 //----------------------------------------------------------------------------
@@ -282,7 +281,8 @@ void vtkMRMLDisplayableManagerGroup::AddDisplayableManager(
   this->Internal->NameToDisplayableManagerMap[displayableManagerClassName] = displayableManager;
 
   vtkDebugMacro(<< this->GetClassName() << " (" << this << "): "
-                << "registering DisplayableManager: " << displayableManager );
+                << "registering DisplayableManager: " << displayableManager << "("
+                << displayableManager->GetClassName() << ")");
 }
 
 //----------------------------------------------------------------------------

@@ -104,7 +104,7 @@ bool TestBatchRemoveDisplayNode()
 {
   vtkSmartPointer<vtkRenderWindow> renderWindow = CreateRenderWindow();
   vtkNew<vtkMRMLScene> scene;
-  vtkSmartPointer<vtkMRMLDisplayableManagerGroup> displayableManagerGroup = 
+  vtkSmartPointer<vtkMRMLDisplayableManagerGroup> displayableManagerGroup =
     CreateDisplayableManager(scene.GetPointer(),
                              renderWindow->GetRenderers()->GetFirstRenderer());
 
@@ -119,7 +119,8 @@ bool TestBatchRemoveDisplayNode()
   vtkNew<vtkSphereSource> sphereSource;
   sphereSource->SetRadius(10.);
   sphereSource->Update();
-  modelNode->SetAndObservePolyData(sphereSource->GetOutput());
+
+  modelNode->SetPolyDataConnection(sphereSource->GetOutputPort());
   modelNode->AddAndObserveDisplayNodeID(modelDisplayNode->GetID());
   scene->AddNode(modelNode);
   modelNode->Delete();

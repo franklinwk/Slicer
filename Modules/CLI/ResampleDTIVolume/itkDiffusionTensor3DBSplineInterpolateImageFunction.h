@@ -39,13 +39,16 @@ public:
   typedef BSplineInterpolateImageFunction<ImageType, TCoordRep, double>
   BSplineInterpolateFunction;
 
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(DiffusionTensor3DBSplineInterpolateImageFunction, DiffusionTensor3DInterpolateImageFunctionReimplementation);
+
   itkNewMacro( Self );
   // /Get the Spline Order, supports 0th - 5th order splines. The default is a 1st order spline.
   itkGetMacro( SplineOrder, int );
   // /Set the Spline Order, supports 0th - 5th order splines. The default is a 1st order spline.
   itkSetMacro( SplineOrder, unsigned int );
 protected:
-  void AllocateInterpolator();
+  void AllocateInterpolator() ITK_OVERRIDE;
 
   DiffusionTensor3DBSplineInterpolateImageFunction();
   unsigned int m_SplineOrder;

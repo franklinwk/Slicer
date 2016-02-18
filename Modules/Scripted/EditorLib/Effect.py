@@ -1,17 +1,19 @@
 import os
-from __main__ import vtk
-from __main__ import qt
-from __main__ import slicer
+import vtk
+import qt
+import slicer
 from EditOptions import EditOptions
 import EditUtil
+from slicer.util import NodeModify
 
+__all__ = ['EffectOptions', 'EffectTool', 'EffectLogic', 'Effect']
 
 #########################################################
 #
-# 
+#
 comment = """
 
-  Effect is a superclass for tools that plug into the 
+  Effect is a superclass for tools that plug into the
   slicer Editor module.
 
   It consists of:
@@ -30,7 +32,7 @@ comment = """
 
   These classes are Abstract.
 
-# TODO : 
+# TODO :
 """
 #
 #########################################################
@@ -50,7 +52,7 @@ class EffectOptions(EditOptions):
     # options for operating only on a portion of the input volume
     # ('All' meaning the full volume or 'Visible' meaning defined by
     # the current slice node are supported)
-    # if a subclass provides a list of scope options 
+    # if a subclass provides a list of scope options
     # then a selection menu will be provided.
     #
     self.availableScopeOptions = ('All','Visible')
@@ -121,26 +123,22 @@ class EffectOptions(EditOptions):
     self.disconnectWidgets()
     self.scope = self.parameterNode.GetParameter("Effect,scope")
     scopeIndex = self.availableScopeOptions.index(self.scope)
-    self.scopeComboBox.currentIndex = scopeIndex 
+    self.scopeComboBox.currentIndex = scopeIndex
     self.connectWidgets()
 
   def onScopeChanged(self,index):
     self.updateMRMLFromGUI()
 
   def updateMRMLFromGUI(self):
-    disableState = self.parameterNode.GetDisableModifiedEvent()
-    self.parameterNode.SetDisableModifiedEvent(1)
-    super(EffectOptions,self).updateMRMLFromGUI()
-    self.scope = self.availableScopeOptions[self.scopeComboBox.currentIndex]
-    self.parameterNode.SetParameter( "Effect,scope", str(self.scope) )
-    self.parameterNode.SetDisableModifiedEvent(disableState)
-    if not disableState:
-      self.parameterNode.InvokePendingModifiedEvent()
+    with NodeModify(self.parameterNode):
+      super(EffectOptions,self).updateMRMLFromGUI()
+      self.scope = self.availableScopeOptions[self.scopeComboBox.currentIndex]
+      self.parameterNode.SetParameter( "Effect,scope", str(self.scope) )
 
 #
 # EffectTool
 #
- 
+
 class EffectTool(object):
   """
   One instance of this will be created per-view when the effect
@@ -178,17 +176,23 @@ class EffectTool(object):
     # - make the observers high priority so they can override other
     #   event processors
     self.interactorObserverTags = []
-    events = ( "LeftButtonPressEvent", "LeftButtonReleaseEvent",
-      "MiddleButtonPressEvent", "MiddleButtonReleaseEvent",
-      "RightButtonPressEvent", "RightButtonReleaseEvent",
-      "MouseMoveEvent", "KeyPressEvent", "EnterEvent", "LeaveEvent" )
+    events = ( vtk.vtkCommand.LeftButtonPressEvent,
+      vtk.vtkCommand.LeftButtonReleaseEvent,
+      vtk.vtkCommand.MiddleButtonPressEvent,
+      vtk.vtkCommand.MiddleButtonReleaseEvent,
+      vtk.vtkCommand.RightButtonPressEvent,
+      vtk.vtkCommand.RightButtonReleaseEvent,
+      vtk.vtkCommand.MouseMoveEvent,
+      vtk.vtkCommand.KeyPressEvent,
+      vtk.vtkCommand.EnterEvent,
+      vtk.vtkCommand.LeaveEvent )
     for e in events:
       tag = self.interactor.AddObserver(e, self.processEvent, 1.0)
       self.interactorObserverTags.append(tag)
 
     self.sliceNodeTags = []
     sliceNode = self.sliceLogic.GetSliceNode()
-    tag = sliceNode.AddObserver('ModifiedEvent', self.processEvent, 1.0)
+    tag = sliceNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.processEvent, 1.0)
     self.sliceNodeTags.append(tag)
 
     # spot for tracking the current cursor while it is turned off for paining
@@ -198,8 +202,6 @@ class EffectTool(object):
     """Event filter that lisens for certain key events that
     should be responded to by all events.
     Currently:
-      escape - cancel operation
-      'e' - toggle paint color to black and back
       '\\' - pick up paint color from current location (eyedropper)
     """
     if event == "KeyPressEvent":
@@ -207,7 +209,7 @@ class EffectTool(object):
       if key.lower() == 'backslash':
         xy = self.interactor.GetEventPosition()
         if self.interactor.FindPokedRenderer(*xy):
-          self.editUtil.setLabel(self.logic.labelAtXY(xy)) 
+          self.editUtil.setLabel(self.logic.labelAtXY(xy))
         else:
           print('not in viewport')
         self.abortEvent(event)
@@ -230,10 +232,10 @@ class EffectTool(object):
       self.sliceWidget.unsetCursor()
 
   def abortEvent(self,event):
-    """Set the AbortFlag on the vtkCommand associated 
-    with the event - causes other things listening to the 
+    """Set the AbortFlag on the vtkCommand associated
+    with the event - causes other things listening to the
     interactor not to receive the events"""
-    # TODO: make interactorObserverTags a map to we can 
+    # TODO: make interactorObserverTags a map to we can
     # explicitly abort just the event we handled - it will
     # be slightly more efficient
     for tag in self.interactorObserverTags:
@@ -255,13 +257,13 @@ class EffectTool(object):
 #
 # EffectLogic
 #
- 
+
 class EffectLogic(object):
   """
   This class contains helper methods for a given effect
   type.  It can be instanced as needed by an EffectTool
   or EffectOptions instance in order to compute intermediate
-  results (say, for user feedback) or to implement the final 
+  results (say, for user feedback) or to implement the final
   segmentation editing operation.  This class is split
   from the EffectTool so that the operations can be used
   by other code without the need for a view context.
@@ -283,7 +285,7 @@ class EffectLogic(object):
 
   def rasToXY(self,rasPoint):
     return self.rasToXYZ()[0:2]
-    
+
   def rasToXYZ(self,rasPoint):
     """return x y for a give r a s"""
     sliceNode = self.sliceLogic.GetSliceNode()
@@ -301,8 +303,8 @@ class EffectLogic(object):
 
   def layerXYToIJK(self,layerLogic,xyPoint):
     """return i j k in image space of the layer for a given x y"""
-    xyToIJK = layerLogic.GetXYToIJKTransform().GetMatrix()
-    ijk = xyToIJK.MultiplyPoint(xyPoint + (0,1,))[:3]
+    xyToIJK = layerLogic.GetXYToIJKTransform()
+    ijk = xyToIJK.TransformDoublePoint(xyPoint + (0,))
     i = int(round(ijk[0]))
     j = int(round(ijk[1]))
     k = int(round(ijk[2]))
@@ -337,7 +339,7 @@ class EffectLogic(object):
     return rast[:3]
 
   def getPaintColor(self):
-    """Return rgba for the current paint label in the current 
+    """Return rgba for the current paint label in the current
     label layers color table"""
     labelLogic = self.sliceLogic.GetLayerLogic()
     volumeDisplayNode = logic.GetVolumeDisplayNode()
@@ -392,7 +394,7 @@ class EffectLogic(object):
     return( self.scopedImageBuffer )
 
   def applyScopedLabel(self):
-    """Put the output label into the right spot depending on the 
+    """Put the output label into the right spot depending on the
     scope mode"""
     layerLogic = self.sliceLogic.GetLabelLayer()
     volumeNode = layerLogic.GetVolumeNode()
@@ -412,18 +414,18 @@ class EffectLogic(object):
 
   def getVisibleCorners(self,layerLogic,slicePaint=None):
     """return a nested list of ijk coordinates representing
-    the indices of the corners of the currently visible 
+    the indices of the corners of the currently visible
     slice view for the given layerLogic
     - optionally set those as the corners of a vtkImageSlicePaint"""
 
-    xyToIJK = layerLogic.GetXYToIJKTransform().GetMatrix()
+    xyToIJK = layerLogic.GetXYToIJKTransform()
     w,h,d = layerLogic.GetImageData().GetDimensions()
     xyCorners = ( (0,0), (w,0), (0,h), (w,h) )
     ijkCorners = []
     for xy in xyCorners:
-      ijk = xyToIJK.MultiplyPoint(xy + (0,1))[:3]
+      ijk = xyToIJK.TransformDoublePoint(xy + (0,))
       ijkCorners.append(map(round, ijk))
-      
+
     if slicePaint:
       slicePaint.SetTopLeft(ijkCorners[0])
       slicePaint.SetTopRight(ijkCorners[1])
@@ -433,7 +435,7 @@ class EffectLogic(object):
     return( ijkCorners )
 
 #
-# The Effect class definition 
+# The Effect class definition
 #
 
 class Effect(object):

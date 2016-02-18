@@ -26,13 +26,13 @@
 
 class vtkMRMLCameraNode;
 
-class vtkMRMLTestCustomDisplayableManager : 
+class vtkMRMLTestCustomDisplayableManager :
   public vtkMRMLAbstractDisplayableManager
 {
 
 public:
   static vtkMRMLTestCustomDisplayableManager* New();
-  vtkTypeRevisionMacro(vtkMRMLTestCustomDisplayableManager,vtkMRMLAbstractDisplayableManager);
+  vtkTypeMacro(vtkMRMLTestCustomDisplayableManager,vtkMRMLAbstractDisplayableManager);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   // For testing
@@ -55,7 +55,7 @@ private:
 
   vtkMRMLTestCustomDisplayableManager(const vtkMRMLTestCustomDisplayableManager&);// Not implemented
   void operator=(const vtkMRMLTestCustomDisplayableManager&);                     // Not Implemented
-  
+
   class vtkInternal;
   vtkInternal * Internal;
 

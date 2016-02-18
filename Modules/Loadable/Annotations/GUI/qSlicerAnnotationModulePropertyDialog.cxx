@@ -51,7 +51,7 @@ qSlicerAnnotationModulePropertyDialog::qSlicerAnnotationModulePropertyDialog(con
   ui.setupUi(this);
 
   this->setAttribute(Qt::WA_DeleteOnClose);
- 
+
   ui.DescriptionLabel->setVisible(true);
   ui.DescriptionTextEdit->setVisible(true);
   ui.lineTickSpacingSlider->setSynchronizeSiblings(ctkSliderWidget::SynchronizeWidth);
@@ -90,7 +90,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
   this->updateNameText();
   this->updateTypeLabelText();
   this->updateIDLabelText();
-  
+
   // update the typeIcon according to the annotation type
   QIcon icon = QIcon(this->m_logic->GetAnnotationIcon(this->m_id.c_str()));
   QPixmap pixmap = icon.pixmap(32, 32);
@@ -119,7 +119,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
       ui.visibleInvisibleButton->setToolTip(QString("Click to hide this annotation"));
       }
     }
-  
+
   // customise the all color picker button
   ui.allColorPickerButton->setToolTip(tr("Set unselected color of whole annotation (points, text, lines), use advanced pane to set individual colors"));
   ui.allColorPickerButton->setDialogOptions(ctkColorPickerButton::UseCTKColorDialog);
@@ -132,7 +132,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
     {
     return;
     }
-  
+
   // hide the RAS if it's not a fiducial
   ui.RASCoordinatesWidget->setMRMLScene(this->m_logic->GetMRMLScene());
   if (!mrmlNode->IsA("vtkMRMLAnnotationFiducialNode"))
@@ -161,7 +161,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
       ui.RASCoordinatesWidget->setEnabled(1);
       }
     }
-  
+
   // if it's a hierarchy node, don't show the size or lock buttons
   if (this->m_logic->IsAnnotationHierarchyNode(this->m_id))
     {
@@ -176,7 +176,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
     ui.hierarchyGlyphTypeLabel->show();
     ui.hierarchyPointGlyphTypeComboBox->show();
     ui.hierarchyPointGlyphTypeDefaultButton->show();
-    
+
     // fill in types if empty
     if (ui.hierarchyPointGlyphTypeComboBox->count() == 0)
       {
@@ -230,16 +230,16 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
       ui.hierarchyTextScaleSlider->setEnabled(false);
       ui.hierarchyTextScaleSlider->setValue(textScale);
       ui.hierarchyTextScaleSlider->setEnabled(enabled);
-      
+
       tdNode->Delete();
     }
-    
+
     ui.sizeLabel->hide();
     ui.sizeSmallPushButton->hide();
     ui.sizeMediumPushButton->hide();
     ui.sizeLargePushButton->hide();
 
-    ui.lockUnlockButton->hide(); 
+    ui.lockUnlockButton->hide();
 
     // the rest is hidden, so just return
     return;
@@ -276,6 +276,9 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
 
     double opacity = textDisplayNode->GetOpacity();
     ui.textOpacitySliderSpinBoxWidget->setValue(opacity);
+
+    int visibility = textDisplayNode->GetVisibility();
+    ui.textVisibilityCheckBox->setChecked(visibility);
     }
 
   // load the current measurement
@@ -336,7 +339,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
       {
       ui.pointsTableWidget->insertRow(p);
       double *coord = pointsNode->GetControlPointCoordinates(p);
-      
+
       if (coord)
         {
         QTableWidgetItem* xItem = new QTableWidgetItem();
@@ -353,8 +356,8 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
     }
   if (pointDisplayNode)
     {
-    
-  
+
+
     // unselected color
     double *pointUnSelColor = pointDisplayNode->GetColor();
     QColor pointUnSelQColor;
@@ -362,7 +365,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
     ui.pointUnselectedColorPickerButton->setDisplayColorName(false);
     ui.pointUnselectedColorPickerButton->setColor(pointUnSelQColor);
     ui.pointUnselectedColorPickerButton->setDialogOptions(ctkColorPickerButton::UseCTKColorDialog);
-    
+
     // selected color
     double *pointSelColor = pointDisplayNode->GetSelectedColor();
     QColor pointSelQColor;
@@ -370,9 +373,9 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
     ui.pointSelectedColorPickerButton->setDisplayColorName(false);
     ui.pointSelectedColorPickerButton->setColor(pointSelQColor);
     ui.pointSelectedColorPickerButton->setDialogOptions(ctkColorPickerButton::UseCTKColorDialog);
-    
+
     // load the glyph type
-  
+
 
     // fill in the combo box with glyph types if not already done
     if (ui.pointGlyphTypeComboBox->count() == 0)
@@ -405,7 +408,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
       }
     // glyph size
     ui.pointSizeSliderSpinBoxWidget->setValue(pointDisplayNode->GetGlyphScale());
-    
+
     // glyph material properties
     ui.pointOpacitySliderSpinBoxWidget->setValue(pointDisplayNode->GetOpacity());
     ui.pointAmbientSliderSpinBoxWidget->setValue(pointDisplayNode->GetAmbient());
@@ -413,11 +416,11 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
     ui.pointSpecularSliderSpinBoxWidget->setValue(pointDisplayNode->GetSpecular());
 
     // Expand fiducial projection panel if projection turned on
-    bool collapseGroupBox = 
-      pointDisplayNode->GetSliceProjection() & pointDisplayNode->ProjectionOn ? false : true; 
+    bool collapseGroupBox =
+      pointDisplayNode->GetSliceProjection() & pointDisplayNode->ProjectionOn ? false : true;
     ui.pointFiducialProjectionPropertiesGroupBox->setCollapsed(collapseGroupBox);
     }
-    
+
   /// Lines
   // get the line version of the node
   vtkMRMLAnnotationLinesNode *linesNode = vtkMRMLAnnotationLinesNode::SafeDownCast(mrmlNode);
@@ -453,7 +456,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
     ui.lineSelectedColorPickerButton->setDisplayColorName(false);
     ui.lineSelectedColorPickerButton->setColor(lineSelQColor);
     ui.lineSelectedColorPickerButton->setDialogOptions(ctkColorPickerButton::UseCTKColorDialog);
-    
+
     // width
     ui.lineWidthSliderSpinBoxWidget_2->setValue(lineDisplayNode->GetLineThickness());
 
@@ -467,7 +470,7 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
 
     // max ticks
     ui.lineMaxTicksSliderSpinBoxWidget->setValue(lineDisplayNode->GetMaxTicks());
-    
+
     // line material properties
     ui.lineOpacitySliderSpinBoxWidget_2->setValue(lineDisplayNode->GetOpacity());
     ui.lineAmbientSliderSpinBoxWidget_2->setValue(lineDisplayNode->GetAmbient());
@@ -475,11 +478,11 @@ void qSlicerAnnotationModulePropertyDialog::initialize()
     ui.lineSpecularSliderSpinBoxWidget_2->setValue(lineDisplayNode->GetSpecular());
 
     // Expand ruler projection panel if projection turned on
-    bool collapseGroupBox = 
-      lineDisplayNode->GetSliceProjection() & lineDisplayNode->ProjectionOn ? false : true; 
+    bool collapseGroupBox =
+      lineDisplayNode->GetSliceProjection() & lineDisplayNode->ProjectionOn ? false : true;
     ui.lineRulerProjectionPropertiesGroupBox->setCollapsed(collapseGroupBox);
     }
- 
+
   /// ROI
   // get the line version of the node
   vtkMRMLAnnotationROINode *roiNode = vtkMRMLAnnotationROINode::SafeDownCast(mrmlNode);
@@ -550,8 +553,8 @@ void qSlicerAnnotationModulePropertyDialog::createConnection()
                 this, SLOT(onHierarchyPointGlyphChanged(QString)));
   this->connect(ui.hierarchyPointGlyphTypeDefaultButton, SIGNAL(clicked()),
                 this, SLOT(onHierarchyPointGlyphTypeDefaultButtonClicked()));
-  
-                                                  
+
+
   this->connect(ui.sizeSmallPushButton, SIGNAL(clicked()), this, SLOT(onSizeSmallPushButtonClicked()));
   this->connect(ui.sizeMediumPushButton, SIGNAL(clicked()), this, SLOT(onSizeMediumPushButtonClicked()));
   this->connect(ui.sizeLargePushButton, SIGNAL(clicked()), this, SLOT(onSizeLargePushButtonClicked()));
@@ -574,6 +577,9 @@ void qSlicerAnnotationModulePropertyDialog::createConnection()
   this->connect(ui.textOpacitySliderSpinBoxWidget, SIGNAL(valueChanged(double)),
       this, SLOT(onTextOpacityChanged(double)));
 
+  this->connect(ui.textVisibilityCheckBox, SIGNAL(toggled(bool)),
+                this, SLOT(onTextVisibilityChanged(bool)));
+
   // point
   this->connect(ui.pointsTableWidget, SIGNAL(itemChanged(QTableWidgetItem*)),
                 this, SLOT(onPointsTableWidgetChanged(QTableWidgetItem*)));
@@ -584,7 +590,7 @@ void qSlicerAnnotationModulePropertyDialog::createConnection()
 
   this->connect(ui.pointSizeSliderSpinBoxWidget, SIGNAL(valueChanged(double)),
                 this, SLOT(onPointSizeChanged(double)));
-  
+
   this->connect(ui.pointGlyphTypeComboBox, SIGNAL(currentIndexChanged(QString)),
                 this, SLOT(onPointGlyphChanged(QString)));
 
@@ -596,7 +602,7 @@ void qSlicerAnnotationModulePropertyDialog::createConnection()
                 this, SLOT(onPointDiffuseChanged(double)));
   this->connect(ui.pointSpecularSliderSpinBoxWidget, SIGNAL(valueChanged(double)),
                 this, SLOT(onPointSpecularChanged(double)));
-  
+
   // line
   this->connect(ui.lineUnselectedColorPickerButton, SIGNAL(colorChanged(QColor)),
                 this, SLOT(onLineColorChanged(QColor)));
@@ -624,7 +630,7 @@ void qSlicerAnnotationModulePropertyDialog::createConnection()
                 this, SLOT(onLineDiffuseChanged(double)));
   this->connect(ui.lineSpecularSliderSpinBoxWidget_2, SIGNAL(valueChanged(double)),
                 this, SLOT(onLineSpecularChanged(double)));
-  
+
   this->connect(ui.lockUnlockButton, SIGNAL(clicked()), this, SLOT(onLockUnlockButtonClicked()));
   this->connect(ui.visibleInvisibleButton, SIGNAL(clicked()), this, SLOT(onVisibleInvisibleButtonClicked()));
 }
@@ -937,6 +943,22 @@ void qSlicerAnnotationModulePropertyDialog::onTextOpacityChanged(double value)
 }
 
 //------------------------------------------------------------------------------
+void qSlicerAnnotationModulePropertyDialog::onTextVisibilityChanged(bool value)
+{
+  // get the text display node
+  vtkMRMLAnnotationTextDisplayNode *textDisplayNode = this->m_logic->GetTextDisplayNode(this->m_id.c_str());
+  if (!textDisplayNode)
+    {
+    return;
+    }
+  if (textDisplayNode->GetScene())
+    {
+    textDisplayNode->GetScene()->SaveStateForUndo(textDisplayNode);
+    }
+  textDisplayNode->SetVisibility(value);
+}
+
+//------------------------------------------------------------------------------
 void qSlicerAnnotationModulePropertyDialog::onLockUnlockButtonClicked()
 {
   // toggle the lock flag
@@ -1000,7 +1022,7 @@ void qSlicerAnnotationModulePropertyDialog::onPointsTableWidgetChanged(QTableWid
     return;
     }
 //  std::cout << "onPointsTableWidgetChanged: row = " << row << ", col = " <<  col << ", newValue = " << newValue << std::endl;
- 
+
   // otherwise it's the coordinate that changed
   // get the point coordinates corresponding to this row
   double *oldCoords = pointsNode->GetControlPointCoordinates(row);
@@ -1395,7 +1417,7 @@ void qSlicerAnnotationModulePropertyDialog::getAllColor(QColor &qcolor)
 {
   // use black as a default
   qcolor.setRgbF(0.0, 0.0, 0.0, 1.0);
-  
+
   vtkMRMLNode *mrmlNode = this->m_logic->GetMRMLScene()->GetNodeByID(this->m_id.c_str());
   if (!mrmlNode)
     {
@@ -1436,7 +1458,7 @@ void qSlicerAnnotationModulePropertyDialog::getAllColor(QColor &qcolor)
       else
         {
         double *thisColor = displayNode->GetColor();
-        if (thisColor && firstColor && 
+        if (thisColor && firstColor &&
             (thisColor[0] != firstColor[0] ||
              thisColor[1] != firstColor[1] ||
              thisColor[2] != firstColor[2]))
@@ -1483,7 +1505,7 @@ void qSlicerAnnotationModulePropertyDialog::onDialogAccepted()
     {
     return;
     }
-  
+
   // delete all backups
   this->m_logic->DeleteBackupNodes(this->m_id.c_str());
 
@@ -1500,7 +1522,7 @@ void qSlicerAnnotationModulePropertyDialog::lockUnlockInterface(bool lock)
   // them here
   //  ui.nameLineEdit->setEnabled(lock);
   //  ui.visibleInvisibleButton->setEnabled(lock);
-  
+
   ui.allColorPickerButton->setEnabled(lock);
   ui.sizeSmallPushButton->setEnabled(lock);
   ui.sizeMediumPushButton->setEnabled(lock);
@@ -1515,6 +1537,7 @@ void qSlicerAnnotationModulePropertyDialog::lockUnlockInterface(bool lock)
   ui.textUnselectedColorPickerButton->setEnabled(lock);
   ui.textScaleSliderSpinBoxWidget->setEnabled(lock);
   ui.textOpacitySliderSpinBoxWidget->setEnabled(lock);
+  ui.textVisibilityCheckBox->setEnabled(lock);
 
 
   // Point
@@ -1643,7 +1666,7 @@ void qSlicerAnnotationModulePropertyDialog::setColorOnAnnotationDisplayNodes(con
       ui.textUnselectedColorPickerButton->setColor(qcolor);
       }
     }
-  
+
   // get the point display node
   vtkMRMLAnnotationPointDisplayNode *pointDisplayNode = this->m_logic->GetPointDisplayNode(id);
   if (pointDisplayNode)
@@ -1746,7 +1769,7 @@ void qSlicerAnnotationModulePropertyDialog::onHierarchyTextScaleDefaultButtonCli
   vtkMRMLAnnotationTextDisplayNode *tdNode = vtkMRMLAnnotationTextDisplayNode::New();
   double textScale = tdNode->GetTextScale();
   tdNode->Delete();
-  
+
   ui.hierarchyTextScaleSlider->setValue(textScale);
 }
 
@@ -1849,7 +1872,7 @@ void qSlicerAnnotationModulePropertyDialog:: onSizeMediumPushButtonClicked()
 //-----------------------------------------------------------------------------
 void qSlicerAnnotationModulePropertyDialog:: onSizeLargePushButtonClicked()
 {
-  // get and use the default sizes from the display nodes 
+  // get and use the default sizes from the display nodes
   vtkNew<vtkMRMLAnnotationTextDisplayNode> defaultTextDisplayNode;
   double defaultTextSize = defaultTextDisplayNode->GetTextScale();
   vtkMRMLAnnotationTextDisplayNode *textDisplayNode = this->m_logic->GetTextDisplayNode(this->m_id.c_str());

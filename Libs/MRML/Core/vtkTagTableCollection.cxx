@@ -7,7 +7,6 @@
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro ( vtkTagTableCollection );
-vtkCxxRevisionMacro(vtkTagTableCollection, "$Revision: 1.0 $");
 
 //---------------------------------------------------------------------------
 vtkTagTableCollection::vtkTagTableCollection ( ) {
@@ -95,7 +94,7 @@ vtkTagTable *vtkTagTableCollection::GetNextTable(vtkCollectionSimpleIterator &co
 {
   return vtkTagTable::SafeDownCast(this->GetNextItemAsObject(cookie));
 }
-  
+
 //---------------------------------------------------------------------------
 void vtkTagTableCollection::ClearAllTagTables ( )
 {

@@ -12,10 +12,14 @@
 
 =========================================================================auto=*/
 #include "vtkTeemEstimateDiffusionTensor.h"
+#include "vtkInformation.h"
+#include "vtkInformationVector.h"
 #include "vtkObjectFactory.h"
+#include "vtkStreamingDemandDrivenPipeline.h"
 #include "vtkPointData.h"
 #include "vtkImageData.h"
 #include "vtkFloatArray.h"
+#include <vtkVersion.h>
 
 
 #define VTKEPS 10e-12
@@ -32,7 +36,7 @@ vtkTeemEstimateDiffusionTensor::vtkTeemEstimateDiffusionTensor()
 
   this->NumberOfGradients = 7;
 
-  // this is LeBihan's b factor for physical MR gradient parameters 
+  // this is LeBihan's b factor for physical MR gradient parameters
   // (same number as C-F uses)
   this->BValues = vtkDoubleArray::New();
   this->BValues->SetNumberOfComponents(1);
@@ -42,7 +46,7 @@ vtkTeemEstimateDiffusionTensor::vtkTeemEstimateDiffusionTensor()
     this->BValues->SetValue(i,1000);
     }
   this->MaxB = 1000;
- 
+
   // Scalar Factor for the tensor values
   //this->ScaleFactor = 1;
   this->MinimumSignalValue = 1.0;
@@ -54,11 +58,10 @@ vtkTeemEstimateDiffusionTensor::vtkTeemEstimateDiffusionTensor()
   this->ShiftNegativeEigenvalues = 0;
 
   // Output images beside the estimated tensor
-  this->Baseline = vtkImageData::New();
-  this->AverageDWI = vtkImageData::New();
- 
-  // defaults are from DT-MRI 
-  // (from Processing and Visualization for 
+  this->SetNumberOfOutputPorts(3);
+
+  // defaults are from DT-MRI
+  // (from Processing and Visualization for
   // Diffusion Tensor MRI, C-F Westin, pg 8)
   this->DiffusionGradients = vtkDoubleArray::New();
   this->DiffusionGradients->SetNumberOfComponents(3);
@@ -71,14 +74,18 @@ vtkTeemEstimateDiffusionTensor::vtkTeemEstimateDiffusionTensor()
   this->SetDiffusionGradient(5,1,-1,0);
   this->SetDiffusionGradient(6,-1,0,1);
 
+  this->RescaledDiffusionGradients = vtkDoubleArray::New();
+  this->RescaledDiffusionGradients->DeepCopy(this->DiffusionGradients);
+
 }
+
+//----------------------------------------------------------------------------
 vtkTeemEstimateDiffusionTensor::~vtkTeemEstimateDiffusionTensor()
 {
   this->BValues->Delete();
   this->DiffusionGradients->Delete();
-  this->Baseline->Delete();
-  this->AverageDWI->Delete();
-  if (this->Transform) 
+  this->RescaledDiffusionGradients->Delete();
+  if (this->Transform)
     {
     this->Transform->Delete();
     }
@@ -87,20 +94,20 @@ vtkTeemEstimateDiffusionTensor::~vtkTeemEstimateDiffusionTensor()
 //----------------------------------------------------------------------------
 void vtkTeemEstimateDiffusionTensor::PrintSelf(ostream& os, vtkIndent indent)
 {
-  vtkImageToImageFilter::PrintSelf(os,indent);
+  this->Superclass::PrintSelf(os,indent);
 
   os << indent << "NumberOfGradients: " << this->NumberOfGradients << "\n";
   double g[3];
   // print all of the gradients
-  for (int i = 0; i < this->NumberOfGradients; i++ ) 
+  for (int i = 0; i < this->NumberOfGradients; i++ )
     {
       this->GetDiffusionGradient(i,g);
-      os << indent << "Gradient " << i << ": (" 
+      os << indent << "Gradient " << i << ": ("
          << g[0] << ", "
          << g[1] << ", "
-         << g[2] << ")" 
+         << g[2] << ")"
          <<  "B value: "
-         << this->BValues->GetValue(i) << "\n"; 
+         << this->BValues->GetValue(i) << "\n";
     }
 }
 
@@ -127,13 +134,24 @@ void vtkTeemEstimateDiffusionTensor::CalculateMaxB()
 }
 
 //----------------------------------------------------------------------------
+vtkImageData* vtkTeemEstimateDiffusionTensor::GetBaseline()
+{
+  return this->GetOutput(1);
+}
+//----------------------------------------------------------------------------
+vtkImageData* vtkTeemEstimateDiffusionTensor::GetAverageDWI()
+{
+  return this->GetOutput(2);
+}
+
+//----------------------------------------------------------------------------
 void vtkTeemEstimateDiffusionTensor::TransformDiffusionGradients()
 {
   double gradient[3];
   double g[3];
   double norm;
   // if matrix has not been set by user don't use it
-  if (this->Transform == NULL) 
+  if (this->Transform == NULL)
     {
       return;
     }
@@ -143,19 +161,19 @@ void vtkTeemEstimateDiffusionTensor::TransformDiffusionGradients()
 
 
   // transform each gradient by this matrix
-  for (int i = 0; i < this->NumberOfGradients; i++ ) 
+  for (int i = 0; i < this->NumberOfGradients; i++ )
     {
       this->GetDiffusionGradient(i,g);
       this->Transform->TransformPoint(g,gradient);
 
       norm = sqrt(gradient[0]*gradient[0]+gradient[1]*gradient[1]+gradient[2]*gradient[2]);
-      if (norm > VTKEPS) 
+      if (norm > VTKEPS)
         {
         gradient[0] /=norm;
         gradient[1] /=norm;
         gradient[2] /=norm;
         }
-      // set the gradient to the transformed one 
+      // set the gradient to the transformed one
       this->SetDiffusionGradient(i,gradient);
     }
 }
@@ -164,7 +182,7 @@ void vtkTeemEstimateDiffusionTensor::TransformDiffusionGradients()
 // The number of required inputs is one more than the number of
 // diffusion gradients applied.  (Since image 0 is an image
 // acquired without diffusion gradients).
-void vtkTeemEstimateDiffusionTensor::SetNumberOfGradients(int num) 
+void vtkTeemEstimateDiffusionTensor::SetNumberOfGradients(int num)
 {
   if (this->NumberOfGradients != num)
     {
@@ -191,20 +209,34 @@ void vtkTeemEstimateDiffusionTensor::GetDiffusionGradient(int num,double grad[3]
 
 //----------------------------------------------------------------------------
 //
-void vtkTeemEstimateDiffusionTensor::ExecuteInformation(vtkImageData *inData, 
-                                             vtkImageData *outData)
+int vtkTeemEstimateDiffusionTensor::RequestInformation(
+  vtkInformation * vtkNotUsed(request),
+  vtkInformationVector **inputVector,
+  vtkInformationVector *outputVector)
 {
-  // We always want to output input scalars Type
-  outData->SetScalarType(inData->GetScalarType());
-  // We output one scalar components: baseline (for legacy issues)
-  outData->SetNumberOfScalarComponents(1);
+  // get the info objects
+  vtkInformation* outInfo = outputVector->GetInformationObject(0);
+  vtkInformation* inInfo = inputVector[0]->GetInformationObject(0);
 
-  this->Baseline->CopyTypeSpecificInformation( this->GetInput() );
-  this->AverageDWI->CopyTypeSpecificInformation( this->GetInput() );
-  this->Baseline->SetScalarType(inData->GetScalarType());
-  this->AverageDWI->SetScalarType(inData->GetScalarType());
-  this->Baseline->SetNumberOfScalarComponents(1);
-  this->AverageDWI->SetNumberOfScalarComponents(1);
+  int scalarType = VTK_INT;
+  vtkInformation *inScalarInfo =
+    vtkDataObject::GetActiveFieldInformation(inInfo,
+      vtkDataObject::FIELD_ASSOCIATION_POINTS,
+      vtkDataSetAttributes::SCALARS);
+  if (inScalarInfo)
+    {
+    scalarType = inScalarInfo->Get(vtkDataObject::FIELD_ARRAY_TYPE());
+    }
+  // We always want to output input scalars Type
+  // We output one scalar components: baseline (for legacy issues)
+  vtkDataObject::SetPointDataActiveScalarInfo(outInfo, scalarType, 1);
+
+  vtkInformation* baselineOutInfo = outputVector->GetInformationObject(1);
+  vtkInformation* averageDWIOutInfo = outputVector->GetInformationObject(2);
+  vtkDataObject::SetPointDataActiveScalarInfo(baselineOutInfo, scalarType, 1);
+  vtkDataObject::SetPointDataActiveScalarInfo(averageDWIOutInfo, scalarType, 1);
+
+  return 1;
 
 }
 
@@ -213,26 +245,36 @@ void vtkTeemEstimateDiffusionTensor::ExecuteInformation(vtkImageData *inData,
 // as well as scalars.  This gets called before multithreader starts
 // (after which we can't allocate, for example in ThreadedExecute).
 // Note we return to the regular pipeline at the end of this function.
-void vtkTeemEstimateDiffusionTensor::ExecuteData(vtkDataObject *out)
+int vtkTeemEstimateDiffusionTensor::RequestData(
+  vtkInformation* request,
+  vtkInformationVector** inputVector,
+  vtkInformationVector* outputVector)
 {
-  vtkImageData *output = vtkImageData::SafeDownCast(out);
-  vtkImageData *inData = (vtkImageData *) this->GetInput();
+  vtkInformation* inInfo = inputVector[0]->GetInformationObject(0);
+  vtkInformation* outInfo = outputVector->GetInformationObject(0);
+
+  vtkImageData *inData = vtkImageData::SafeDownCast(
+    inInfo->Get(vtkDataObject::DATA_OBJECT()));
+  vtkImageData *output = vtkImageData::SafeDownCast(
+    outInfo->Get(vtkDataObject::DATA_OBJECT()));
 
   //Check inputs numbertenEstimateMethodLLS
-  if (inData == NULL) {
+  if (inData == NULL)
+    {
     vtkErrorMacro("Input with DWIs has not been assigned");
-    return;
-  }  
+    return 0;
+    }
 
   //Check if this input is multicomponent and match the number of  gradients
-  int ncomp = this->GetInput()->GetPointData()->GetScalars()->GetNumberOfComponents();
-  if (ncomp != this->NumberOfGradients) {
-      vtkErrorMacro("The input has to have a number of components equal to the number of gradients");
-      return;
-    }  
-  
+  int ncomp = inData->GetPointData()->GetScalars()->GetNumberOfComponents();
+  if (ncomp != this->NumberOfGradients)
+    {
+    vtkErrorMacro("The input has to have a number of components equal to the number of gradients");
+    return 0;
+    }
+
   // set extent so we know how many tensors to allocate
-  output->SetExtent(output->GetUpdateExtent());
+  output->SetExtent(this->GetUpdateExtent());
 
   // allocate output tensors
   vtkFloatArray* data = vtkFloatArray::New();
@@ -244,12 +286,21 @@ void vtkTeemEstimateDiffusionTensor::ExecuteData(vtkDataObject *out)
   data->Delete();
 
   // Allocate baseline and averageDWI images
-  this->Baseline->SetExtent(output->GetUpdateExtent());
-  this->AverageDWI->SetExtent(output->GetUpdateExtent());
-  this->Baseline->AllocateScalars();
-  this->AverageDWI->AllocateScalars();
-  this->Baseline->GetPointData()->GetScalars()->SetName("Baseline");
-  this->AverageDWI->GetPointData()->GetScalars()->SetName("AverageDWI");
+  vtkImageData* baseline = 0;
+  vtkImageData* averageDWI = 0;
+  vtkInformation* baselineOutInfo = outputVector->GetInformationObject(1);
+  vtkInformation* averageDWIOutInfo = outputVector->GetInformationObject(2);
+
+  baseline = vtkImageData::SafeDownCast(
+    baselineOutInfo->Get(vtkDataObject::DATA_OBJECT()));
+  averageDWI = vtkImageData::SafeDownCast(
+    averageDWIOutInfo->Get(vtkDataObject::DATA_OBJECT()));
+  baseline->SetExtent(this->GetUpdateExtent());
+  averageDWI->SetExtent(this->GetUpdateExtent());
+  baseline->AllocateScalars(baselineOutInfo);
+  averageDWI->AllocateScalars(averageDWIOutInfo);
+  baseline->GetPointData()->GetScalars()->SetName("Baseline");
+  averageDWI->GetPointData()->GetScalars()->SetName("AverageDWI");
 
   // make sure our gradient matrix is up to date
   //This update is not thread safe and it has to be performed outside
@@ -257,21 +308,22 @@ void vtkTeemEstimateDiffusionTensor::ExecuteData(vtkDataObject *out)
   // if the user has transformed the coordinate system
   this->TransformDiffusionGradients();
 
+  // Rescale gradients to account for multiple b-Values.
+  //This is done in a different array to preserve the original gradients set by the user
+  this->RescaleGradients();
+
   // jump back into normal pipeline: call standard superclass method here
   //Do not jump to do the proper allocation of output data
-  this->vtkImageToImageFilter::ExecuteData(out);
-
+  return this->Superclass::RequestData(request, inputVector, outputVector);
 }
-
-
 
 //----------------------------------------------------------------------------
 // This templated function executes the filter for any type of data.
 template <class T>
 static void vtkTeemEstimateDiffusionTensorExecute(vtkTeemEstimateDiffusionTensor *self,
-                                           vtkImageData *inData, 
+                                           vtkImageData *inData,
                                            T * inPtr,
-                                           vtkImageData *outData, 
+                                           vtkImageData *outData,
                                            T * outPtr,
                                            int outExt[6], int id)
 {
@@ -292,7 +344,7 @@ static void vtkTeemEstimateDiffusionTensorExecute(vtkTeemEstimateDiffusionTensor
   T * baselinePtr = NULL;
   T * averageDWIPtr = NULL;
   Nrrd *ngrad =NULL;
-  Nrrd *nbmat =NULL; 
+  Nrrd *nbmat =NULL;
   //Creating new nrrd arrays
   ngrad  = nrrdNew();
   nbmat = nrrdNew();
@@ -314,7 +366,7 @@ static void vtkTeemEstimateDiffusionTensorExecute(vtkTeemEstimateDiffusionTensor
   vtkIdType *outInc;
   int *outFullUpdateExt;
   outInc = self->GetOutput()->GetIncrements();
-  outFullUpdateExt = self->GetOutput()->GetUpdateExtent(); //We are only working over the update extent
+  outFullUpdateExt = self->GetUpdateExtent(); //We are only working over the update extent
   ptId = ((outExt[0] - outFullUpdateExt[0]) * outInc[0]
          + (outExt[2] - outFullUpdateExt[2]) * outInc[1]
          + (outExt[4] - outFullUpdateExt[4]) * outInc[2]);
@@ -325,18 +377,18 @@ static void vtkTeemEstimateDiffusionTensorExecute(vtkTeemEstimateDiffusionTensor
 
   // find the region to loop over
   maxX = outExt[1] - outExt[0];
-  maxY = outExt[3] - outExt[2]; 
+  maxY = outExt[3] - outExt[2];
   maxZ = outExt[5] - outExt[4];
   target = (unsigned long)(outData->GetNumberOfScalarComponents()*
                            (maxZ+1)*(maxY+1)/50.0);
   target++;
 
-  // Get increments to march through image data 
+  // Get increments to march through image data
   inData->GetContinuousIncrements(outExt, inIncX, inIncY, inIncZ);
   outData->GetContinuousIncrements(outExt, outIncX, outIncY, outIncZ);
 
   numInputs = inData->GetNumberOfScalarComponents();
-  dwi = new double[numInputs]; 
+  dwi = new double[numInputs];
 
   double _ten[7];
 
@@ -344,9 +396,9 @@ static void vtkTeemEstimateDiffusionTensorExecute(vtkTeemEstimateDiffusionTensor
     {
       for (idxY = 0; !self->AbortExecute && idxY <= maxY; idxY++)
         {
-          if (!id) 
+          if (!id)
             {
-              if (!(count%target)) 
+              if (!(count%target))
                 {
                   self->UpdateProgress(count/(50.0*target));
                 }
@@ -357,7 +409,7 @@ static void vtkTeemEstimateDiffusionTensorExecute(vtkTeemEstimateDiffusionTensor
              // create tensor from combination of gradient inputs
              averageDWI = 0.0;
              numDWI =0;
-             for (int k=0; k< numInputs; k++) 
+             for (int k=0; k< numInputs; k++)
              {
                dwi[k] = (double) inPtr[k];
                if (self->GetBValues()->GetValue(k) > 1)
@@ -376,7 +428,7 @@ static void vtkTeemEstimateDiffusionTensorExecute(vtkTeemEstimateDiffusionTensor
               outT[1][2] = outT[2][1] = _ten[5];
               outT[2][2] = _ten[6];
 
-              // Pixel operation              
+              // Pixel operation
               outTensors->SetTuple(ptId,(float *)outT);
               // copy no diffusion data through for scalars
               *outPtr = (T) tec->estimatedB0;
@@ -410,37 +462,47 @@ static void vtkTeemEstimateDiffusionTensorExecute(vtkTeemEstimateDiffusionTensor
       averageDWIPtr += outIncZ;
       inPtr += inIncZ;
     }
-
   delete [] dwi;
   // Delete Context
-  tenEstimateContextNix(tec);  
+  tenEstimateContextNix(tec);
   nrrdNix(ngrad);
   nrrdNuke(nbmat);
 }
 
-int vtkTeemEstimateDiffusionTensor::SetGradientsToContext(tenEstimateContext *tec,Nrrd *ngrad, Nrrd *nbmat) 
+//----------------------------------------------------------------------------
+// To accomodate different b-values we might have to rescale the gradients
+void vtkTeemEstimateDiffusionTensor::RescaleGradients()
+{
+  unsigned int Ngrads = this->DiffusionGradients->GetNumberOfTuples();
+  // Reset rescaled diffusion grandients array before rescaling
+  this->RescaledDiffusionGradients->DeepCopy(this->DiffusionGradients);
+  double *data = (double *) this->DiffusionGradients->GetVoidPointer(0);
+  double *data_r = (double *) this->RescaledDiffusionGradients->GetVoidPointer(0);
+  double factor;
+  for (unsigned int i=0; i < Ngrads; i++)
+    {
+    factor =  sqrt(this->BValues->GetValue(i)/this->MaxB);
+    data_r[0] = data[0] * factor;
+    data_r[1] = data[1] * factor;
+    data_r[2] = data[2] * factor;
+    data += 3;
+    data_r += 3;
+    }
+}
+
+//----------------------------------------------------------------------------
+int vtkTeemEstimateDiffusionTensor::SetGradientsToContext(tenEstimateContext *tec,Nrrd *ngrad, Nrrd *nbmat)
 {
   char *err = NULL;
   const int type = nrrdTypeDouble;
   size_t size[2];
-  size[0]=3;
-  size[1]=this->DiffusionGradients->GetNumberOfTuples();
-  double *data = (double *) this->DiffusionGradients->GetVoidPointer(0);
+  size[0] = 3;
+  size[1] = this->RescaledDiffusionGradients->GetNumberOfTuples();
+  double *data = (double *) this->RescaledDiffusionGradients->GetVoidPointer(0);
   if(nrrdWrap_nva(ngrad ,data,type,2,size)) {
     biffAdd(NRRD, err);
     sprintf(err,"%s:",this->GetClassName());
     return 1;
-  }
-  
-  // To accomodate different b-values we might have to rescale the gradients
-  data = (double *) (ngrad ->data);
-  double factor;
-  for (unsigned int i=0; i< size[1]; i++) {
-   factor =  sqrt(this->BValues->GetValue(i)/this->MaxB);
-   data[0] = data[0] * factor;
-   data[1] = data[1] * factor;
-   data[2] = data[2] * factor;
-   data += 3;
   }
 
   //tenEstimateGradientsSet(tec,ngrad,maxB,!this->knownB0);
@@ -456,7 +518,9 @@ int vtkTeemEstimateDiffusionTensor::SetGradientsToContext(tenEstimateContext *te
   return 0;
 }
 
-int vtkTeemEstimateDiffusionTensor::SetTenContext(  tenEstimateContext *tec,Nrrd* ngrad, Nrrd* nbmat )
+//----------------------------------------------------------------------------
+int vtkTeemEstimateDiffusionTensor
+::SetTenContext(  tenEstimateContext *tec,Nrrd* ngrad, Nrrd* nbmat )
 {
     tec->progress = AIR_TRUE;
 
@@ -473,7 +537,7 @@ int vtkTeemEstimateDiffusionTensor::SetTenContext(  tenEstimateContext *tec,Nrrd
     if (!EE) tenEstimateVerboseSet(tec, verbose);
     if (!EE) EE |= tenEstimateMethodSet(tec, this->EstimationMethod);
     if (!EE) EE |= tenEstimateValueMinSet(tec, this->MinimumSignalValue);
- 
+
     switch(this->EstimationMethod) {
     case tenEstimateMethodLLS:
         tec->recordErrorLogDwi = AIR_TRUE;
@@ -503,7 +567,7 @@ int vtkTeemEstimateDiffusionTensor::SetTenContext(  tenEstimateContext *tec,Nrrd
     // Do not set any threshold for the mask. Do that later
     if (!EE) EE |= tenEstimateThresholdSet(tec, 0, 1);
     if (!EE) EE |= tenEstimateUpdate(tec);
- 
+
     if (EE) {
       err=biffGetDone(TEN);
       fprintf(stderr, "%s: trouble setting up estimation:\n%s\n",
@@ -512,7 +576,6 @@ int vtkTeemEstimateDiffusionTensor::SetTenContext(  tenEstimateContext *tec,Nrrd
     }
 
 return 0;
-
 }
 
 //----------------------------------------------------------------------------
@@ -520,18 +583,14 @@ return 0;
 // algorithm to fill the output from the inputs.
 // It just executes a switch statement to call the correct function for
 // the regions data types.
-void vtkTeemEstimateDiffusionTensor::ThreadedExecute(vtkImageData *inData, 
+void vtkTeemEstimateDiffusionTensor::ThreadedExecute(vtkImageData *inData,
                                               vtkImageData *outData,
                                               int outExt[6], int id)
 {
   void *inPtrs;
   void *outPtr = outData->GetScalarPointerForExtent(outExt);
 
-#if ITK_VERSION_MAJOR < 4
-  vtkDebugMacro("in threaded execute, " << this->GetNumberOfInputs() << " inputs ");
-#else
-  vtkDebugMacro("in threaded execute, " << this->GetNumberOfIndexedInputs() << " inputs ");
-#endif
+  vtkDebugMacro("in threaded execute, " << this->GetNumberOfInputConnections(0) << " inputconnections ");
 
   // Loop through to fill input pointer array
   inPtrs = inData->GetScalarPointerForExtent(outExt);
@@ -548,5 +607,3 @@ void vtkTeemEstimateDiffusionTensor::ThreadedExecute(vtkImageData *inData,
       return;
     }
 }
-
-

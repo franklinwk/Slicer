@@ -43,6 +43,7 @@
 #include <vtkImageMapper.h>
 #include <vtkProperty2D.h>
 #include <vtkActor2D.h>
+#include <vtkVersion.h>
 
 // STD includes
 
@@ -80,8 +81,8 @@ vtkMRMLSliceLogic *setupSliceDisplay(vtkMRMLScene *scene, vtkRenderWindow *rw, c
   displayNode->SetAndObserveColorNodeID( colorNode->GetID() );
 
   // read the data
-  storageNode->SetFileName( archetype ); 
-  storageNode->ReadData( volumeNode ); 
+  storageNode->SetFileName( archetype );
+  storageNode->ReadData( volumeNode );
 
 
   //
@@ -100,19 +101,20 @@ vtkMRMLSliceLogic *setupSliceDisplay(vtkMRMLScene *scene, vtkRenderWindow *rw, c
   //
   // get the output slice and put it into the render window
   //
-  vtkImageData *slice = sliceLogic->GetImageData();
+  // vtkImageData *slice = 0;
+  vtkAlgorithmOutput *slicePort = sliceLogic->GetImageDataConnection();
 
   vtkImageMapper *mapper = vtkImageMapper::New();
   mapper->SetColorWindow( 255. );
   mapper->SetColorLevel ( 127.5 );
-  mapper->SetInput( slice );
+  mapper->SetInputConnection( slicePort );
   vtkActor2D *actor = vtkActor2D::New();
   actor->SetMapper( mapper );
   actor->GetProperty()->SetDisplayLocationToBackground();
   vtkRenderer *renderer = vtkRenderer::New();
   renderer->AddActor2D( actor );
   rw->AddRenderer( renderer );
-  
+
   // clean up
   mapper->Delete();
   actor->Delete();
@@ -171,7 +173,7 @@ int qSlicerWidgetTest2(int argc, char * argv[] )
   qarchetype.append("share/MRML/Testing/TestData/fixed.nrrd");
   QByteArray archetype = qarchetype.toAscii();
 
-  vtkMRMLSliceLogic *sliceLogic = setupSliceDisplay( 
+  vtkMRMLSliceLogic *sliceLogic = setupSliceDisplay(
           scene, vtkWidget->GetRenderWindow(), archetype.data() );
 
   // quit after 5 seconds if the Quit button hasn't been clicked

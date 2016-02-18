@@ -16,6 +16,7 @@
 #include "vtkSliceViewInteractorStyle.h"
 
 // MRML includes
+#include "vtkMRMLInteractionNode.h"
 #include "vtkMRMLScene.h"
 #include "vtkMRMLSliceLogic.h"
 #include "vtkMRMLSliceNode.h"
@@ -30,12 +31,13 @@
 #include "vtkCommand.h"
 #include "vtkNew.h"
 
+//STL includes
+#include <algorithm>
 
 //----------------------------------------------------------------------------
 vtkCxxSetObjectMacro(vtkSliceViewInteractorStyle, SliceLogic, vtkMRMLSliceLogic);
 
 //----------------------------------------------------------------------------
-vtkCxxRevisionMacro(vtkSliceViewInteractorStyle, "$Revision$");
 vtkStandardNewMacro(vtkSliceViewInteractorStyle);
 
 //----------------------------------------------------------------------------
@@ -43,15 +45,30 @@ vtkSliceViewInteractorStyle::vtkSliceViewInteractorStyle()
 {
   this->ActionState = vtkSliceViewInteractorStyle::None;
 
-  this->ActionStartSliceToRAS = vtkMatrix4x4::New();
-  this->ActionStartXYToRAS = vtkMatrix4x4::New();
-  this->ScratchMatrix = vtkMatrix4x4::New();
-
+  this->ActionStartRAS[0] = 0.;
+  this->ActionStartRAS[1] = 0.;
+  this->ActionStartRAS[2] = 0.;
+  this->ActionStartFOV[0] = 0.;
+  this->ActionStartFOV[1] = 0.;
+  this->ActionStartFOV[2] = 0.;
+  this->ActionStartWindow[0] = 0;
+  this->ActionStartWindow[1] = 0;
   this->LastActionWindow[0] = 0;
   this->LastActionWindow[1] = 0;
 
   this->ActionStartForegroundOpacity = 0;
   this->ActionStartLabelOpacity = 0;
+  this->ActionStartVolumeWindow = 0;
+  this->ActionStartVolumeLevel = 0;
+  this->ActionStartVolumeRangeLow = 0;
+  this->ActionStartVolumeRangeHigh = 0;
+
+  this->ActionStartSliceToRAS = vtkMatrix4x4::New();
+  this->ActionStartXYToRAS = vtkMatrix4x4::New();
+  this->ScratchMatrix = vtkMatrix4x4::New();
+
+  this->LastLabelOpacity = 0.;
+  this->LastForegroundOpacity = 0.;
 
   this->SliceLogic = 0;
 }
@@ -236,6 +253,27 @@ void vtkSliceViewInteractorStyle::OnMiddleButtonUp()
 }
 
 //----------------------------------------------------------------------------
+int vtkSliceViewInteractorStyle::GetMouseInteractionMode()
+{
+  if ( this->SliceLogic == 0 ||
+       this->SliceLogic->GetMRMLScene() == 0 )
+    {
+    vtkErrorMacro("vtkSliceViewInteractorStyle::GetMouseInteractionMode: failed to get scene");
+    return vtkMRMLInteractionNode::ViewTransform;
+    }
+  vtkMRMLScene* scene = this->SliceLogic->GetMRMLScene();
+
+  vtkMRMLInteractionNode *interactionNode = vtkMRMLInteractionNode::SafeDownCast(scene->GetNthNodeByClass(0,"vtkMRMLInteractionNode"));
+  if (interactionNode == 0)
+    {
+    vtkErrorMacro("vtkSliceViewInteractorStyle::GetMouseInteractionMode: failed to get interaction node");
+    return vtkMRMLInteractionNode::ViewTransform;
+    }
+
+  return interactionNode->GetCurrentInteractionMode();
+}
+
+//----------------------------------------------------------------------------
 void vtkSliceViewInteractorStyle::OnLeftButtonDown()
 {
   if (this->Interactor->GetShiftKey())
@@ -248,7 +286,14 @@ void vtkSliceViewInteractorStyle::OnLeftButtonDown()
     }
   else
     {
-    this->StartAdjustWindowLevel();
+    // Oonly adjust window/level in the default mouse mode.
+    // Without this window/level could be changed accidentally while in place mode
+    // and accidentally dragging the mouse while placing a new markup.
+    // (in the future it may make sense to add a special mouse mode for window/level)
+    if (this->GetMouseInteractionMode() == vtkMRMLInteractionNode::ViewTransform)
+      {
+      this->StartAdjustWindowLevel();  
+      }
     }
   this->SetActionStartWindow(this->GetInteractor()->GetEventPosition());
   this->SetLastActionWindow(this->GetInteractor()->GetEventPosition());

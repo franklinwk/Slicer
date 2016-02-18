@@ -3,8 +3,7 @@
   <category>Core</category>
   <title>Volumes</title>
   <description><![CDATA[This module is used for changing the appearance of various volume types.]]></description>
-  <version>4.3</version>
-  <documentation-url>http://wiki.slicer.org/slicerWiki/index.php/Documentation/4.3/Modules/Volumes</documentation-url>
+  <documentation-url>http://wiki.slicer.org/slicerWiki/index.php/Documentation/Nightly/Modules/Volumes</documentation-url>
   <license>slicer4</license>
   <contributor>Steve Pieper (Isomics), Julien Finet (Kitware), Alex Yarmarkovich (Isomics), Nicole Aucoin (SPL, BWH)</contributor>
   <acknowledgements><![CDATA[This work is part of the National Alliance for Medical Image Computing (NAMIC), funded by the National Institutes of Health through the NIH Roadmap for Medical Research, Grant U54 EB005149.]]></acknowledgements>
@@ -62,6 +61,10 @@
     <parameter>
       <label>Lookup Table</label>
       <description><![CDATA[Select the color mapping for scalar volumes to colors.]]></description>
+    </parameter>
+    <parameter>
+      <label>Label Outline Thickness</label>
+      <description><![CDATA[When displaying the label map in outline mode, this controls the width of the outline (in pixels).]]></description>
     </parameter>
     <parameter>
       <label>Interpolate</label>

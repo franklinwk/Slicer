@@ -27,7 +27,6 @@
 
 // CTK includes
 #include <ctkAxesWidget.h>
-#include <ctkPopupWidget.h>
 
 // qMRML includes
 #include "qMRMLColors.h"
@@ -58,8 +57,6 @@ qMRMLThreeDViewPrivate::qMRMLThreeDViewPrivate(qMRMLThreeDView& object)
   this->DisplayableManagerGroup = 0;
   this->MRMLScene = 0;
   this->MRMLViewNode = 0;
-  this->PinButton = 0;
-  this->PopupWidget = 0;
 }
 
 //---------------------------------------------------------------------------
@@ -76,11 +73,6 @@ void qMRMLThreeDViewPrivate::init()
 {
   Q_Q(qMRMLThreeDView);
   q->setRenderEnabled(this->MRMLScene != 0);
-
-  this->PopupWidget = new ctkPopupWidget;
-  QHBoxLayout* popupLayout = new QHBoxLayout;
-  popupLayout->addWidget(new QToolButton);
-  this->PopupWidget->setLayout(popupLayout);
 
   vtkNew<vtkThreeDViewInteractorStyle> interactorStyle;
   q->interactor()->SetInteractorStyle(interactorStyle.GetPointer());
@@ -116,7 +108,9 @@ void qMRMLThreeDViewPrivate::initDisplayableManagers()
   displayableManagers << "vtkMRMLCameraDisplayableManager"
                       << "vtkMRMLViewDisplayableManager"
                       << "vtkMRMLModelDisplayableManager"
-                      << "vtkMRMLThreeDReformatDisplayableManager";
+                      << "vtkMRMLThreeDReformatDisplayableManager"
+                      << "vtkMRMLOrientationMarkerDisplayableManager"
+                      << "vtkMRMLRulerDisplayableManager";
   foreach(const QString& displayableManager, displayableManagers)
     {
     if(!factory->IsDisplayableManagerRegistered(displayableManager.toLatin1()))

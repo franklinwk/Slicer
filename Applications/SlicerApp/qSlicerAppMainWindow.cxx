@@ -55,6 +55,7 @@
 #include "qSlicerActionsDialog.h"
 #include "qSlicerApplication.h"
 #include "qSlicerAppAboutDialog.h"
+#include "qSlicerAppErrorReportDialog.h"
 #include "qSlicerAbstractModule.h"
 #if defined Slicer_USE_QtTesting && defined Slicer_BUILD_CLI_SUPPORT
 #include "qSlicerCLIModuleWidgetEventPlayer.h"
@@ -81,6 +82,17 @@
 
 // VTK includes
 #include <vtkCollection.h>
+
+namespace
+{
+
+//-----------------------------------------------------------------------------
+void setThemeIcon(QAction* action, const QString& name)
+{
+  action->setIcon(QIcon::fromTheme(name, action->icon()));
+}
+
+} // end of anonymous namespace
 
 //-----------------------------------------------------------------------------
 // qSlicerAppMainWindowPrivate methods
@@ -227,6 +239,12 @@ void qSlicerAppMainWindowPrivate::setupUi(QMainWindow * mainWindow)
                    qSlicerApplication::application()->ioManager(),
                    SLOT(openSceneViewsDialog()));
 
+  // if testing is enabled on the application level, add a time out to the pop ups
+  if (qSlicerApplication::application()->testAttribute(qSlicerCoreApplication::AA_EnableTesting))
+    {
+    this->CaptureToolBar->setPopupsTimeOut(true);
+    }
+
   QList<QAction*> toolBarActions;
   toolBarActions << this->MainToolBar->toggleViewAction();
   //toolBarActions << this->UndoRedoToolBar->toggleViewAction();
@@ -297,6 +315,8 @@ void qSlicerAppMainWindowPrivate::setupUi(QMainWindow * mainWindow)
       this->ModuleSelectorToolBar->modulesMenu(), QString("currentModule"));
 #endif
   // Layout manager should also listen the MRML scene
+  // Note: This creates the OpenGL context for each view, so things like
+  // multisampling should probably be configured before this line is executed.
   this->LayoutManager->setMRMLScene(qSlicerApplication::application()->mrmlScene());
   QObject::connect(qSlicerApplication::application(),
                    SIGNAL(mrmlSceneChanged(vtkMRMLScene*)),
@@ -311,7 +331,7 @@ void qSlicerAppMainWindowPrivate::setupUi(QMainWindow * mainWindow)
                    this->ModuleSelectorToolBar, SLOT(selectModule(QString)));
 
   // Add menus for configuring compare view
-  QMenu *compareMenu = new QMenu(q->tr("Select number of viewers..."));
+  QMenu *compareMenu = new QMenu(q->tr("Select number of viewers..."), mainWindow);
   compareMenu->setObjectName("CompareMenuView");
   compareMenu->addAction(this->ViewLayoutCompare_2_viewersAction);
   compareMenu->addAction(this->ViewLayoutCompare_3_viewersAction);
@@ -325,7 +345,7 @@ void qSlicerAppMainWindowPrivate::setupUi(QMainWindow * mainWindow)
                    q, SLOT(onLayoutCompareActionTriggered(QAction*)));
 
   // ... and for widescreen version of compare view as well
-  compareMenu = new QMenu(q->tr("Select number of viewers..."));
+  compareMenu = new QMenu(q->tr("Select number of viewers..."), mainWindow);
   compareMenu->setObjectName("CompareMenuWideScreen");
   compareMenu->addAction(this->ViewLayoutCompareWidescreen_2_viewersAction);
   compareMenu->addAction(this->ViewLayoutCompareWidescreen_3_viewersAction);
@@ -339,7 +359,7 @@ void qSlicerAppMainWindowPrivate::setupUi(QMainWindow * mainWindow)
                    q, SLOT(onLayoutCompareWidescreenActionTriggered(QAction*)));
 
   // ... and for the grid version of the compare views
-  compareMenu = new QMenu(q->tr("Select number of viewers..."));
+  compareMenu = new QMenu(q->tr("Select number of viewers..."), mainWindow);
   compareMenu->setObjectName("CompareMenuGrid");
   compareMenu->addAction(this->ViewLayoutCompareGrid_2x2_viewersAction);
   compareMenu->addAction(this->ViewLayoutCompareGrid_3x3_viewersAction);
@@ -415,12 +435,43 @@ void qSlicerAppMainWindowPrivate::setupUi(QMainWindow * mainWindow)
   this->HelpReportBugOrFeatureRequestAction->setIcon(questionIcon);
   this->HelpVisualBlogAction->setIcon(networkIcon);
 
+  this->CutAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+  this->CopyAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+  this->PasteAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+
+  setThemeIcon(this->FileExitAction, "application-exit");
+  setThemeIcon(this->EditUndoAction, "edit-undo");
+  setThemeIcon(this->EditRedoAction, "edit-redo");
+  setThemeIcon(this->CutAction, "edit-cut");
+  setThemeIcon(this->CopyAction, "edit-copy");
+  setThemeIcon(this->PasteAction, "edit-paste");
+  setThemeIcon(this->EditApplicationSettingsAction, "preferences-system");
+  setThemeIcon(this->HelpAboutSlicerAppAction, "help-about");
+  setThemeIcon(this->HelpReportBugOrFeatureRequestAction, "tools-report-bug");
+  setThemeIcon(this->ModuleHomeAction, "go-home");
+
   //----------------------------------------------------------------------------
   // Error log widget
   //----------------------------------------------------------------------------
   this->ErrorLogWidget = new ctkErrorLogWidget;
   this->ErrorLogWidget->setErrorLogModel(
-    qSlicerCoreApplication::application()->errorLogModel());
+    qSlicerApplication::application()->errorLogModel());
+
+  //----------------------------------------------------------------------------
+  // Python console
+  //----------------------------------------------------------------------------
+#ifdef Slicer_USE_PYTHONQT
+  if (q->pythonConsole())
+    {
+    QObject::connect(q->pythonConsole(), SIGNAL(aboutToExecute(const QString&)),
+      q, SLOT(onPythonConsoleUserInput(const QString&)));
+    }
+  else
+    {
+    qWarning("qSlicerAppMainWindowPrivate::setupUi: Failed to create Python console");
+    }
+#endif
+
 }
 
 //-----------------------------------------------------------------------------
@@ -480,7 +531,10 @@ void qSlicerAppMainWindowPrivate::setupRecentlyLoadedMenu(const QList<qSlicerIO:
     {
     qSlicerIO::IOProperties filePropertie = iterator.previous();
     QString fileName = filePropertie.value("fileName").toString();
-    Q_ASSERT(!fileName.isEmpty());
+    if (fileName.isEmpty())
+      {
+      continue;
+      }
     QAction * action = this->RecentlyLoadedMenu->addAction(
       fileName, q, SLOT(onFileRecentLoadedActionTriggered()));
     action->setProperty("fileParameters", filePropertie);
@@ -589,7 +643,7 @@ void qSlicerAppMainWindowPrivate::setupStatusBar()
   this->ErrorLogToolButton->setDefaultAction(this->WindowErrorLogAction);
   q->statusBar()->addPermanentWidget(this->ErrorLogToolButton);
 
-  QObject::connect(qSlicerCoreApplication::application()->errorLogModel(),
+  QObject::connect(qSlicerApplication::application()->errorLogModel(),
                    SIGNAL(entryAdded(ctkErrorLogLevel::LogLevel)),
                    q, SLOT(onWarningsOrErrorsOccurred(ctkErrorLogLevel::LogLevel)));
 }
@@ -682,6 +736,16 @@ ctkPythonConsole* qSlicerAppMainWindow::pythonConsole()const
       }
     }
   return d->PythonConsole;
+}
+
+//---------------------------------------------------------------------------
+void qSlicerAppMainWindow::onPythonConsoleUserInput(const QString& cmd)
+{
+  Q_D(qSlicerAppMainWindow);
+  if (!cmd.isEmpty())
+    {
+    qDebug("Python console user input: %s", qPrintable(cmd));
+    }
 }
 #endif
 
@@ -936,7 +1000,8 @@ void qSlicerAppMainWindow::on_HelpAboutSlicerAppAction_triggered()
 //---------------------------------------------------------------------------
 void qSlicerAppMainWindow::on_HelpReportBugOrFeatureRequestAction_triggered()
 {
-  QDesktopServices::openUrl(QUrl("http://www.na-mic.org/Bug/index.php"));
+  qSlicerAppErrorReportDialog errorReport(this);
+  errorReport.exec();
 }
 
 //---------------------------------------------------------------------------
@@ -1016,9 +1081,16 @@ void qSlicerAppMainWindow::disclaimer()
     {
     return;
     }
-  QString message = QString("Thank you for using %1!\n\n"
-                            "This software is not intended for clinical use.")
-    .arg(app->applicationName() + " " + app->applicationVersion());
+
+  QString message = QString(Slicer_DISCLAIMER_AT_STARTUP);
+  if (message.isEmpty())
+    {
+    // No disclaimer message to show, skip the popup
+    return;
+    }
+
+  // Replace "%1" in the text by the name and version of the application
+  message = message.arg(app->applicationName() + " " + app->applicationVersion());
 
   ctkMessageBox* disclaimerMessage = new ctkMessageBox(this);
   disclaimerMessage->setAttribute( Qt::WA_DeleteOnClose, true );
@@ -1038,6 +1110,7 @@ void qSlicerAppMainWindow::setupMenuActions()
   d->ViewLayoutConventionalQuantitativeAction->setData(vtkMRMLLayoutNode::SlicerLayoutConventionalQuantitativeView);
   d->ViewLayoutFourUpAction->setData(vtkMRMLLayoutNode::SlicerLayoutFourUpView);
   d->ViewLayoutFourUpQuantitativeAction->setData(vtkMRMLLayoutNode::SlicerLayoutFourUpQuantitativeView);
+  d->ViewLayoutFourUpTableAction->setData(vtkMRMLLayoutNode::SlicerLayoutFourUpTableView);
   d->ViewLayoutDual3DAction->setData(vtkMRMLLayoutNode::SlicerLayoutDual3DView);
   d->ViewLayoutTriple3DAction->setData(vtkMRMLLayoutNode::SlicerLayoutTriple3DEndoscopyView);
   d->ViewLayoutOneUp3DAction->setData(vtkMRMLLayoutNode::SlicerLayoutOneUp3DView);
@@ -1122,10 +1195,6 @@ void qSlicerAppMainWindow::setupMenuActions()
 //---------------------------------------------------------------------------
 void qSlicerAppMainWindow::on_LoadDICOMAction_triggered()
 {
-//  Q_D(qSlicerAppMainWindow);
-// raise the dicom module....
-//  d->ModuleSelectorToolBar->selectModule("DICOM");
-
   qSlicerLayoutManager * layoutManager = qSlicerApplication::application()->layoutManager();
 
   if (!layoutManager)
@@ -1148,7 +1217,16 @@ void qSlicerAppMainWindow::onWarningsOrErrorsOccurred(ctkErrorLogLevel::LogLevel
 //---------------------------------------------------------------------------
 void qSlicerAppMainWindow::on_EditApplicationSettingsAction_triggered()
 {
-  qSlicerApplication::application()->settingsDialog()->exec();
+  ctkSettingsDialog* const settingsDialog =
+    qSlicerApplication::application()->settingsDialog();
+
+  // Reload settings to apply any changes that have been made outside of the
+  // dialog (e.g. changes to module paths due to installing extensions). See
+  // http://na-mic.org/Mantis/view.php?id=3658.
+  settingsDialog->reloadSettings();
+
+  // Now show the dialog
+  settingsDialog->exec();
 }
 
 //---------------------------------------------------------------------------

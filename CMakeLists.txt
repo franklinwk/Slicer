@@ -1,5 +1,16 @@
 
 cmake_minimum_required(VERSION 2.8.9)
+if(POLICY CMP0017)
+  cmake_policy(SET CMP0017 OLD)
+endif()
+foreach(p
+  CMP0048 # CMake 3.0
+  CMP0054 # CMake 3.1
+  )
+  if(POLICY ${p})
+    cmake_policy(SET ${p} NEW)
+  endif()
+endforeach()
 
 #-----------------------------------------------------------------------------
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
@@ -9,7 +20,7 @@ include(ExternalProjectDependency)
 #-----------------------------------------------------------------------------
 if(APPLE)
   # Note: By setting CMAKE_OSX_* variables before any enable_language() or project() calls,
-  #       we ensure that the bitness will be properly detected.
+  #       we ensure that the bitness, and C++ standard library will be properly detected.
   include(SlicerBlockSetCMakeOSXVariables)
   mark_as_superbuild(
     VARS CMAKE_OSX_ARCHITECTURES:STRING CMAKE_OSX_SYSROOT:PATH CMAKE_OSX_DEPLOYMENT_TARGET:STRING
@@ -17,14 +28,20 @@ if(APPLE)
     )
 endif()
 
-project(Slicer)
-
 #-----------------------------------------------------------------------------
-# See http://cmake.org/cmake/help/cmake-2-8-docs.html#section_Policies for details
-#-----------------------------------------------------------------------------
-if(POLICY CMP0017)
-  cmake_policy(SET CMP0017 OLD)
+if(NOT DEFINED Slicer_VERSION_MAJOR)
+  set(Slicer_VERSION_MAJOR "4")
 endif()
+if(NOT DEFINED Slicer_VERSION_MINOR)
+  set(Slicer_VERSION_MINOR "5")
+endif()
+if(NOT DEFINED Slicer_VERSION_PATCH)
+  set(Slicer_VERSION_PATCH "0")
+endif()
+if(POLICY CMP0048)
+  set(_project_version VERSION "${Slicer_VERSION_MAJOR}.${Slicer_VERSION_MINOR}.${Slicer_VERSION_PATCH}")
+endif()
+project(Slicer ${_project_version})
 
 #-----------------------------------------------------------------------------
 # Update CMake module path
@@ -43,6 +60,13 @@ set(Slicer_EXTENSIONS_CMAKE_DIR ${Slicer_SOURCE_DIR}/Extensions/CMake)
 include(SlicerCheckSourceTree)
 
 #-----------------------------------------------------------------------------
+# Superbuild Option - Enabled by default
+#-----------------------------------------------------------------------------
+option(Slicer_SUPERBUILD "Build ${PROJECT_NAME} and the projects it depends on." ON)
+mark_as_advanced(Slicer_SUPERBUILD)
+set(Slicer_BINARY_INNER_SUBDIR Slicer-build)
+
+#-----------------------------------------------------------------------------
 include(CTestUseLaunchers OPTIONAL)
 if(${CTEST_USE_LAUNCHERS})
   message(STATUS "CTest launchers enabled")
@@ -52,37 +76,17 @@ endif()
 # Sanity checks
 #------------------------------------------------------------------------------
 if(WIN32)
-  option(Slicer_SKIP_ROOT_DIR_MAX_LENGTH_CHECK "Skip root directory length check" OFF)
-  mark_as_advanced(Slicer_SKIP_ROOT_DIR_MAX_LENGTH_CHECK)
-  if(NOT Slicer_SKIP_ROOT_DIR_MAX_LENGTH_CHECK)
-    set(root_directory_max_length 40)
-    string(LENGTH "${CMAKE_CURRENT_SOURCE_DIR}" n)
-    if(n GREATER ${root_directory_max_length})
-      message(
-        FATAL_ERROR
-        "Source tree directory of ${PROJECT_NAME} is too deep (${n} > ${root_directory_max_length})."
-        "Please use a shorter root directory for the ${PROJECT_NAME} source tree."
-        )
-    endif()
-    string(LENGTH "${CMAKE_CURRENT_BINARY_DIR}" n)
-    if(n GREATER ${root_directory_max_length})
-      message(
-        FATAL_ERROR
-        "Binary tree directory of ${PROJECT_NAME} is too deep (${n} > ${root_directory_max_length})."
-        "Please use a shorter root directory for the ${PROJECT_NAME} binary tree."
-        )
-    endif()
+  set(${PROJECT_NAME}_ROOT_DIR_MAX_LENGTH 40)
+  if(NOT ${PROJECT_NAME}_SUPERBUILD)
+    string(LENGTH ${Slicer_BINARY_INNER_SUBDIR} _inner_subdir_length)
+    math(EXPR ${PROJECT_NAME}_ROOT_DIR_MAX_LENGTH "${${PROJECT_NAME}_ROOT_DIR_MAX_LENGTH} + ${_inner_subdir_length}")
   endif()
+  include(PreventDirWithTooManyChars)
 endif()
 include(PreventInSourceBuilds)
 include(PreventInBuildInstalls)
-
-if(NOT DEFINED Slicer_SKIP_DIR_WITH_SPACES_CHECK)
-  set(Slicer_SKIP_DIR_WITH_SPACES_CHECK FALSE)
-endif()
-if(NOT Slicer_SKIP_DIR_WITH_SPACES_CHECK)
-  include(PreventDirWithSpaces)
-endif()
+include(PreventDirWithSpaces)
+mark_as_superbuild(${PROJECT_NAME}_SKIP_DIR_WITH_SPACES_CHECK:BOOL)
 
 #-----------------------------------------------------------------------------
 # Overwrite default options
@@ -160,14 +164,6 @@ if(NOT DEFINED Slicer_REQUIRED_QT_VERSION)
   set(Slicer_REQUIRED_QT_VERSION "4.7.4" CACHE STRING "Minimum required Qt version" FORCE)
 endif()
 mark_as_superbuild(Slicer_REQUIRED_QT_VERSION)
-
-#-----------------------------------------------------------------------------
-# Superbuild Option - Enabled by default
-#-----------------------------------------------------------------------------
-option(Slicer_SUPERBUILD "Build ${PROJECT_NAME} and the projects it depends on." ON)
-mark_as_advanced(Slicer_SUPERBUILD)
-
-set(Slicer_BINARY_INNER_SUBDIR Slicer-build)
 
 #-----------------------------------------------------------------------------
 # Build shared lib by default
@@ -251,11 +247,15 @@ mark_as_superbuild(Slicer_UPDATE_TRANSLATION)
 set(Slicer_FORCED_WC_REVISION "" CACHE STRING "Overwrite value of auto-discovered Slicer_WC_REVISION")
 mark_as_advanced(Slicer_FORCED_WC_REVISION)
 
+option(Slicer_USE_FOLDERS "Organize build targets into folders" ON)
+mark_as_superbuild(Slicer_USE_FOLDERS)
+mark_as_advanced(Slicer_USE_FOLDERS)
+
 #-----------------------------------------------------------------------------
 # External projects related options
 #-----------------------------------------------------------------------------
 CMAKE_DEPENDENT_OPTION(
-  Slicer_USE_PYTHONQT_WITH_OPENSSL "Enable PythonQt SSL support" OFF
+  Slicer_USE_PYTHONQT_WITH_OPENSSL "Enable PythonQt SSL support" ON
   "Slicer_USE_PYTHONQT" OFF)
 mark_as_superbuild(Slicer_USE_PYTHONQT_WITH_OPENSSL)
 
@@ -269,12 +269,6 @@ CMAKE_DEPENDENT_OPTION(
   "Slicer_USE_PYTHONQT" OFF)
 mark_as_superbuild(Slicer_USE_NUMPY)
 
-set(Slicer_USE_BatchMake OFF CACHE INTERNAL "Build Slicer with BatchMake support." FORCE)
-mark_as_superbuild(Slicer_USE_BatchMake:BOOL)
-
-option(Slicer_USE_MIDAS       "Build Slicer with MIDAS support." OFF)
-mark_as_superbuild(Slicer_USE_MIDAS)
-
 option(Slicer_USE_OpenIGTLink "Build Slicer with OpenIGTLink support." ON)
 mark_as_superbuild(Slicer_USE_OpenIGTLink)
 
@@ -286,24 +280,15 @@ option(Slicer_USE_QtTesting    "Integrate QtTesting framework into Slicer." ON)
 mark_as_advanced(Slicer_USE_QtTesting)
 mark_as_superbuild(Slicer_USE_QtTesting)
 
-set(ITK_VERSION_MAJOR 4 CACHE STRING "Choose the expected ITK major version to build Slicer (3 or 4).")
-# Set the possible values of ITK major version for cmake-gui
-set_property(CACHE ITK_VERSION_MAJOR PROPERTY STRINGS "3" "4")
-if(NOT "${ITK_VERSION_MAJOR}" STREQUAL "3" AND NOT "${ITK_VERSION_MAJOR}" STREQUAL "4")
-  set(ITK_VERSION_MAJOR 3 CACHE STRING "Choose the expected ITK major version to build Slicer (3 or 4)." FORCE)
-  message(WARNING "Setting ITK_VERSION_MAJOR to '3' as an valid value was specified.")
-endif()
-mark_as_superbuild(ITK_VERSION_MAJOR)
-
-set(USE_ITKv3 OFF)
-set(USE_ITKv4 ON)
-if(${ITK_VERSION_MAJOR} STREQUAL "3")
-  set(USE_ITKv3 ON)
-  set(USE_ITKv4 OFF)
-endif()
-
-CMAKE_DEPENDENT_OPTION(Slicer_USE_SimpleITK "Build Slicer with SimpleITK support" OFF "USE_ITKv4" OFF)
+option(Slicer_USE_SimpleITK "Build Slicer with SimpleITK support" ON)
 mark_as_superbuild(Slicer_USE_SimpleITK)
+
+option(Slicer_BUILD_ITKPython "Build Python wrapping for ITK" OFF)
+mark_as_superbuild(Slicer_BUILD_ITKPython)
+CMAKE_DEPENDENT_OPTION(
+  Slicer_INSTALL_ITKPython "Install Slicer with Python wrapping for ITK" OFF
+  "Slicer_BUILD_ITKPython" OFF)
+mark_as_superbuild(Slicer_INSTALL_ITKPython)
 
 #
 # SimpleITK has large internal libraries, which take an extremely long
@@ -356,12 +341,10 @@ endif()
 #-----------------------------------------------------------------------------
 # CTestCustom
 #-----------------------------------------------------------------------------
-if(BUILD_TESTING)
-  configure_file(
-    CMake/CTestCustom.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake
-    @ONLY)
-endif()
+configure_file(
+  CMake/CTestCustom.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake
+  @ONLY)
 
 #-----------------------------------------------------------------------------
 # Additional CXX/C Flags
@@ -382,7 +365,7 @@ if(Slicer_BUILD_I18N_SUPPORT)
   include(SlicerMacroTranslation)
 endif()
 include(SlicerFunctionInstallLibrary)
-
+include(SlicerFunctionAddPythonQtResources)
 
 #-----------------------------------------------------------------------------
 # Internationalization
@@ -400,14 +383,6 @@ endif()
 include(SlicerBlockCXXRequiredFlags)
 
 #-----------------------------------------------------------------------------
-# Organization name
-#-----------------------------------------------------------------------------
-set(Slicer_ORGANIZATION_DOMAIN "www.na-mic.org" CACHE INTERNAL "Organization domain")
-set(Slicer_ORGANIZATION_NAME "NA-MIC" CACHE INTERNAL "Organization name")
-
-set(SLICER_REVISION_SPECIFIC_USER_SETTINGS_FILEBASENAME "")
-
-#-----------------------------------------------------------------------------
 # Main application
 #-----------------------------------------------------------------------------
 if(NOT DEFINED Slicer_MAIN_PROJECT)
@@ -417,19 +392,74 @@ mark_as_superbuild(Slicer_MAIN_PROJECT:STRING)
 if(NOT DEFINED ${Slicer_MAIN_PROJECT}_APPLICATION_NAME)
   set(${Slicer_MAIN_PROJECT}_APPLICATION_NAME Slicer CACHE INTERNAL "Main application name")
 else()
-  set(SlicerApp_APPLICATION_NAME Slicer)
+  if(NOT DEFINED SlicerApp_APPLICATION_NAME)
+    set(SlicerApp_APPLICATION_NAME Slicer)
+  endif()
 endif()
 
 set(Slicer_MAIN_PROJECT_APPLICATION_NAME ${${Slicer_MAIN_PROJECT}_APPLICATION_NAME})
 
+if(WIN32)
+  option(Slicer_BUILD_WIN32_CONSOLE "Build ${PROJECT_NAME} executable as a console app on windows (allows debug output)" ON)
+else()
+  set(Slicer_BUILD_WIN32_CONSOLE OFF)
+endif()
+mark_as_superbuild(Slicer_BUILD_WIN32_CONSOLE:BOOL)
+
+#-----------------------------------------------------------------------------
+# Organization name
+#-----------------------------------------------------------------------------
+if(NOT DEFINED Slicer_ORGANIZATION_DOMAIN)
+  set(Slicer_ORGANIZATION_DOMAIN "www.na-mic.org" CACHE STRING "Organization domain")
+endif()
+mark_as_advanced(Slicer_ORGANIZATION_DOMAIN)
+mark_as_superbuild(Slicer_ORGANIZATION_DOMAIN)
+message(STATUS "Configuring ${Slicer_MAIN_PROJECT_APPLICATION_NAME} organization domain [${Slicer_ORGANIZATION_DOMAIN}]")
+
+if(NOT DEFINED Slicer_ORGANIZATION_NAME)
+  set(Slicer_ORGANIZATION_NAME "NA-MIC" CACHE STRING "Organization name")
+endif()
+mark_as_advanced(Slicer_ORGANIZATION_NAME)
+mark_as_superbuild(Slicer_ORGANIZATION_NAME)
+message(STATUS "Configuring ${Slicer_MAIN_PROJECT_APPLICATION_NAME} organization name [${Slicer_ORGANIZATION_NAME}]")
+
+set(SLICER_REVISION_SPECIFIC_USER_SETTINGS_FILEBASENAME "")
+
+#-----------------------------------------------------------------------------
+# Home and favorite modules
+#-----------------------------------------------------------------------------
+if(NOT DEFINED Slicer_DEFAULT_HOME_MODULE)
+  set(Slicer_DEFAULT_HOME_MODULE "Welcome" CACHE STRING "Name of the module that Slicer activates on start-up by default")
+endif()
+mark_as_advanced(Slicer_DEFAULT_HOME_MODULE)
+mark_as_superbuild(Slicer_DEFAULT_HOME_MODULE)
+message(STATUS "Configuring ${Slicer_MAIN_PROJECT_APPLICATION_NAME} default home module [${Slicer_DEFAULT_HOME_MODULE}]")
+
+if(NOT DEFINED Slicer_DEFAULT_FAVORITE_MODULES)
+  set(Slicer_DEFAULT_FAVORITE_MODULES "SubjectHierarchy, Volumes, Models, Transforms, Markups, Editor" CACHE STRING "Name of the modules shown on the toolbar by default (comma-separated list)")
+endif()
+mark_as_advanced(Slicer_DEFAULT_FAVORITE_MODULES)
+mark_as_superbuild(Slicer_DEFAULT_FAVORITE_MODULES)
+message(STATUS "Configuring ${Slicer_MAIN_PROJECT_APPLICATION_NAME} default favorite modules [${Slicer_DEFAULT_FAVORITE_MODULES}]")
+
+#-----------------------------------------------------------------------------
+# Disclaimer popup
+#-----------------------------------------------------------------------------
+
+if(NOT DEFINED Slicer_DISCLAIMER_AT_STARTUP)
+  set(Slicer_DISCLAIMER_AT_STARTUP "Thank you for using %1!<br><br>This software is not intended for clinical use." CACHE STRING "Text displayed at the first startup of Slicer in a popup window")
+  # Note: %1 is replaced by the application name and version. Add <br> for newline.
+  # If the disclaimer text is set to empty then no disclaimer popup is displayed.
+endif()
+mark_as_advanced(Slicer_DISCLAIMER_AT_STARTUP)
+mark_as_superbuild(Slicer_DISCLAIMER_AT_STARTUP)
+message(STATUS "Configuring ${Slicer_MAIN_PROJECT_APPLICATION_NAME} text of disclaimer at startup [${Slicer_DISCLAIMER_AT_STARTUP}]")
+
 #-----------------------------------------------------------------------------
 # Slicer version number.
 #-----------------------------------------------------------------------------
-set(Slicer_VERSION_MAJOR "4")
-set(Slicer_VERSION_MINOR "3")
-set(Slicer_VERSION_PATCH "1")
 # Releases define a tweak level
-#set(Slicer_VERSION_TWEAK 0)
+#set(Slicer_VERSION_TWEAK 1)
 #set(Slicer_VERSION_RC 0)
 
 SlicerMacroExtractRepositoryInfo(VAR_PREFIX Slicer) # Used to configure vtkSlicerVersionConfigure.h.in
@@ -440,21 +470,22 @@ if(NOT Slicer_FORCED_WC_REVISION STREQUAL "")
   set(Slicer_WC_REVISION "${Slicer_FORCED_WC_REVISION}")
 endif()
 
-if(NOT DEFINED Slicer_VERSION_TWEAK)
-  # if it's not a release, use the date as a tweak
-  set(Slicer_VERSION_TWEAK "${Slicer_BUILDDATE}")
+if("${Slicer_VERSION_TWEAK}" STREQUAL "")
+  set(_version_qualifier "-${Slicer_BUILDDATE}")
+elseif("${Slicer_VERSION_TWEAK}" GREATER 0)
+  set(_version_qualifier "-${Slicer_VERSION_TWEAK}")
 endif()
 
+# XXX This variable should not be set explicitly
 set(Slicer_VERSION      "${Slicer_VERSION_MAJOR}.${Slicer_VERSION_MINOR}")
 set(Slicer_VERSION_FULL "${Slicer_VERSION}.${Slicer_VERSION_PATCH}")
 if(Slicer_VERSION_RC)
   set(Slicer_VERSION_FULL "${Slicer_VERSION_FULL}-rc${Slicer_VERSION_RC}")
 endif()
-if(Slicer_VERSION_TWEAK GREATER 0)
-  set(Slicer_VERSION_FULL "${Slicer_VERSION_FULL}-${Slicer_VERSION_TWEAK}")
-endif()
-message(STATUS "Configuring ${SlicerApp_APPLICATION_NAME} version [${Slicer_VERSION_FULL}]")
-message(STATUS "Configuring ${SlicerApp_APPLICATION_NAME} revision [${Slicer_WC_REVISION}]")
+set(Slicer_VERSION_FULL "${Slicer_VERSION_FULL}${_version_qualifier}")
+
+message(STATUS "Configuring ${Slicer_MAIN_PROJECT_APPLICATION_NAME} version [${Slicer_VERSION_FULL}]")
+message(STATUS "Configuring ${Slicer_MAIN_PROJECT_APPLICATION_NAME} revision [${Slicer_WC_REVISION}]")
 
 #-----------------------------------------------------------------------------
 # Slicer sub-directories
@@ -463,6 +494,7 @@ set(Slicer_BIN_DIR "bin")
 set(Slicer_LIB_DIR "lib/Slicer-${Slicer_VERSION_MAJOR}.${Slicer_VERSION_MINOR}")
 set(Slicer_INCLUDE_DIR "include/Slicer-${Slicer_VERSION_MAJOR}.${Slicer_VERSION_MINOR}")
 set(Slicer_SHARE_DIR "share/Slicer-${Slicer_VERSION_MAJOR}.${Slicer_VERSION_MINOR}")
+set(Slicer_LIBEXEC_DIR "libexec/Slicer-${Slicer_VERSION_MAJOR}.${Slicer_VERSION_MINOR}")
 set(Slicer_ITKFACTORIES_DIR "${Slicer_LIB_DIR}/ITKFactories")
 set(Slicer_QM_DIR "${Slicer_BIN_DIR}/Translations")
 
@@ -494,6 +526,7 @@ set(Slicer_INSTALL_BIN_DIR "${Slicer_INSTALL_ROOT}${Slicer_BIN_DIR}")
 set(Slicer_INSTALL_LIB_DIR "${Slicer_INSTALL_ROOT}${Slicer_LIB_DIR}")
 set(Slicer_INSTALL_INCLUDE_DIR "${Slicer_INSTALL_ROOT}${Slicer_INCLUDE_DIR}")
 set(Slicer_INSTALL_SHARE_DIR "${Slicer_INSTALL_ROOT}${Slicer_SHARE_DIR}")
+set(Slicer_INSTALL_LIBEXEC_DIR "${Slicer_INSTALL_ROOT}${Slicer_LIBEXEC_DIR}")
 set(Slicer_INSTALL_ITKFACTORIES_DIR "${Slicer_INSTALL_LIB_DIR}/ITKFactories")
 set(Slicer_INSTALL_QM_DIR "${Slicer_INSTALL_ROOT}${Slicer_QM_DIR}")
 
@@ -504,82 +537,57 @@ if(Slicer_BUILD_CLI_SUPPORT)
 endif()
 
 #-----------------------------------------------------------------------------
-# ITKv4 - Slicer_ITK_COMPONENTS
+# VTKv6 - Slicer_VTK_COMPONENTS
 #-----------------------------------------------------------------------------
-set(Slicer_ITK_COMPONENTS "")
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  set(ITK_IO_MODULES_USED
-    ITKIOJPEG
-    ITKIOGDCM
-    ITKIOBMP
-    ITKIOLSM
-    ITKIOPNG
-    ITKIOTIFF
-    ITKIOVTK
-    ITKIOStimulate
-    ITKIOBioRad
-    ITKIOMeta
-    ITKIONIFTI
-    ITKIONRRD
-    ITKIOGIPL
+set(Slicer_VTK_RENDERING_BACKEND "OpenGL2" CACHE STRING "Choose the rendering backend.")
+set_property(CACHE Slicer_VTK_RENDERING_BACKEND PROPERTY STRINGS "OpenGL" "OpenGL2")
+mark_as_superbuild(Slicer_VTK_RENDERING_BACKEND)
+set(Slicer_VTK_RENDERING_USE_${Slicer_VTK_RENDERING_BACKEND}_BACKEND 1)
+
+set(Slicer_VTK_COMPONENTS
+  vtkFiltersExtraction
+  vtkFiltersFlowPaths
+  vtkFiltersGeometry
+  vtkGUISupportQtOpenGL
+  #vtkGUISupportQtWebkit
+  vtkGUISupportQtSQL
+  vtkIOImage
+  vtkIOLegacy
+  vtkIOPLY
+  vtkIOXML
+  vtkImagingMath
+  vtkImagingMorphological
+  vtkImagingStatistics
+  vtkImagingStencil
+  vtkInteractionImage
+  vtkRenderingContext${Slicer_VTK_RENDERING_BACKEND}
+  vtkRenderingQt
+  vtkRenderingVolume${Slicer_VTK_RENDERING_BACKEND}
+  vtkTestingRendering
+  vtkViewsQt
+  vtkzlib
+  )
+if(Slicer_USE_PYTHONQT)
+  list(APPEND Slicer_VTK_COMPONENTS
+    vtkWrappingPythonCore
     )
-  if(Slicer_BUILD_DICOM_SUPPORT)
-    list(APPEND ITK_IO_MODULES_USED ITKIODCMTK)
+endif()
+if(UNIX AND NOT APPLE)
+  find_package(FontConfig QUIET)
+  if(FONTCONFIG_FOUND)
+    list(APPEND Slicer_VTK_COMPONENTS
+      vtkRenderingFreeTypeFontConfig
+      # vtkRenderingFreeTypeOpenGL # Since commit 4f7460a5 (> 6.2.0), vtkRenderingFreeTypeOpenGL
+                                   # has been removed. This mean Slicer will not compile
+                                   # against version of VTK folder than 6.3.0 having FontConfig
+                                   # capabilities.
+                                   # If this is needed, a configure test would have to
+                                   # be added to check if the module is available or not.
+      )
+    if(TARGET vtkRenderingFreeTypeOpenGL)
+      list(APPEND VTK_LIBRARIES vtkRenderingFreeTypeOpenGL)
+    endif()
   endif()
-  set(Slicer_ITK_COMPONENTS
-    ITKAnisotropicSmoothing
-    ITKAntiAlias
-    ITKBiasCorrection
-    ITKBinaryMathematicalMorphology
-    ITKCommon
-    ITKConnectedComponents
-    ITKCurvatureFlow
-    ITKDeprecated
-    ITKDiffusionTensorImage
-    ITKDisplacementField
-    ITKDistanceMap
-    ITKFastMarching
-    ITKHDF5
-    ITKIOImageBase
-    ITKIOSpatialObjects
-    ITKIOStimulate
-    ITKIOTransformBase
-    ITKImageAdaptors
-    ITKImageCompare
-    ITKImageCompose
-    ITKImageFeature
-    ITKImageFilterBase
-    ITKImageFunction
-    ITKImageFusion
-    ITKImageGradient
-    ITKImageGrid
-    ITKImageIntensity
-    ITKImageSources
-    ITKImageStatistics
-    ITKLabelVoting
-    ITKLevelSets
-    ITKMathematicalMorphology
-    ITKMesh
-    ITKOptimizers
-    ITKPDEDeformableRegistration
-    ITKPath
-    ITKQuadEdgeMesh
-    ITKQuadEdgeMeshFiltering
-    ITKRegionGrowing
-    ITKRegistrationCommon
-    ITKReview
-    ITKSmoothing
-    ITKSpatialObjects
-    ITKStatistics
-    ITKTestKernel
-    ITKThresholding
-    ITKTransform
-    ITKV3Compatibility
-    ITKVTK
-    #    ITKVtkGlue
-    ITKZLIB
-    ${ITK_IO_MODULES_USED}
-    )
 endif()
 
 #-----------------------------------------------------------------------------
@@ -628,21 +636,19 @@ mark_as_superbuild(VARS QT_QMAKE_EXECUTABLE LABELS "FIND_PACKAGE")
 #-----------------------------------------------------------------------------
 # Testing
 #-----------------------------------------------------------------------------
-if(BUILD_TESTING)
-  # NOTE: For CTEST_USE_LAUNCHER to work, it's required to include CTest at the superbuild level.
-  #       See http://www.kitware.com/blog/home/post/11
+# NOTE: For CTEST_USE_LAUNCHER to work, it's required to include CTest at the superbuild level.
+#       See http://www.kitware.com/blog/home/post/11
 
-  set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED 1) # Do not add CTest default targets
-  include(CTest)
+set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED 1) # Do not add CTest default targets
+include(CTest)
 
-  # Add Experimental target - Adapted from CTestTargets.cmake
-  set(__conf_types "")
-  if(CMAKE_CONFIGURATION_TYPES)
-    # We need to pass the configuration type on the test command line.
-    set(__conf_types -C "${CMAKE_CFG_INTDIR}")
-  endif()
-  add_custom_target(Experimental ${CMAKE_CTEST_COMMAND} ${__conf_types} -D Experimental)
+# Add Experimental target - Adapted from CTestTargets.cmake
+set(__conf_types "")
+if(CMAKE_CONFIGURATION_TYPES)
+  # We need to pass the configuration type on the test command line.
+  set(__conf_types -C "${CMAKE_CFG_INTDIR}")
 endif()
+add_custom_target(Experimental ${CMAKE_CTEST_COMMAND} ${__conf_types} -D Experimental)
 
 #-----------------------------------------------------------------------------
 # Superbuild script
@@ -659,13 +665,13 @@ foreach(dep QT ${Slicer_DEPENDENCIES})
 endforeach()
 
 #-----------------------------------------------------------------------------
-# CMake Function(s) and Macro(s)
+# Folders
 #-----------------------------------------------------------------------------
-if(Slicer_BUILD_CLI_SUPPORT)
-  include(SlicerMacroBuildCLI)
-endif()
+set_property(GLOBAL PROPERTY USE_FOLDERS ${Slicer_USE_FOLDERS})
 
+#-----------------------------------------------------------------------------
 # Clear SlicerTargets.cmake
+#-----------------------------------------------------------------------------
 file(WRITE "${Slicer_BINARY_DIR}/SlicerTargets.cmake" "")
 
 #-----------------------------------------------------------------------------
@@ -703,7 +709,7 @@ set(Slicer_ModuleWidgets_INCLUDE_DIRS CACHE INTERNAL "Slicer Module Widgets incl
 # Get operating system, architecture and bitness
 #-----------------------------------------------------------------------------
 SlicerMacroGetOperatingSystemArchitectureBitness(VAR_PREFIX Slicer)
-message(STATUS "Configuring ${SlicerApp_APPLICATION_NAME} for [${Slicer_OS}-${Slicer_ARCHITECTURE}]")
+message(STATUS "Configuring ${Slicer_MAIN_PROJECT_APPLICATION_NAME} for [${Slicer_OS}-${Slicer_ARCHITECTURE}]")
 
 #-----------------------------------------------------------------------------
 # ExternalData configuration for test data
@@ -721,19 +727,22 @@ set(Slicer_ExternalData_URL_TEMPLATES ${ExternalData_URL_TEMPLATES})
 set(Slicer_LAUNCHER_EXECUTABLE ${Slicer_BINARY_DIR}/${Slicer_MAIN_PROJECT_APPLICATION_NAME}${CMAKE_EXECUTABLE_SUFFIX})
 set(Slicer_LAUNCH_COMMAND ${Slicer_LAUNCHER_EXECUTABLE} --launcher-no-splash --launch)
 
-if(BUILD_TESTING)
-  include(SlicerMacroConfigureModuleCxxTestDriver)
-  include(SlicerMacroSimpleTest)
-  include(SlicerMacroPythonTesting)
-  include(SlicerMacroConfigureGenericCxxModuleTests)
-  include(SlicerMacroConfigureGenericPythonModuleTests)
+include(SlicerMacroConfigureModuleCxxTestDriver)
+include(SlicerMacroSimpleTest)
+include(SlicerMacroPythonTesting)
+include(SlicerMacroConfigureGenericCxxModuleTests)
+include(SlicerMacroConfigureGenericPythonModuleTests)
 
+if(BUILD_TESTING)
   include(MIDAS)
   set(MIDAS_REST_URL "http://midas.kitware.com/api/rest" CACHE STRING "The MIDAS server where testing data resides")
   set(MIDAS_KEY_DIR "${Slicer_SOURCE_DIR}/Testing/Data")
   set(MIDAS_DATA_DIR "${Slicer_BINARY_DIR}/MIDAS_Data")
 
-  set(CXX_TEST_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  # The variable CXX_TEST_PATH should *NOT* be used when adding tests.
+  # Instead the the $<TARGET_FILE:...> generator expression should be
+  # considered. See r16586 for more details.
+  set(CXX_TEST_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}) # XXX
 
   configure_file(
     ${Slicer_SOURCE_DIR}/CTestConfig.cmake
@@ -741,49 +750,40 @@ if(BUILD_TESTING)
     COPYONLY)
 
   add_subdirectory(CMake/Testing)
+
+  if(Slicer_BUILD_CLI_SUPPORT)
+    set(SEM_LAUNCH_COMMAND ${Slicer_LAUNCH_COMMAND})
+    if(USE_VALGRIND)
+      set(SEM_LAUNCH_COMMAND "${Slicer_BINARY_DIR}/Scripts/runValgrindForOneModule.sh")
+    endif()
+  endif()
 endif()
 
 #-----------------------------------------------------------------------------
-# ITK
+# NOTE: How to include dependent packages ?
 #-----------------------------------------------------------------------------
-set(expected_ITK_VERSION_MAJOR ${ITK_VERSION_MAJOR})
-set(Slicer_ITK_COMPONENTS "")
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  find_package(ITK COMPONENTS ${Slicer_ITK_COMPONENTS})
-else()
-  find_package(ITK REQUIRED)
-endif()
 
-if(${ITK_VERSION_MAJOR} VERSION_LESS ${expected_ITK_VERSION_MAJOR})
-  # Note: Since ITKv3 doesn't include a ITKConfigVersion.cmake file, let's check the version
-  #       explicitly instead of passing the version as an argument to find_package() command.
-  message(FATAL_ERROR "Could not find a configuration file for package \"ITK\" that is compatible "
-                      "with requested version \"${expected_ITK_VERSION_MAJOR}\".\n"
-                      "The following configuration files were considered but not accepted:\n"
-                      "  ${ITK_CONFIG}, version: ${ITK_VERSION_MAJOR}.${ITK_VERSION_MINOR}.${ITK_VERSION_PATCH}\n")
-endif()
-
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
-  list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
-  list(APPEND ITK_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/Libs/ITKFactoryRegistration
-    ${CMAKE_CURRENT_BINARY_DIR}/Libs/ITKFactoryRegistration
-    )
-endif()
-include(${ITK_USE_FILE})
+# Every Slicer sub project, library or module is responsible
+# to call find_package (optionally specifying a list of components)
+# and (if it applies) include the associated "use file".
+#
+# This means that moving forward most of the find_package calls listed below
+# will be removed.
 
 #-----------------------------------------------------------------------------
 # VTK
 #-----------------------------------------------------------------------------
-find_package(VTK REQUIRED)
-if(NOT VTK_USE_QVTK)
+find_package(VTK 7.1 COMPONENTS ${Slicer_VTK_COMPONENTS} REQUIRED NO_MODULE)
+if(NOT TARGET vtkGUISupportQt)
   message(FATAL_ERROR "error: VTK was not configured to use QT, you probably need "
-                      "to recompile it with VTK_USE_GUISUPPORT ON, VTK_USE_QVTK ON, "
-                      "DESIRED_QT_VERSION 4 and QT_QMAKE_EXECUTABLE set appropriatly. "
-                      "Note that Qt >= ${Slicer_REQUIRED_QT_VERSION} is *required*")
+                    "to recompile it with VTK_USE_GUISUPPORT ON, VTK_Group_Qt ON, "
+                    "DESIRED_QT_VERSION 4 and QT_QMAKE_EXECUTABLE set appropriatly. "
+                    "Note that Qt >= ${Slicer_REQUIRED_QT_VERSION} is *required*")
 endif()
 include(${VTK_USE_FILE})
+if(NOT DEFINED VTK_RENDERING_BACKEND)
+  set(VTK_RENDERING_BACKEND "OpenGL")
+endif()
 
 #-----------------------------------------------------------------------------
 # CTK
@@ -792,33 +792,9 @@ find_package(CTK REQUIRED)
 include(${CTK_USE_FILE})
 
 #-----------------------------------------------------------------------------
-# QtTesting
-#-----------------------------------------------------------------------------
-if(Slicer_USE_QtTesting)
-  set(QtTesting_INSTALL_DIR ${CTK_QtTesting_INSTALL_DIR})
-  set(QtTesting_DIR ${CTK_QtTesting_DIR})
-  find_package(QtTesting REQUIRED)
-endif()
-
-#-----------------------------------------------------------------------------
-# ZLIB
-#-----------------------------------------------------------------------------
-find_package(ZLIB REQUIRED)
-include_directories(${ZLIB_INCLUDE_DIRS})
-
-#-----------------------------------------------------------------------------
-# qRestAPI
-#-----------------------------------------------------------------------------
-if(Slicer_BUILD_EXTENSIONMANAGER_SUPPORT)
-  find_package(qRestAPI REQUIRED)
-  include(${qRestAPI_USE_FILE})
-endif()
-
-#-----------------------------------------------------------------------------
 # Update CMake module path
 #-----------------------------------------------------------------------------
 set(CMAKE_MODULE_PATH
-  ${VTK_CMAKE_DIR}
   ${CTK_CMAKE_DIR}
   ${CMAKE_MODULE_PATH}
   ${CTK_CMAKE_UTILITIES_DIR})
@@ -841,7 +817,7 @@ if(Slicer_USE_PYTHONQT)
     OUTPUT_VARIABLE Slicer_PYTHON_VERSION_DOT
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   string(REGEX REPLACE "[.]" "" Slicer_PYTHON_VERSION ${Slicer_PYTHON_VERSION_DOT})
-  message(STATUS "Configuring ${SlicerApp_APPLICATION_NAME} with python ${Slicer_PYTHON_VERSION_DOT}")
+  message(STATUS "Configuring ${Slicer_MAIN_PROJECT_APPLICATION_NAME} with python ${Slicer_PYTHON_VERSION_DOT}")
 
   set(CTK_COMPILE_PYTHON_SCRIPTS_GLOBAL_TARGET_NAME "Slicer")
 endif()
@@ -850,14 +826,6 @@ endif()
 # PythonQt
 #-----------------------------------------------------------------------------
 if(Slicer_USE_PYTHONQT)
-  if(NOT VTK_WRAP_PYTHON)
-    message(FATAL_ERROR "Since Slicer_USE_PYTHONQT is ON, VTK_WRAP_PYTHON is expected to be ON. "
-                        "Re-configure VTK with python wrapping.")
-  endif()
-
-  include(vtkMacroKitPythonWrap)
-
-  set(PYTHONQT_INSTALL_DIR ${CTK_PYTHONQT_INSTALL_DIR})
   # Find PythonQt package so that PYTHONQT_USE_RELEASE_PYTHON_FALLBACK is defined
   # See https://github.com/commontk/PythonQt/issues/7
   # and https://github.com/commontk/PythonQt/issues/8
@@ -873,35 +841,11 @@ endif()
 #-----------------------------------------------------------------------------
 # Teem
 #-----------------------------------------------------------------------------
+# XXX Waiting teem provide a correct TeemConfig.cmake exporting targets, this is needed
+#     to ensure the link_directories for teem is defined and avoid error like:
+#     warning: libteem.so.1, needed by ../../../../bin/libvtkTeem.so, may conflict with libteem.so.2
 find_package(Teem REQUIRED)
 include(${Teem_USE_FILE})
-
-#-----------------------------------------------------------------------------
-# SlicerLibCurl
-#-----------------------------------------------------------------------------
-find_package(CURL REQUIRED)
-include_directories(${CURL_INCLUDE_DIRS})
-
-#-----------------------------------------------------------------------------
-# LibArchive
-#-----------------------------------------------------------------------------
-find_package(LibArchive REQUIRED MODULE)
-
-#-----------------------------------------------------------------------------
-# BatchMake
-#-----------------------------------------------------------------------------
-if(Slicer_USE_BatchMake)
-  find_package(BatchMake REQUIRED)
-  include(${BatchMake_USE_FILE})
-endif()
-
-#-----------------------------------------------------------------------------
-# OpenIGTLink
-#-----------------------------------------------------------------------------
-if(Slicer_USE_OpenIGTLink)
-  find_package(OpenIGTLink REQUIRED)
-  include(${OpenIGTLink_USE_FILE})
-endif()
 
 #-----------------------------------------------------------------------------
 # SlicerExecutionModel settings
@@ -913,6 +857,7 @@ set(SlicerExecutionModel_EXTRA_EXECUTABLE_TARGET_LIBRARIES "" CACHE INTERNAL "Sl
 # Set Slicer buildin libraries *_DIR variables
 #-----------------------------------------------------------------------------
 set(GenerateLM_DIR ${Slicer_BINARY_DIR}/Libs/GenerateLM)
+set(vtkAddon_DIR ${Slicer_BINARY_DIR}/Libs/vtkAddon)
 set(vtkITK_DIR ${Slicer_BINARY_DIR}/Libs/vtkITK)
 
 #-----------------------------------------------------------------------------
@@ -1007,6 +952,9 @@ include_directories(
 add_subdirectory(Libs)
 add_subdirectory(Base)
 add_subdirectory(Resources)
+add_subdirectory(Utilities/Scripts)
+add_subdirectory(Utilities/Scripts/SlicerWizard)
+add_subdirectory(Utilities/Templates)
 
 #-----------------------------------------------------------------------------
 # Macro useful to build ModuleLogic, ModuleMRML and ModuleWidgets libraries
@@ -1055,8 +1003,11 @@ set(Slicer_EXTENSION_CPACK ${Slicer_SOURCE_DIR}/CMake/SlicerExtensionCPack.cmake
 # --------------------------------------------------------------------------
 # Bundle extension(s)
 # --------------------------------------------------------------------------
+
+set(extensions_build_dir "${Slicer_BINARY_DIR}/E")
+
 # Configure SlicerConfig for bundled extension(s) or module(s)
-set(Slicer_DIR "${Slicer_BINARY_DIR}/Extensions")
+set(Slicer_DIR ${extensions_build_dir})
 configure_file(
   ${Slicer_SOURCE_DIR}/CMake/SlicerConfig.cmake.in
   ${Slicer_DIR}/SlicerConfig.cmake @ONLY)
@@ -1066,9 +1017,19 @@ message(STATUS "Configuring remote modules")
 message(STATUS "--------------------------------------------------")
 add_subdirectory(Modules/Remote)
 
-# List of extension source directories can be passed at configuration time
-# using the following syntax:
+# Add remote extension source directories.
+#
+# Directories can be set in two ways:
+#
+# (1) Automatically by specifying the label 'REMOTE_EXTENSION' when
+#     calling 'Slicer_Remote_Add' from SuperBuild.cmake.
+#
+# (2) Expicitly by configuring the project using the following syntax:
 #  cmake -DSlicer_EXTENSION_SOURCE_DIRS:STRING=/path/to/ExtensionA;/path/to/ExtensionB /path/to/source/Slicer
+#
+foreach(varname ${Slicer_EP_LABEL_REMOTE_EXTENSION})
+  list(APPEND Slicer_EXTENSION_SOURCE_DIRS ${${varname}})
+endforeach()
 foreach(extension_source_dir ${Slicer_EXTENSION_SOURCE_DIRS})
   get_filename_component(extension_source_dir ${extension_source_dir} REALPATH)
   get_filename_component(extension_source_dirname ${extension_source_dir} NAME_WE)
@@ -1076,7 +1037,7 @@ foreach(extension_source_dir ${Slicer_EXTENSION_SOURCE_DIRS})
   message(STATUS "Configuring extension: ${extension_source_dirname}")
   set(ExternalData_SOURCE_ROOT ${extension_source_dir})
   set(${extension_source_dirname}_SOURCE_DIR ${extension_source_dir})
-  set(${extension_source_dirname}_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/Extensions/${extension_source_dirname})
+  set(${extension_source_dirname}_BINARY_DIR ${extensions_build_dir}/${extension_source_dirname})
   add_subdirectory(
     ${${extension_source_dirname}_SOURCE_DIR}
     ${${extension_source_dirname}_BINARY_DIR}
@@ -1134,7 +1095,16 @@ endif()
 # Documentation
 #-----------------------------------------------------------------------------
 
+# Automatically generate documentation at build time
+set(all_arg)
+if(DOCUMENTATION_TARGET_IN_ALL)
+  set(all_arg "ALL")
+endif()
+add_custom_target(doc ${all_arg})
+add_custom_target(doc-tarballs ${all_arg})
+
 add_subdirectory(Utilities/Doxygen)
+add_subdirectory(Utilities/Scripts/SlicerWizard/doc)
 
 if(NOT Slicer_INSTALL_NO_DEVELOPMENT)
   file(GLOB cmake_files "${CMAKE_CURRENT_SOURCE_DIR}/CMake/*.cmake")
@@ -1160,7 +1130,11 @@ ExternalData_Add_Target(${Slicer_ExternalData_DATA_MANAGEMENT_TARGET})
 #-----------------------------------------------------------------------------
 # Create targets CopySlicerPython{Resource, Script}Files, CompileSlicerPythonFiles
 if(Slicer_USE_PYTHONQT)
-  ctkFunctionAddCompilePythonScriptTargets(${CTK_COMPILE_PYTHON_SCRIPTS_GLOBAL_TARGET_NAME})
+  slicerFunctionAddPythonQtResourcesTargets(SlicerPythonResources)
+  ctkFunctionAddCompilePythonScriptTargets(
+    ${CTK_COMPILE_PYTHON_SCRIPTS_GLOBAL_TARGET_NAME}
+    DEPENDS SlicerPythonResources
+    )
 endif()
 
 #-----------------------------------------------------------------------------
@@ -1168,4 +1142,3 @@ endif()
 # the end of the whole configuration process, as a "last step".
 # This directory is typically the last add_subdirectory in the main CMakeLists.txt.
 add_subdirectory(CMake/LastConfigureStep)
-

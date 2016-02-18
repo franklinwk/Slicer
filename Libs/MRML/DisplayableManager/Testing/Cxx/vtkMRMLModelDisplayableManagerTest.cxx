@@ -95,7 +95,8 @@ int vtkMRMLModelDisplayableManagerTest(int argc, char* argv[])
   vtkNew<vtkSphereSource> sphereSource;
   sphereSource->SetRadius(10.);
   sphereSource->Update();
-  modelNode->SetAndObservePolyData(sphereSource->GetOutput());
+  modelNode->SetPolyDataConnection(sphereSource->GetOutputPort());
+
   scene->AddNode(modelNode.GetPointer());
 
   vtkNew<vtkMRMLModelDisplayNode> modelDisplayNode;
@@ -159,7 +160,7 @@ int vtkMRMLModelDisplayableManagerTest(int argc, char* argv[])
     screenshootFilename += "/Baseline/vtkMRMLCameraDisplayableManagerTest1.png";
     vtkNew<vtkPNGWriter> writer;
     writer->SetFileName(screenshootFilename.c_str());
-    writer->SetInput(windowToImageFilter->GetOutput());
+    writer->SetInputConnection(windowToImageFilter->GetOutputPort());
     writer->Write();
     std::cout << "Saved screenshot: " << screenshootFilename << std::endl;
     }

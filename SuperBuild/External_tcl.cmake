@@ -30,67 +30,150 @@ if(NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
   set(tcl_base ${CMAKE_CURRENT_BINARY_DIR}/tcl)
   set(tcl_build ${CMAKE_CURRENT_BINARY_DIR}/tcl-build)
 
-  set(TCL_TK_VERSION_DOT "8.4")
-  set(TCL_TK_VERSION "84")
+  set(tcl_DOWNLOAD_COMMAND)
+  set(tcl_PATCH_COMMAND)
 
   if(WIN32)
+    set(TCL_TK_VERSION_DOT "8.5")
+    set(TCL_TK_VERSION "85")
+    set(INCR_TCL_VERSION_DOT "3.4")
+    set(INCR_TCL_VERSION "34")
     if("${CMAKE_SIZEOF_VOID_P}" EQUAL 8)
-      set(TCL_TK_VERSION_DOT "8.5")
-      set(TCL_TK_VERSION "85")
-      set(INCR_TCL_VERSION_DOT "3.4")
-      set(INCR_TCL_VERSION "34")
-      set(tcl_SVN_REPOSITORY "http://svn.slicer.org/Slicer3-lib-mirrors/trunk/Binaries/Windows/tcl85-x64-build")
-      set(tcl_SVN_REVISION -r "184")
+      set(tcl_URL "http://slicer.kitware.com/midas3/download/item/159433/tcl85-x64-build.zip")
+      set(tcl_MD5 "10f0a12590acaaef924dc22e80c9d70a")
     else()
-      set(INCR_TCL_VERSION_DOT "3.2")
-      set(INCR_TCL_VERSION "32")
-      set(tcl_SVN_REPOSITORY "http://svn.slicer.org/Slicer3-lib-mirrors/trunk/Binaries/Windows/tcl-build")
-      set(tcl_SVN_REVISION -r "176")
+      set(tcl_URL "http://slicer.kitware.com/midas3/download/item/159432/tcl85-build.zip")
+      set(tcl_MD5 "07401cf7128a9a79403c8d9b745024a6")
     endif()
+    set(tcl_DOWNLOAD_COMMAND
+      URL ${tcl_URL}
+      URL_MD5 ${tcl_MD5}
+      )
     set(tcl_SOURCE_DIR tcl-build)
     mark_as_superbuild(
       INCR_TCL_VERSION_DOT:STRING
       INCR_TCL_VERSION:STRING
       )
+
+    #-----------------------------------------------------------------------------
+    # Launcher setting specific to build tree
+
+    # library paths
+    set(${proj}_incrTcl_LIBRARY_PATHS_LAUNCHER_BUILD
+      ${tcl_build}/lib/itcl${INCR_TCL_VERSION_DOT}
+      ${tcl_build}/lib/itk${INCR_TCL_VERSION_DOT}
+      )
+    mark_as_superbuild(
+      VARS ${proj}_incrTcl_LIBRARY_PATHS_LAUNCHER_BUILD
+      LABELS "LIBRARY_PATHS_LAUNCHER_BUILD"
+      )
+
+    # Note: Search locations for TCL packages - space separated list
+    set(TCLLIBPATH "${tcl_build}/lib/itcl${INCR_TCL_VERSION_DOT}")
+    set(TCLLIBPATH "${TCLLIBPATH} ${tcl_build}/lib/itk${INCR_TCL_VERSION_DOT}")
+
+    # environment variables
+    set(${proj}_incrTcl_ENVVARS_LAUNCHER_BUILD "TCLLIBPATH=${TCLLIBPATH}")
+    mark_as_superbuild(
+      VARS ${proj}_incrTcl_ENVVARS_LAUNCHER_BUILD
+      LABELS "ENVVARS_LAUNCHER_BUILD"
+      )
+
+    #-----------------------------------------------------------------------------
+    # Launcher setting specific to install tree
+
+    # library paths
+    set(${proj}_incrTcl_LIBRARY_PATHS_LAUNCHER_INSTALLED
+      <APPLAUNCHER_DIR>/lib/TclTk/lib/itcl${INCR_TCL_VERSION_DOT}
+      <APPLAUNCHER_DIR>/lib/TclTk/lib/itk${INCR_TCL_VERSION_DOT}
+      )
+    mark_as_superbuild(
+      VARS ${proj}_incrTcl_LIBRARY_PATHS_LAUNCHER_INSTALLED
+      LABELS "LIBRARY_PATHS_LAUNCHER_INSTALLED"
+      )
+
+    # Note: Search locations for TCL packages - space separated list
+    set(TCLLIBPATH "<APPLAUNCHER_DIR>/lib/TclTk/lib/itcl${INCR_TCL_VERSION_DOT}")
+    set(TCLLIBPATH "${TCLLIBPATH} <APPLAUNCHER_DIR>/lib/TclTk/lib/itk${INCR_TCL_VERSION_DOT}")
+
+    # environment variables
+    set(${proj}_incrTcl_ENVVARS_LAUNCHER_INSTALLED "TCLLIBPATH=${TCLLIBPATH}")
+    mark_as_superbuild(
+      VARS ${proj}_incrTcl_ENVVARS_LAUNCHER_INSTALLED
+      LABELS "ENVVARS_LAUNCHER_INSTALLED"
+      )
+
   else()
-    set(tcl_SVN_REPOSITORY "http://svn.slicer.org/Slicer3-lib-mirrors/trunk/tcl/tcl")
-    set(tcl_SVN_REVISION -r "81")
+    set(TCL_TK_VERSION_DOT "8.6")
+    set(TCL_TK_VERSION "86")
     set(tcl_SOURCE_DIR tcl/tcl)
     set(tcl_BUILD_IN_SOURCE 1)
 
-    # configure, make and make install all need to be executed in tcl/unix. External_Project
-    # doesn't provide any way to set the working directory for each step so we do so by
-    # configuring a script that has an execute_process command that has the correct working
-    # directory
-    configure_file(
-      SuperBuild/tcl_configure_step.cmake.in
-      ${CMAKE_CURRENT_BINARY_DIR}/tcl_configure_step.cmake
-      @ONLY)
+    set(tcl_DOWNLOAD_COMMAND
+      URL "http://slicer.kitware.com/midas3/download/item/155630/tcl8.6.1-src.tar.gz"
+      URL_MD5 "aae4b701ee527c6e4e1a6f9c7399882e"
+      )
 
-    set(tcl_CONFIGURE_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/tcl_configure_step.cmake)
+    include(ExternalProjectForNonCMakeProject)
 
-    configure_file(
-      SuperBuild/tcl_make_step.cmake.in
-      ${CMAKE_CURRENT_BINARY_DIR}/tcl_make_step.cmake
-      @ONLY)
+    # patch: Since (1) a more recent version of itcl is provided by External_incrTcl
+    #        and (2) packages bundled with tcl are not used, the patch command
+    #        simply remove the 'pkgs' folder.
+    set(tcl_PATCH_COMMAND
+      PATCH_COMMAND ${CMAKE_COMMAND} -E remove_directory ${tcl_base}/tcl/pkgs
+      )
 
-    set(tcl_BUILD_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/tcl_make_step.cmake)
+    # environment
+    set(_env_script ${CMAKE_BINARY_DIR}/${proj}_Env.cmake)
+    ExternalProject_Write_SetBuildEnv_Commands(${_env_script})
 
-    configure_file(
-      SuperBuild/tcl_install_step.cmake.in
-      ${CMAKE_CURRENT_BINARY_DIR}/tcl_install_step.cmake
-      @ONLY)
+    set(_configure_cflags)
+    #
+    # To fix compilation problem: relocation R_X86_64_32 against `a local symbol' can not be
+    # used when making a shared object; recompile with -fPIC
+    # See http://www.cmake.org/pipermail/cmake/2007-May/014350.html
+    #
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8) # 64-bit
+      set(_configure_cflags "-fPIC")
+    endif()
 
-    set(tcl_INSTALL_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/tcl_install_step.cmake)
+    # configure step
+    set(_configure_script ${CMAKE_BINARY_DIR}/${proj}_configure_step.cmake)
+    file(WRITE ${_configure_script}
+"include(\"${_env_script}\")
+set(${proj}_WORKING_DIR \"${tcl_base}/tcl/unix\")
+ExternalProject_Execute(${proj} \"configure\" sh configure
+  --prefix=${tcl_build} --with-cflags=${_configure_cflags}
+  )
+")
+    set(tcl_CONFIGURE_COMMAND ${CMAKE_COMMAND} -P ${_configure_script})
+
+    # build step
+    set(_build_script ${CMAKE_BINARY_DIR}/${proj}_build_step.cmake)
+    file(WRITE ${_build_script}
+"include(\"${_env_script}\")
+set(${proj}_WORKING_DIR \"${tcl_base}/tcl/unix\")
+ExternalProject_Execute(${proj} \"build\" make)
+")
+    set(tcl_BUILD_COMMAND ${CMAKE_COMMAND} -P ${_build_script})
+
+    # install step
+    set(_install_script ${CMAKE_BINARY_DIR}/${proj}_install_step.cmake)
+    file(WRITE ${_install_script}
+"include(\"${_env_script}\")
+set(${proj}_WORKING_DIR \"${tcl_base}/tcl/unix\")
+ExternalProject_Execute(${proj} \"install\" make install)
+")
+    set(tcl_INSTALL_COMMAND ${CMAKE_COMMAND} -P ${_install_script})
   endif()
 
   ExternalProject_Add(${proj}
     ${${proj}_EP_ARGS}
-    SVN_REPOSITORY ${tcl_SVN_REPOSITORY}
-    SVN_REVISION ${tcl_SVN_REVISION}
+    ${tcl_DOWNLOAD_COMMAND}
     UPDATE_COMMAND "" # Disable update
     SOURCE_DIR ${tcl_SOURCE_DIR}
     BUILD_IN_SOURCE ${tcl_BUILD_IN_SOURCE}
+    ${tcl_PATCH_COMMAND}
     CONFIGURE_COMMAND ${tcl_CONFIGURE_COMMAND}
     BUILD_COMMAND ${tcl_BUILD_COMMAND}
     INSTALL_COMMAND ${tcl_INSTALL_COMMAND}
@@ -111,12 +194,89 @@ if(NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
   if(WIN32)
     set(TCL_LIBRARY ${tcl_build}/lib/tcl${TCL_TK_VERSION}.lib)
     set(TK_LIBRARY ${tcl_build}/lib/tk${TCL_TK_VERSION}.lib)
+    set(${proj}_LIBRARY_PATHS_LAUNCHER_BUILD ${tcl_build}/bin)
   else()
     set(TCL_LIBRARY ${tcl_build}/lib/libtcl${TCL_TK_VERSION_DOT}${CMAKE_SHARED_LIBRARY_SUFFIX})
     set(TK_LIBRARY ${tcl_build}/lib/libtk${TCL_TK_VERSION_DOT}${CMAKE_SHARED_LIBRARY_SUFFIX})
+    set(${proj}_LIBRARY_PATHS_LAUNCHER_BUILD ${tcl_build}/lib)
   endif()
 
   set(Slicer_TCL_DIR ${tcl_build})
+
+  #-----------------------------------------------------------------------------
+  # Launcher setting specific to build tree
+
+  # library paths
+  mark_as_superbuild(
+    VARS ${proj}_LIBRARY_PATHS_LAUNCHER_BUILD
+    LABELS "LIBRARY_PATHS_LAUNCHER_BUILD"
+    )
+
+  # paths
+  set(${proj}_PATHS_LAUNCHER_BUILD ${tcl_build}/bin)
+  mark_as_superbuild(
+    VARS ${proj}_PATHS_LAUNCHER_BUILD
+    LABELS "PATHS_LAUNCHER_BUILD"
+    )
+
+  set(_pythonhome ${CMAKE_BINARY_DIR}/python-install)
+  set(pythonpath_subdir lib/python2.7)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(pythonpath_subdir Lib)
+  endif()
+
+  # pythonpath
+  set(${proj}_PYTHONPATH_LAUNCHER_BUILD
+    ${_pythonhome}/${pythonpath_subdir}/lib-tk
+    )
+  mark_as_superbuild(
+    VARS ${proj}_PYTHONPATH_LAUNCHER_BUILD
+    LABELS "PYTHONPATH_LAUNCHER_BUILD"
+    )
+
+  # environment variables
+  set(${proj}_ENVVARS_LAUNCHER_BUILD
+    "TCL_LIBRARY=${tcl_build}/lib/tcl${TCL_TK_VERSION_DOT}"
+    "TK_LIBRARY=${tcl_build}/lib/tk${TCL_TK_VERSION_DOT}"
+    )
+  mark_as_superbuild(
+    VARS ${proj}_ENVVARS_LAUNCHER_BUILD
+    LABELS "ENVVARS_LAUNCHER_BUILD"
+    )
+
+  #-----------------------------------------------------------------------------
+  # Launcher setting specific to install tree
+
+  set(tcllib_subdir lib)
+  if(WIN32)
+    set(tcllib_subdir bin)
+  endif()
+
+  # library paths
+  set(${proj}_LIBRARY_PATHS_LAUNCHER_INSTALLED <APPLAUNCHER_DIR>/lib/TclTk/${tcllib_subdir})
+  mark_as_superbuild(
+    VARS ${proj}_LIBRARY_PATHS_LAUNCHER_INSTALLED
+    LABELS "LIBRARY_PATHS_LAUNCHER_INSTALLED"
+    )
+
+  # pythonpath
+  set(${proj}_PYTHONPATH_LAUNCHER_INSTALLED
+    <APPLAUNCHER_DIR>/lib/Python/${pythonpath_subdir}/lib-tk
+    )
+  mark_as_superbuild(
+    VARS ${proj}_PYTHONPATH_LAUNCHER_INSTALLED
+    LABELS "PYTHONPATH_LAUNCHER_INSTALLED"
+    )
+
+  # environment variables
+  set(${proj}_ENVVARS_LAUNCHER_INSTALLED
+    "TCL_LIBRARY=<APPLAUNCHER_DIR>/lib/TclTk/lib/tcl${TCL_TK_VERSION_DOT}"
+    "TK_LIBRARY=<APPLAUNCHER_DIR>/lib/TclTk/lib/tk${TCL_TK_VERSION_DOT}"
+    )
+  mark_as_superbuild(
+    VARS ${proj}_ENVVARS_LAUNCHER_INSTALLED
+    LABELS "ENVVARS_LAUNCHER_INSTALLED"
+    )
 
 else()
   ExternalProject_Add_Empty(${proj} DEPENDS ${${proj}_DEPENDENCIES})

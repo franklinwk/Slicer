@@ -23,7 +23,7 @@
 
 /// \brief Extracts points whose scalar value satisfies threshold criterion.
 ///
-/// vtkPolyDataTensorToColor is a filter that extracts points from a dataset that 
+/// vtkPolyDataTensorToColor is a filter that extracts points from a dataset that
 /// satisfy a threshold criterion. The criterion can take three forms:
 /// 1) greater than a particular value; 2) less than a particular value; or
 /// 3) between a particular value. The output of the filter is polygonal data.
@@ -33,7 +33,7 @@ class VTK_Teem_EXPORT vtkPolyDataTensorToColor : public vtkPolyDataAlgorithm
 {
 public:
   static vtkPolyDataTensorToColor *New();
-  vtkTypeRevisionMacro(vtkPolyDataTensorToColor,vtkPolyDataAlgorithm);
+  vtkTypeMacro(vtkPolyDataTensorToColor,vtkPolyDataAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   vtkSetClampMacro(ColorMode, int, vtkTensorGlyph::COLOR_BY_SCALARS, vtkTensorGlyph::COLOR_BY_EIGENVALUES);
@@ -41,28 +41,29 @@ public:
   void SetColorModeToScalars()
     {this->SetColorMode(vtkTensorGlyph::COLOR_BY_SCALARS);};
   void SetColorModeToEigenvalues()
-    {this->SetColorMode(vtkTensorGlyph::COLOR_BY_EIGENVALUES);}; 
-    
-  /// 
+    {this->SetColorMode(vtkTensorGlyph::COLOR_BY_EIGENVALUES);};
+
+  ///
   /// Turn on/off extraction of eigenvalues from tensor.
   vtkSetMacro(ExtractEigenvalues,int);
   vtkBooleanMacro(ExtractEigenvalues,int);
   vtkGetMacro(ExtractEigenvalues,int);
 
-  /// 
+  ///
   /// Turn on/off extraction of scalars for color.
   vtkSetMacro(ExtractScalar,int);
   vtkBooleanMacro(ExtractScalar,int);
   vtkGetMacro(ExtractScalar,int);
 
-    
   /// TO DO: make more of these
 
-  /// 
+  ///
   /// Output one component scalars according to scalar invariants
   void ColorGlyphsByLinearMeasure();
   void ColorGlyphsBySphericalMeasure();
   void ColorGlyphsByPlanarMeasure();
+  void ColorGlyphsByParallelDiffusivity();
+  void ColorGlyphsByPerpendicularDiffusivity();
   void ColorGlyphsByMaxEigenvalue();
   void ColorGlyphsByMidEigenvalue();
   void ColorGlyphsByMinEigenvalue();
@@ -70,7 +71,6 @@ public:
   void ColorGlyphsByFractionalAnisotropy();
   void ColorGlyphsByTrace();
   void ColorGlyphsByOrientation();
-
 
 protected:
   vtkPolyDataTensorToColor();
@@ -84,7 +84,7 @@ protected:
   void ColorGlyphsBy(int measure);
   int ColorMode; /// The coloring mode to use for the glyphs.
   int ExtractEigenvalues; /// Boolean controls eigenfunction extraction
-  
+
   int ExtractScalar;
 
   int ScalarInvariant;  /// which function of eigenvalues to use for coloring

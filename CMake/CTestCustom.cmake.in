@@ -39,16 +39,6 @@ set(CTEST_CUSTOM_MEMCHECK_IGNORE
 
   )
 
-set(CTEST_CUSTOM_ERROR_MATCH
-  ${CTEST_CUSTOM_ERROR_MATCH}
-  "CMake Error[ :]"
-  )
-
-set(CTEST_CUSTOM_WARNING_MATCH
-  ${CTEST_CUSTOM_WARNING_MATCH}
-  "CMake Warning[ :]"
-  )
-
 set(CTEST_CUSTOM_MAXIMUM_NUMBER_OF_ERRORS   1000)
 set(CTEST_CUSTOM_MAXIMUM_NUMBER_OF_WARNINGS 1000)
 
@@ -130,13 +120,6 @@ set(CTEST_CUSTOM_WARNING_EXCEPTION
   "[Uu]tilities.gdcm"
   "[Uu]tilities.vxl"
   "[Uu]tilities.itktiff"
-  "([Ii]nsight|ITKv3).[Cc]ode.[Cc]ommon"
-  "([Ii]nsight|ITKv3).[Cc]ode.[Nn]umerics"
-  "([Ii]nsight|ITKv3).[Cc]ode.(IO|io)"
-  "([Ii]nsight|ITKv3).[Cc]ode.[Ss]patial[Oo]bject"
-  "([Ii]nsight|ITKv3).[Uu]tilities.[Nn]rrd(IO|io)"
-  "([Ii]nsight|ITKv3).[Uu]tilities.(openjpeg|nifti)"
-  "([Ii]nsight|ITKv3|BRAINSFit).*Informational: catch(...) semantics changed since Visual C\\+\\+ 7.1; structured exceptions (SEH) are no longer caught"
 
   # VTK suppressions
   "vtkfreetype"
@@ -163,9 +146,6 @@ set(CTEST_CUSTOM_WARNING_EXCEPTION
 
   # Libs/OpenIGTLink
   "(OpenIGTLink|openigtlink).[Ss]ource.igtl"
-
-  # Batchmake
-  "BatchMake.Utilities.Zip.(zip|unzipcmd|zipcmd).*warning"
 
   # Libs/tclap
   "tclap.include.tclap.*Arg.h.*warning C4512"

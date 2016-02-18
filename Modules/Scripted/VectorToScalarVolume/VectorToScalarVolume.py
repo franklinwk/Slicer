@@ -1,43 +1,36 @@
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
+
+from slicer.ScriptedLoadableModule import *
 
 #
 # VectorToScalarVolume
 #
 
-class VectorToScalarVolume:
+class VectorToScalarVolume(ScriptedLoadableModule):
   def __init__(self, parent):
-    parent.title = "Vector to Scalar Volume"
-    parent.categories = ["Converters"]
-    parent.dependencies = []
-    parent.contributors = ["Steve Pieper (Isomics)",]
-    parent.helpText = """
+    ScriptedLoadableModule.__init__(self, parent)
+    self.parent.title = "Vector to Scalar Volume"
+    self.parent.categories = ["Converters"]
+    self.parent.dependencies = []
+    self.parent.contributors = ["Steve Pieper (Isomics)",]
+    self.parent.helpText = """
     Make a scalar (1 component) volume from a vector volume
     """
-    parent.acknowledgementText = """
-Developed by Steve Pieper, Isomics, Inc., 
-partially funded by NIH grant 3P41RR013218-12S1 (NAC) and is part of the National Alliance 
-for Medical Image Computing (NA-MIC), funded by the National Institutes of Health through the 
+    self.parent.acknowledgementText = """
+Developed by Steve Pieper, Isomics, Inc.,
+partially funded by NIH grant 3P41RR013218-12S1 (NAC) and is part of the National Alliance
+for Medical Image Computing (NA-MIC), funded by the National Institutes of Health through the
 NIH Roadmap for Medical Research, Grant U54 EB005149."""
-    self.parent = parent
 
 #
 # VectorToScalarVolumeWidget
 #
 
-class VectorToScalarVolumeWidget:
-  def __init__(self, parent = None):
-    if not parent:
-      self.parent = slicer.qMRMLWidget()
-      self.parent.setLayout(qt.QVBoxLayout())
-      self.parent.setMRMLScene(slicer.mrmlScene)
-    else:
-      self.parent = parent
-    self.layout = self.parent.layout()
-    if not parent:
-      self.setup()
-      self.parent.show()
+class VectorToScalarVolumeWidget(ScriptedLoadableModuleWidget):
 
   def setup(self):
+    ScriptedLoadableModuleWidget.setup(self)
+
     # Collapsible button
     self.selectionCollapsibleButton = ctk.ctkCollapsibleButton()
     self.selectionCollapsibleButton.text = "Selection"
@@ -55,7 +48,7 @@ class VectorToScalarVolumeWidget:
     self.inputSelector = qt.QLabel("Input Vector Volume: ", self.inputFrame)
     self.inputFrame.layout().addWidget(self.inputSelector)
     self.inputSelector = slicer.qMRMLNodeComboBox(self.inputFrame)
-    self.inputSelector.nodeTypes = ( ("vtkMRMLVectorVolumeNode"), "" )
+    self.inputSelector.nodeTypes = ["vtkMRMLVectorVolumeNode"]
     self.inputSelector.addEnabled = False
     self.inputSelector.removeEnabled = False
     self.inputSelector.setMRMLScene( slicer.mrmlScene )
@@ -67,7 +60,7 @@ class VectorToScalarVolumeWidget:
     self.outputSelector = qt.QLabel("Output Scalar Volume: ", self.outputFrame)
     self.outputFrame.layout().addWidget(self.outputSelector)
     self.outputSelector = slicer.qMRMLNodeComboBox(self.outputFrame)
-    self.outputSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
+    self.outputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
     self.outputSelector.setMRMLScene( slicer.mrmlScene )
     self.outputSelector.addEnabled = True
     self.outputSelector.renameEnabled = True
@@ -88,30 +81,26 @@ class VectorToScalarVolumeWidget:
     outputVolume = self.outputSelector.currentNode()
     # check for input data
     if not (inputVolume and outputVolume):
-      qt.QMessageBox.critical(
-          slicer.util.mainWindow(),
-          'Luminance', 'Input and output volumes are required for conversion')
+      slicer.util.errorDisplay('Input and output volumes are required for conversion', windowTitle='Luminance')
       return
     # check that data has enough components
     inputImage = inputVolume.GetImageData()
     if not inputImage or inputImage.GetNumberOfScalarComponents() < 3:
-      qt.QMessageBox.critical(
-          slicer.util.mainWindow(),
-          'Vector to Scalar Volume', 'Input does not have enough components for conversion')
+      slicer.util.errorDisplay('Input does not have enough components for conversion',
+                               windowTitle='Vector to Scalar Volume')
       return
     # run the filter
-    # - extract the RGB portions 
+    # - extract the RGB portions
     extract = vtk.vtkImageExtractComponents()
     extract.SetComponents(0,1,2)
-    extract.SetInput(inputVolume.GetImageData())
     luminance = vtk.vtkImageLuminance()
-    luminance.SetInput(extract.GetOutput())
-    luminance.GetOutput().Update()
+    extract.SetInputConnection(inputVolume.GetImageDataConnection())
+    luminance.SetInputConnection(extract.GetOutputPort())
+    luminance.Update()
     ijkToRAS = vtk.vtkMatrix4x4()
     inputVolume.GetIJKToRASMatrix(ijkToRAS)
     outputVolume.SetIJKToRASMatrix(ijkToRAS)
-    outputVolume.SetAndObserveImageData(luminance.GetOutput())
-
+    outputVolume.SetImageDataConnection(luminance.GetOutputPort())
     # make the output volume appear in all the slice views
     selectionNode = slicer.app.applicationLogic().GetSelectionNode()
     selectionNode.SetReferenceActiveVolumeID(outputVolume.GetID())

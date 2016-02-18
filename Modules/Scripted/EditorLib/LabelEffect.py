@@ -1,24 +1,29 @@
 import os
-from __main__ import vtk
-from __main__ import qt
-from __main__ import ctk
-from __main__ import slicer
-from EditOptions import EditOptions
-import EditUtil
+import vtk
+import qt
+import ctk
+import slicer
+from EditUtil import EditUtil
 import Effect
 
+__all__ = [
+  'LabelEffectOptions',
+  'LabelEffectTool',
+  'LabelEffectLogic',
+  'LabelEffect'
+  ]
 
 #########################################################
 #
-# 
+#
 comment = """
 
-  LabelEffect is a subclass of Effect (for tools that plug into the 
-  slicer Editor module) and a superclass for tools edit the 
+  LabelEffect is a subclass of Effect (for tools that plug into the
+  slicer Editor module) and a superclass for tools edit the
   currently selected label map (i.e. for things like paint or
   draw, but not for things like make model or next fiducial).
 
-# TODO : 
+# TODO :
 """
 #
 #########################################################
@@ -113,13 +118,13 @@ class LabelEffectOptions(Effect.EffectOptions):
         return
     super(LabelEffectOptions,self).updateGUIFromMRML(caller,event)
     self.disconnectWidgets()
-    self.paintOver.setChecked( 
+    self.paintOver.setChecked(
                 int(self.parameterNode.GetParameter("LabelEffect,paintOver")) )
-    self.thresholdPaint.setChecked( 
+    self.thresholdPaint.setChecked(
                 int(self.parameterNode.GetParameter("LabelEffect,paintThreshold")) )
-    self.threshold.setMinimumValue( 
+    self.threshold.setMinimumValue(
                 float(self.parameterNode.GetParameter("LabelEffect,paintThresholdMin")) )
-    self.threshold.setMaximumValue( 
+    self.threshold.setMaximumValue(
                 float(self.parameterNode.GetParameter("LabelEffect,paintThresholdMax")) )
     self.thresholdLabel.setHidden( not self.thresholdPaint.checked )
     self.threshold.setHidden( not self.thresholdPaint.checked )
@@ -141,9 +146,9 @@ class LabelEffectOptions(Effect.EffectOptions):
       self.parameterNode.SetParameter( "LabelEffect,paintThreshold", "1" )
     else:
       self.parameterNode.SetParameter( "LabelEffect,paintThreshold", "0" )
-    self.parameterNode.SetParameter( 
+    self.parameterNode.SetParameter(
                 "LabelEffect,paintThresholdMin", str(self.threshold.minimumValue) )
-    self.parameterNode.SetParameter( 
+    self.parameterNode.SetParameter(
                 "LabelEffect,paintThresholdMax", str(self.threshold.maximumValue) )
     self.parameterNode.SetDisableModifiedEvent(disableState)
     if not disableState:
@@ -152,7 +157,7 @@ class LabelEffectOptions(Effect.EffectOptions):
 #
 # LabelEffectTool
 #
- 
+
 class LabelEffectTool(Effect.EffectTool):
   """
   One instance of this will be created per-view when the effect
@@ -175,7 +180,7 @@ class LabelEffectTool(Effect.EffectTool):
     super(LabelEffectTool,self).cleanup()
 
   def rotateSliceToImage(self):
-    """adjusts the slice node to align with the 
+    """adjusts the slice node to align with the
       native space of the image data so that paint
       operations can happen cleanly between image
       space and screen space"""
@@ -185,7 +190,7 @@ class LabelEffectTool(Effect.EffectTool):
     volumeNode = sliceLogic.GetBackgroundLayer().GetVolumeNode()
 
     sliceNode.RotateToVolumePlane(volumeNode)
-    # make sure the slice plane does not lie on an index boundary 
+    # make sure the slice plane does not lie on an index boundary
     # - (to avoid rounding issues)
     sliceLogic.SnapSliceOffsetToIJK()
     sliceNode.UpdateMatrices()
@@ -194,13 +199,13 @@ class LabelEffectTool(Effect.EffectTool):
 #
 # LabelEffectLogic
 #
- 
+
 class LabelEffectLogic(Effect.EffectLogic):
   """
   This class contains helper methods for a given effect
   type.  It can be instanced as needed by an LabelEffectTool
   or LabelEffectOptions instance in order to compute intermediate
-  results (say, for user feedback) or to implement the final 
+  results (say, for user feedback) or to implement the final
   segmentation editing operation.  This class is split
   from the LabelEffectTool so that the operations can be used
   by other code without the need for a view context.
@@ -228,7 +233,7 @@ class LabelEffectLogic(Effect.EffectLogic):
     - directions are the XYToRAS for this slice
     - origin is the lower left of the polygon bounds
     - TODO: need to account for the boundary pixels
-    
+
      Note: uses the slicer2-based vtkImageFillROI filter
     """
     labelLogic = self.sliceLogic.GetLabelLayer()
@@ -247,14 +252,14 @@ class LabelEffectLogic(Effect.EffectLogic):
     maskIJKToRAS.SetElement( 2, 3, originRAS[2] )
 
     #
-    # get a good size for the draw buffer 
+    # get a good size for the draw buffer
     # - needs to include the full region of the polygon
-    # - plus a little extra 
+    # - plus a little extra
     #
     # round to int and add extra pixel for both sides
-    # -- TODO: figure out why we need to add buffer pixels on each 
+    # -- TODO: figure out why we need to add buffer pixels on each
     #    side for the width in order to end up with a single extra
-    #    pixel in the rasterized image map.  Probably has to 
+    #    pixel in the rasterized image map.  Probably has to
     #    do with how boundary conditions are handled in the filler
     w = int(xhi - xlo) + 32
     h = int(yhi - ylo) + 32
@@ -266,11 +271,10 @@ class LabelEffectLogic(Effect.EffectLogic):
     if not labelNode: return
     labelImage = labelNode.GetImageData()
     if not labelImage: return
-    imageData.SetScalarType(labelImage.GetScalarType()) 
-    imageData.AllocateScalars()
+    imageData.AllocateScalars(labelImage.GetScalarType(), 1)
 
     #
-    # move the points so the lower left corner of the 
+    # move the points so the lower left corner of the
     # bounding box is at 1, 1 (to avoid clipping)
     #
     translate = vtk.vtkTransform()
@@ -281,10 +285,10 @@ class LabelEffectLogic(Effect.EffectLogic):
     drawPoints.Modified()
 
     fill = slicer.vtkImageFillROI()
-    fill.SetInput(imageData)
+    fill.SetInputData(imageData)
     fill.SetValue(1)
     fill.SetPoints(drawPoints)
-    fill.GetOutput().Update()
+    fill.Update()
 
     mask = vtk.vtkImageData()
     mask.DeepCopy(fill.GetOutput())
@@ -312,7 +316,7 @@ class LabelEffectLogic(Effect.EffectLogic):
 
   def applyPolyMask(self,polyData):
     """
-    rasterize a polyData (closed list of points) 
+    rasterize a polyData (closed list of points)
     into the label map layer
     - points are specified in current XY space
     """
@@ -346,7 +350,7 @@ class LabelEffectLogic(Effect.EffectLogic):
     if not labelNode: return
     labelImage = labelNode.GetImageData()
     if not labelImage: return
-    
+
     #
     # at this point, the mask vtkImageData contains a rasterized
     # version of the polygon and now needs to be added to the label
@@ -367,11 +371,11 @@ class LabelEffectLogic(Effect.EffectLogic):
 
     xlo, xhi, ylo, yhi, zlo, zhi = bounds
     labelLogic = self.sliceLogic.GetLabelLayer()
-    xyToIJK = labelLogic.GetXYToIJKTransform().GetMatrix()
-    tlIJK = xyToIJK.MultiplyPoint( (xlo, yhi, 0, 1) )[:3]
-    trIJK = xyToIJK.MultiplyPoint( (xhi, yhi, 0, 1) )[:3]
-    blIJK = xyToIJK.MultiplyPoint( (xlo, ylo, 0, 1) )[:3]
-    brIJK = xyToIJK.MultiplyPoint( (xhi, ylo, 0, 1) )[:3]
+    xyToIJK = labelLogic.GetXYToIJKTransform()
+    tlIJK = xyToIJK.TransformDoublePoint( (xlo, yhi, 0) )
+    trIJK = xyToIJK.TransformDoublePoint( (xhi, yhi, 0) )
+    blIJK = xyToIJK.TransformDoublePoint( (xlo, ylo, 0) )
+    brIJK = xyToIJK.TransformDoublePoint( (xhi, ylo, 0) )
 
     # do the clamping of the four corners
     dims = labelImage.GetDimensions()
@@ -407,7 +411,7 @@ class LabelEffectLogic(Effect.EffectLogic):
     if not self.extractImage:
       self.extractImage = vtk.vtkImageData()
 
-    parameterNode = self.editUtil.getParameterNode()
+    parameterNode = EditUtil.getParameterNode()
     paintLabel = int(parameterNode.GetParameter("label"))
     paintOver = int(parameterNode.GetParameter("LabelEffect,paintOver"))
     paintThreshold = int(parameterNode.GetParameter("LabelEffect,paintThreshold"))
@@ -439,7 +443,7 @@ class LabelEffectLogic(Effect.EffectLogic):
 
     self.painter.Paint()
 
-    self.editUtil.markVolumeNodeAsModified(labelNode)
+    EditUtil.markVolumeNodeAsModified(labelNode)
 
   def sliceIJKPlane(self):
     """ Return a code indicating which plane of IJK
@@ -480,7 +484,7 @@ class LabelEffectLogic(Effect.EffectLogic):
 
 
 #
-# The LabelEffect class definition 
+# The LabelEffect class definition
 #
 
 class LabelEffect(Effect.Effect):

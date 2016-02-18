@@ -11,17 +11,16 @@ set(GENERATECLP_USE_MD5 ON)
 
 set(dirs )
 
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  list(APPEND dirs
-    ITKFactoryRegistration
-    )
-  set(SlicerExecutionModel_EXTRA_EXECUTABLE_TARGET_LIBRARIES
-    ${SlicerExecutionModel_EXTRA_EXECUTABLE_TARGET_LIBRARIES} ITKFactoryRegistration
-    CACHE INTERNAL "SlicerExecutionModel extra executable target libraries" FORCE
-    )
-endif()
+list(APPEND dirs
+  ITKFactoryRegistration
+  )
+set(SlicerExecutionModel_EXTRA_EXECUTABLE_TARGET_LIBRARIES
+  ${SlicerExecutionModel_EXTRA_EXECUTABLE_TARGET_LIBRARIES} ITKFactoryRegistration
+  CACHE INTERNAL "SlicerExecutionModel extra executable target libraries" FORCE
+  )
 
 list(APPEND dirs
+  vtkAddon
   vtkTeem
   vtkITK
   FreeSurfer
@@ -39,7 +38,6 @@ if(Slicer_BUILD_CLI_SUPPORT)
   list(APPEND dirs MRML/IDImageIO)
 endif()
 list(APPEND dirs
-  MGHImageIO
   MRML/Widgets
   )
 
@@ -56,10 +54,14 @@ if(Slicer_BUILD_CLI_SUPPORT)
 endif()
 
 # ITKFactories directories
-set(MGHImageIO_ITKFACTORIES_DIR ${Slicer_ITKFACTORIES_DIR})
-set(MGHImageIO_INSTALL_ITKFACTORIES_DIR ${Slicer_INSTALL_ITKFACTORIES_DIR})
 set(MRMLIDImageIO_ITKFACTORIES_DIR ${Slicer_ITKFACTORIES_DIR})
 set(MRMLIDImageIO_INSTALL_ITKFACTORIES_DIR ${Slicer_INSTALL_ITKFACTORIES_DIR})
+
+# Name of the environment variable that contains the application home directory.
+set(MRML_APPLICATION_HOME_DIR_ENV "SLICER_HOME")
+
+# Name of the subdirectory within the application directory where shared files are stored.
+set(MRML_APPLICATION_SHARE_SUBDIR ${Slicer_SHARE_DIR})
 
 # vtkITK contains tests that uses MRML's test data.
 set(MRML_TEST_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/MRML/Core/Testing/TestData)
@@ -78,6 +80,7 @@ foreach(dir ${dirs})
   set(${dir_noslash}_INSTALL_SHARE_DIR ${Slicer_INSTALL_ROOT}share/${dir_noslash})
   set(${dir_noslash}_INSTALL_NO_DEVELOPMENT ${Slicer_INSTALL_NO_DEVELOPMENT})
   set(${dir_noslash}_EXPORT_FILE ${Slicer_BINARY_DIR}/SlicerTargets.cmake)
+  set(${dir_noslash}_FOLDER Core-Libs/${dir_noslash})
   add_subdirectory(${dir})
 endforeach()
 
@@ -112,6 +115,7 @@ set(MRML_LIBRARIES ${_mrml_libraries} CACHE INTERNAL "MRML libraries" FORCE)
 # Set variable Slicer_Libs_VTK_WRAPPED_LIBRARIES
 #-----------------------------------------------------------------------------
 set(_vtk_wrapped_libraries
+  vtkAddon
   vtkTeem
   vtkITK
   FreeSurfer

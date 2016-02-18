@@ -1,23 +1,28 @@
 import os
-from __main__ import vtk
-from __main__ import ctk
-from __main__ import qt
-from __main__ import slicer
-from EditOptions import EditOptions
-from EditorLib import EditorLib
+import vtk
+import ctk
+import qt
+import slicer
+from EditOptions import HelpButton
 import Effect
 
+__all__ = [
+  'ThresholdEffectOptions',
+  'ThresholdEffectTool',
+  'ThresholdEffectLogic',
+  'ThresholdEffect'
+  ]
 
 #########################################################
 #
-# 
+#
 comment = """
 
   ThresholdEffect is a subclass of Effect
   the global threshold operation
   in the slicer editor
 
-# TODO : 
+# TODO :
 """
 #
 #########################################################
@@ -76,7 +81,7 @@ class ThresholdEffectOptions(Effect.EffectOptions):
     self.connections.append( (self.threshold, 'valuesChanged(double,double)', self.onThresholdValuesChanged) )
     self.connections.append( (self.apply, 'clicked()', self.onApply) )
 
-    EditorLib.HelpButton(self.frame, "Set labels based on threshold range.  Note: this replaces the current label map values.")
+    HelpButton(self.frame, "Set labels based on threshold range.  Note: this replaces the current label map values.")
 
     # Add vertical spacer
     self.frame.layout().addStretch(1)
@@ -102,7 +107,7 @@ class ThresholdEffectOptions(Effect.EffectOptions):
 
   # note: this method needs to be implemented exactly as-is
   # in each leaf subclass so that "self" in the observer
-  # is of the correct type 
+  # is of the correct type
   def updateParameterNode(self, caller, event):
     node = self.editUtil.getParameterNode()
     if node != self.parameterNode:
@@ -188,7 +193,7 @@ class ThresholdEffectOptions(Effect.EffectOptions):
 #
 # ThresholdEffectTool
 #
- 
+
 class ThresholdEffectTool(Effect.EffectTool):
   """
   One instance of this will be created per-view when the effect
@@ -201,7 +206,7 @@ class ThresholdEffectTool(Effect.EffectTool):
 
   def __init__(self, sliceWidget):
     super(ThresholdEffectTool,self).__init__(sliceWidget)
-    
+
     # create a logic instance to do the non-gui work
     self.logic = ThresholdEffectLogic(self.sliceWidget.sliceLogic())
     self.logic.undoRedo = self.undoRedo
@@ -216,10 +221,10 @@ class ThresholdEffectTool(Effect.EffectTool):
     self.map = None
 
     # feedback actor
-    self.cursorDummyImage = vtk.vtkImageData()
-    self.cursorDummyImage.AllocateScalars()
     self.cursorMapper = vtk.vtkImageMapper()
-    self.cursorMapper.SetInput( self.cursorDummyImage )
+    self.cursorDummyImage = vtk.vtkImageData()
+    self.cursorDummyImage.AllocateScalars(vtk.VTK_UNSIGNED_INT, 1)
+    self.cursorMapper.SetInputData( self.cursorDummyImage )
     self.cursorActor = vtk.vtkActor2D()
     self.cursorActor.VisibilityOff()
     self.cursorActor.SetMapper( self.cursorMapper )
@@ -255,7 +260,7 @@ class ThresholdEffectTool(Effect.EffectTool):
     self.undoRedo.saveState()
 
     thresh = vtk.vtkImageThreshold()
-    thresh.SetInput( self.editUtil.getBackgroundImage() )
+    thresh.SetInputData( self.editUtil.getBackgroundImage() )
     thresh.ThresholdBetween(self.min, self.max)
     thresh.SetInValue( self.editUtil.getLabel() )
     thresh.SetOutValue( 0 )
@@ -300,16 +305,14 @@ class ThresholdEffectTool(Effect.EffectTool):
       self.thresh = vtk.vtkImageThreshold()
     sliceLogic = self.sliceWidget.sliceLogic()
     backgroundLogic = sliceLogic.GetBackgroundLayer()
-    self.thresh.SetInput( backgroundLogic.GetReslice().GetOutput() )
+    self.thresh.SetInputConnection( backgroundLogic.GetReslice().GetOutputPort() )
     self.thresh.ThresholdBetween( self.min, self.max )
     self.thresh.SetInValue( 1 )
     self.thresh.SetOutValue( 0 )
     self.thresh.SetOutputScalarTypeToUnsignedChar()
-    self.map.SetInput( self.thresh.GetOutput() )
+    self.map.SetInputConnection( self.thresh.GetOutputPort() )
+    self.cursorMapper.SetInputConnection( self.map.GetOutputPort() )
 
-    self.map.Update()
-
-    self.cursorMapper.SetInput( self.map.GetOutput() )
     self.cursorActor.VisibilityOn()
 
     self.sliceView.scheduleRender()
@@ -317,13 +320,13 @@ class ThresholdEffectTool(Effect.EffectTool):
 #
 # ThresholdEffectLogic
 #
- 
+
 class ThresholdEffectLogic(Effect.EffectLogic):
   """
   This class contains helper methods for a given effect
   type.  It can be instanced as needed by an ThresholdEffectTool
   or ThresholdEffectOptions instance in order to compute intermediate
-  results (say, for user feedback) or to implement the final 
+  results (say, for user feedback) or to implement the final
   segmentation editing operation.  This class is split
   from the ThresholdEffectTool so that the operations can be used
   by other code without the need for a view context.
@@ -334,7 +337,7 @@ class ThresholdEffectLogic(Effect.EffectLogic):
 
 
 #
-# The ThresholdEffect class definition 
+# The ThresholdEffect class definition
 #
 
 class ThresholdEffect(Effect.Effect):

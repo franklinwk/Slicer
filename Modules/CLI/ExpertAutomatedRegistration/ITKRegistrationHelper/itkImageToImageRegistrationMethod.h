@@ -24,7 +24,9 @@
 namespace itk
 {
 
-/** \class ImageToImageRegistrationMethod base class for the registration methods.
+/** \class ImageToImageRegistrationMethod
+ *
+ * This is the base class for the registration methods.
  *
  * This class has a separate hierarchy from the ImageRegistrationMethod defined
  * in ITK.  The purpose of this class is to provide the common functionalities
@@ -130,9 +132,9 @@ protected:
   /** Method that actually computes the registration. This method is intended
    * to be overloaded by derived classes. Those overload, however, must
    * invoke this method in the base class. */
-  void GenerateData( void );
+  void GenerateData( void ) ITK_OVERRIDE;
 
-  void PrintSelf( std::ostream & os, Indent indent ) const;
+  void PrintSelf( std::ostream & os, Indent indent ) const ITK_OVERRIDE;
 
   /** Provide derived classes with access to the Transform member variable. */
   itkSetObjectMacro( Transform, TransformType );
@@ -140,9 +142,9 @@ protected:
   itkGetConstObjectMacro( Transform, TransformType );
 
   using Superclass::MakeOutput;
-  virtual DataObjectPointer   MakeOutput( DataObjectPointerArraySizeType idx );
+  virtual DataObjectPointer   MakeOutput( DataObjectPointerArraySizeType idx ) ITK_OVERRIDE;
 
-  unsigned long               GetMTime( void ) const;
+  unsigned long               GetMTime( void ) const ITK_OVERRIDE;
 
 protected:
 

@@ -39,6 +39,9 @@
 // VTK includes
 #include <vtkImageData.h>
 #include <vtkNew.h>
+#include <vtkRendererCollection.h>
+#include <vtkRenderLargeImage.h>
+#include <vtkRenderWindow.h>
 #include <vtkSmartPointer.h>
 
 //-----------------------------------------------------------------------------
@@ -60,6 +63,10 @@ public:
   /// This is NULL if the dialog has no associated snapshot node (== new snapshot mode).
   QVariant                           Data;
   QButtonGroup*                      WidgetTypeGroup;
+
+  /// The last selected thumbnail type
+  int LastWidgetType;
+
 };
 
 //-----------------------------------------------------------------------------
@@ -69,11 +76,15 @@ qMRMLScreenShotDialogPrivate::qMRMLScreenShotDialogPrivate(qMRMLScreenShotDialog
   qRegisterMetaType<qMRMLScreenShotDialog::WidgetType>(
       "qMRMLScreenShotDialog::WidgetType");
   this->WidgetTypeGroup = 0;
+
+  this->LastWidgetType = qMRMLScreenShotDialog::FullLayout;
 }
 
 //-----------------------------------------------------------------------------
 void qMRMLScreenShotDialogPrivate::setupUi(QDialog* dialog)
 {
+  Q_Q(qMRMLScreenShotDialog);
+
   this->Ui_qMRMLScreenShotDialog::setupUi(dialog);
   this->WidgetTypeGroup = new QButtonGroup(dialog);
   this->WidgetTypeGroup->setExclusive(true);
@@ -82,14 +93,24 @@ void qMRMLScreenShotDialogPrivate::setupUi(QDialog* dialog)
   this->WidgetTypeGroup->addButton(this->redSliceViewRadio, qMRMLScreenShotDialog::Red);
   this->WidgetTypeGroup->addButton(this->yellowSliceViewRadio, qMRMLScreenShotDialog::Yellow);
   this->WidgetTypeGroup->addButton(this->greenSliceViewRadio, qMRMLScreenShotDialog::Green);
+
+  this->setCheckedRadioButton(this->LastWidgetType);
+
+  QObject::connect(this->WidgetTypeGroup, SIGNAL(buttonClicked(int)),
+                   q, SLOT(setLastWidgetType(int)));
 }
+
 
 //-----------------------------------------------------------------------------
 void qMRMLScreenShotDialogPrivate::setCheckedRadioButton(int type)
 {
   QRadioButton* widgetButton =
     qobject_cast<QRadioButton*>(this->WidgetTypeGroup->button(type));
-  widgetButton->setChecked(true);
+  if (widgetButton)
+    {
+    // this can crash if an invalid type is passed in
+    widgetButton->setChecked(true);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -125,6 +146,13 @@ void qMRMLScreenShotDialog::setLayoutManager(qMRMLLayoutManager* newlayoutManage
 {
   Q_D(qMRMLScreenShotDialog);
   d->LayoutManager = newlayoutManager;
+}
+
+//-----------------------------------------------------------------------------
+void qMRMLScreenShotDialog::setLastWidgetType(int id)
+{
+  Q_D(qMRMLScreenShotDialog);
+  d->LastWidgetType = id;
 }
 
 //-----------------------------------------------------------------------------
@@ -250,7 +278,9 @@ void qMRMLScreenShotDialog::resetDialog()
   // We set the name
   d->nameEdit->clear();
 
-  this->setWidgetType(qMRMLScreenShotDialog::FullLayout);
+  // set the widget type to the last one used
+  this->setWidgetType(qMRMLScreenShotDialog::WidgetType(d->LastWidgetType));
+
   this->setScaleFactor(1.0);
 
   // reset the id
@@ -277,7 +307,7 @@ void qMRMLScreenShotDialog::grabScreenShot(int screenshotWindow)
   switch (screenshotWindow)
     {
     case qMRMLScreenShotDialog::ThreeD:
-      // Create a scrennshot of the first 3DView
+      // Create a screenshot of the first 3DView
       widget = d->LayoutManager.data()->threeDWidget(0)->threeDView();
       break;
     case qMRMLScreenShotDialog::Red:
@@ -294,17 +324,45 @@ void qMRMLScreenShotDialog::grabScreenShot(int screenshotWindow)
       break;
     }
 
-  QImage screenShot = ctk::grabVTKWidget(widget);
+  double scaleFactor = d->scaleFactorSpinBox->value();
 
-  // Rescale the image which gets saved
-  QImage rescaledScreenShot = screenShot.scaled(screenShot.size().width()
-      * d->scaleFactorSpinBox->value(), screenShot.size().height()
-      * d->scaleFactorSpinBox->value());
-
-  // convert the screenshot from QPixmap to vtkImageData and store it with this class
   vtkNew<vtkImageData> newImageData;
-  qMRMLUtils::qImageToVtkImageData(rescaledScreenShot,
-                                   newImageData.GetPointer());
+  if (scaleFactor != 1 &&
+      screenshotWindow  == qMRMLScreenShotDialog::ThreeD)
+    {
+    // use off screen rendering to magnifiy the VTK widget's image without interpolation
+    // TODO: fix VTK so that the slice windows are scaled rather than tiled
+    vtkRenderer *renderer = NULL;
+    renderer = vtkRenderer::SafeDownCast(d->LayoutManager.data()->threeDWidget(0)->threeDView()->renderWindow()->GetRenderers()->GetItemAsObject(0));
+    vtkNew<vtkRenderLargeImage> renderLargeImage;
+    renderLargeImage->SetInput(renderer);
+    renderLargeImage->SetMagnification(scaleFactor);
+    renderLargeImage->Update();
+    newImageData.GetPointer()->DeepCopy(renderLargeImage->GetOutput());
+    }
+  else
+    {
+    // no scaling, or for not just the 3D window
+    QImage screenShot = ctk::grabVTKWidget(widget);
+
+    if (scaleFactor != 1.0)
+      {
+      // Rescale the image which gets saved
+      QImage rescaledScreenShot = screenShot.scaled(screenShot.size().width() * scaleFactor,
+                                                    screenShot.size().height() * scaleFactor);
+
+      // convert the scaled screenshot from QPixmap to vtkImageData
+      qMRMLUtils::qImageToVtkImageData(rescaledScreenShot,
+                                       newImageData.GetPointer());
+      }
+    else
+      {
+      // convert the screenshot from QPixmap to vtkImageData
+      qMRMLUtils::qImageToVtkImageData(screenShot,
+                                       newImageData.GetPointer());
+      }
+    }
+  // save the screen shot image to this class
   this->setImageData(newImageData.GetPointer());
 }
 

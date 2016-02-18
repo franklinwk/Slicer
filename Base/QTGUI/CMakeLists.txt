@@ -82,6 +82,10 @@ set(KIT_SRCS
   qSlicerSettingsModulesPanel.h
   qSlicerSettingsStylesPanel.cxx
   qSlicerSettingsStylesPanel.h
+  qSlicerSettingsViewsPanel.cxx
+  qSlicerSettingsViewsPanel.h
+  qSlicerSettingsDeveloperPanel.cxx
+  qSlicerSettingsDeveloperPanel.h
   qSlicerStyle.cxx
   qSlicerStyle.h
   qSlicerViewersToolBar.cxx
@@ -135,13 +139,6 @@ if(Slicer_USE_PYTHONQT)
     )
 endif()
 
-if(Slicer_USE_QtTesting)
-  list(APPEND KIT_SRCS
-    qSlicerSettingsQtTestingPanel.cxx
-    qSlicerSettingsQtTestingPanel.h
-    )
-endif()
-
 # Since the wrapper doesn't consider hierarchy of classes, let's exclude
 # classes deriving from pure abstract class and remaining abstract pure
 set_source_files_properties(
@@ -190,6 +187,8 @@ set(KIT_MOC_SRCS
   qSlicerSettingsGeneralPanel.h
   qSlicerSettingsModulesPanel.h
   qSlicerSettingsStylesPanel.h
+  qSlicerSettingsViewsPanel.h
+  qSlicerSettingsDeveloperPanel.h
   qSlicerStyle.h
   qSlicerViewersToolBar.h
   qSlicerViewersToolBar_p.h
@@ -228,12 +227,6 @@ if(Slicer_USE_PYTHONQT)
     )
 endif()
 
-if(Slicer_USE_QtTesting)
-  list(APPEND KIT_MOC_SRCS
-    qSlicerSettingsQtTestingPanel.h
-    )
-endif()
-
 # UI files
 set(KIT_UI_SRCS
   Resources/UI/qSlicerActionsDialog.ui
@@ -247,14 +240,17 @@ set(KIT_UI_SRCS
   Resources/UI/qSlicerSettingsInternationalizationPanel.ui
   Resources/UI/qSlicerSettingsModulesPanel.ui
   Resources/UI/qSlicerSettingsStylesPanel.ui
+  Resources/UI/qSlicerSettingsViewsPanel.ui
+  Resources/UI/qSlicerSettingsDeveloperPanel.ui
   Resources/UI/qSlicerWebWidget.ui
   )
 if(Slicer_BUILD_EXTENSIONMANAGER_SUPPORT)
   list(APPEND KIT_UI_SRCS
+    Resources/UI/qSlicerExtensionsActionsWidget.ui
     Resources/UI/qSlicerExtensionsButtonBox.ui
-    Resources/UI/qSlicerExtensionsManageWidget.ui
     Resources/UI/qSlicerExtensionsManagerDialog.ui
     Resources/UI/qSlicerExtensionsManagerWidget.ui
+    Resources/UI/qSlicerExtensionsToolsWidget.ui
     Resources/UI/qSlicerSettingsExtensionsPanel.ui
     )
 endif()
@@ -263,12 +259,6 @@ endif()
 if(Slicer_USE_PYTHONQT)
   list(APPEND KIT_UI_SRCS
     Resources/UI/qSlicerSettingsPythonPanel.ui
-  )
-endif()
-
-if(Slicer_USE_QtTesting)
-  list(APPEND KIT_UI_SRCS
-    Resources/UI/qSlicerSettingsQtTestingPanel.ui
   )
 endif()
 
@@ -322,9 +312,16 @@ SlicerMacroBuildBaseQtLibrary(
 #-----------------------------------------------------------------------------
 # Slicer icon engine
 #-----------------------------------------------------------------------------
+
+#
+# CTK
+#
+set(CTK_LIBRARIES CTKWidgets)
+
 ctkMacroBuildQtIconEnginesPlugin(
   NAME qSlicerIconEnginePlugin
   EXPORT_DIRECTIVE "Q_SLICER_BASE_QTGUI_ICON_ENGINE_EXPORT"
+  FOLDER "Core-Base"
   SRCS qSlicerIconEnginePlugin.cxx qSlicerIconEnginePlugin.h
   MOC_SRCS qSlicerIconEnginePlugin.h
   TARGET_LIBRARIES ${QT_LIBRARIES} ${CTK_LIBRARIES}
@@ -336,7 +333,7 @@ add_subdirectory(StylePlugins)
 
 # Testing
 # Note: Within both Testing/Cxx and Testing/Python, some code is useful to both Slicer and the
-#       Extensions. For that reason, the Testing directory is added inconditionnally.
+#       Extensions. For that reason, the Testing directory is added unconditionally.
 #       The code specific to Slicer will be excluded directly in either Testing/Python
 #       or Testing/Cxx.
 add_subdirectory(Testing)

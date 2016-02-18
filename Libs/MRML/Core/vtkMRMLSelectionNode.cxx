@@ -11,6 +11,7 @@ Date:      $Date: 2006/03/17 15:10:10 $
 Version:   $Revision: 1.2 $
 
 =========================================================================auto=*/
+#include <sstream>
 
 // MRML includes
 #include "vtkMRMLScene.h"
@@ -31,6 +32,7 @@ vtkCxxSetReferenceStringMacro(vtkMRMLSelectionNode, ActivePlaceNodeID);
 vtkCxxSetReferenceStringMacro(vtkMRMLSelectionNode, ActivePlaceNodeClassName);
 vtkCxxSetReferenceStringMacro(vtkMRMLSelectionNode, ActiveROIListID);
 vtkCxxSetReferenceStringMacro(vtkMRMLSelectionNode, ActiveCameraID);
+vtkCxxSetReferenceStringMacro(vtkMRMLSelectionNode, ActiveTableID);
 vtkCxxSetReferenceStringMacro(vtkMRMLSelectionNode, ActiveViewID);
 vtkCxxSetReferenceStringMacro(vtkMRMLSelectionNode, ActiveLayoutID);
 vtkCxxSetReferenceStringMacro(vtkMRMLSelectionNode, ActiveVolumeID);
@@ -44,6 +46,8 @@ vtkMRMLNodeNewMacro(vtkMRMLSelectionNode);
 //----------------------------------------------------------------------------
 vtkMRMLSelectionNode::vtkMRMLSelectionNode()
 {
+  this->HideFromEditors = 1;
+
   this->SetSingletonTag("Singleton");
 
   this->ActiveVolumeID = NULL;
@@ -54,6 +58,7 @@ vtkMRMLSelectionNode::vtkMRMLSelectionNode()
   this->ActivePlaceNodeClassName = NULL;
   this->ActiveROIListID  =NULL;
   this->ActiveCameraID = NULL;
+  this->ActiveTableID = NULL;
   this->ActiveViewID = NULL;
   this->ActiveLayoutID = NULL;
 
@@ -104,6 +109,11 @@ vtkMRMLSelectionNode::~vtkMRMLSelectionNode()
     delete [] this->ActiveCameraID;
     this->ActiveCameraID = NULL;
     }
+  if ( this->ActiveTableID )
+    {
+    delete [] this->ActiveTableID;
+    this->ActiveTableID = NULL;
+    }
   if ( this->ActiveViewID)
     {
     delete []  this->ActiveViewID;
@@ -143,8 +153,30 @@ void vtkMRMLSelectionNode::WriteXML(ostream& of, int nIndent)
   of << indent << " activePlaceNodeClassName=\"" << (this->ActivePlaceNodeClassName ? this->ActivePlaceNodeClassName : "NULL") << "\"";
   of << indent << " activeROIListID=\"" << (this->ActiveROIListID ? this->ActiveROIListID : "NULL") << "\"";
   of << indent << " activeCameraID=\"" << (this->ActiveCameraID ? this->ActiveCameraID : "NULL") << "\"";
+  of << indent << " activeTableID=\"" << (this->ActiveTableID ? this->ActiveTableID : "NULL") << "\"";
   of << indent << " activeViewID=\"" << (this->ActiveViewID ? this->ActiveViewID : "NULL") << "\"";
   of << indent << " activeLayoutID=\"" << (this->ActiveLayoutID ? this->ActiveLayoutID : "NULL") << "\"";
+
+  if (this->ModelHierarchyDisplayNodeClassName.size() > 0)
+    {
+    of << indent << " modelHierarchyDisplayableNodeClassName=\"";
+
+    for (std::map<std::string, std::string>::const_iterator it = this->ModelHierarchyDisplayNodeClassName.begin();
+         it != this->ModelHierarchyDisplayNodeClassName.end(); it++)
+      {
+      of << " " << it->first;
+      }
+    of << "\"";
+
+    of << indent << " modelHierarchyDisplayNodeClassName=\"";
+
+    for (std::map<std::string, std::string>::const_iterator it = this->ModelHierarchyDisplayNodeClassName.begin();
+         it != this->ModelHierarchyDisplayNodeClassName.end(); it++)
+      {
+      of << " " << it->second;
+      }
+    of << "\"";
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -156,6 +188,7 @@ void vtkMRMLSelectionNode::SetSceneReferences()
   this->Scene->AddReferencedNodeID(this->ActiveFiducialListID, this);
   this->Scene->AddReferencedNodeID(this->ActivePlaceNodeID, this);
   this->Scene->AddReferencedNodeID(this->ActiveCameraID, this);
+  this->Scene->AddReferencedNodeID(this->ActiveTableID, this);
   this->Scene->AddReferencedNodeID(this->ActiveViewID, this);
   this->Scene->AddReferencedNodeID(this->ActiveLayoutID, this);
 }
@@ -192,6 +225,10 @@ void vtkMRMLSelectionNode::UpdateReferenceID(const char *oldID, const char *newI
     {
     this->SetActiveCameraID (newID);
     }
+if ( this->ActiveTableID && !strcmp (oldID, this->ActiveTableID ))
+    {
+    this->SetActiveTableID (newID);
+    }
   if ( this->ActiveViewID && !strcmp ( oldID, this->ActiveViewID ))
     {
     this->SetActiveViewID (newID );
@@ -200,7 +237,6 @@ void vtkMRMLSelectionNode::UpdateReferenceID(const char *oldID, const char *newI
     {
     this->SetActiveLayoutID (newID );
     }
-
 }
 
 //-----------------------------------------------------------
@@ -244,7 +280,10 @@ void vtkMRMLSelectionNode::UpdateReferences()
     {
     this->SetActiveCameraID(NULL);
     }
-
+  if (this->ActiveTableID != NULL && this->Scene->GetNodeByID(this->ActiveTableID) == NULL)
+    {
+    this->SetActiveTableID(NULL);
+    }
 }
 //----------------------------------------------------------------------------
 void vtkMRMLSelectionNode::ReadXMLAttributes(const char** atts)
@@ -252,6 +291,9 @@ void vtkMRMLSelectionNode::ReadXMLAttributes(const char** atts)
   int disabledModify = this->StartModify();
 
   this->Superclass::ReadXMLAttributes(atts);
+
+  std::vector<std::string> modelHierarchyDisplayableNodeClassName;
+  std::vector<std::string> modelHierarchyDisplayNodeClassName;
 
   const char* attName;
   const char* attValue;
@@ -294,6 +336,11 @@ void vtkMRMLSelectionNode::ReadXMLAttributes(const char** atts)
       this->SetActiveCameraID (attValue );
       //this->Scene->AddReferencedNodeID (this->ActiveCameraID, this);
       }
+    if (!strcmp (attName, "activeTableID"))
+      {
+      this->SetActiveTableID (attValue );
+      //this->Scene->AddReferencedNodeID (this->ActiveTableID, this);
+      }
     if (!strcmp (attName, "activeViewID"))
       {
       this->SetActiveViewID (attValue);
@@ -304,7 +351,47 @@ void vtkMRMLSelectionNode::ReadXMLAttributes(const char** atts)
       this->SetActiveLayoutID (attValue);
       //this->Scene->AddReferencedNodeID ( this->ActiveLayoutID, this);
       }
+    if (!strcmp (attName, "modelHierarchyDisplayableNodeClassName"))
+      {
+      std::stringstream ss(attValue);
+      while (!ss.eof())
+        {
+        std::string name;
+        ss >> name;
+        if (!name.empty())
+          {
+          modelHierarchyDisplayableNodeClassName.push_back(name);
+          }
+        }
+      }
+    if (!strcmp (attName, "modelHierarchyDisplayNodeClassName"))
+      {
+      std::stringstream ss(attValue);
+      while (!ss.eof())
+        {
+        std::string name;
+        ss >> name;
+        if (!name.empty())
+          {
+          modelHierarchyDisplayNodeClassName.push_back(name);
+          }
+        }
+      }
+    }
 
+  if (modelHierarchyDisplayableNodeClassName.size() != modelHierarchyDisplayNodeClassName.size() )
+    {
+    vtkErrorMacro(<< "ReadXMLAttributes: Number of modelHierarchyDisplayableNodeClassName is not equal to modelHierarchyDisplayNodeClassName.");
+    }
+  else
+    {
+    std::vector<std::string>::const_iterator it1 = modelHierarchyDisplayableNodeClassName.begin();
+    for (std::vector<std::string>::const_iterator it = modelHierarchyDisplayNodeClassName.begin();
+        it != modelHierarchyDisplayNodeClassName.end(); it++)
+      {
+      this->AddModelHierarchyDisplayNodeClassName(*it1, *it);
+      it1++;
+      }
     }
 
   this->EndModify(disabledModify);
@@ -327,9 +414,10 @@ void vtkMRMLSelectionNode::Copy(vtkMRMLNode *anode)
   this->SetActivePlaceNodeID(node->GetActivePlaceNodeID());
   this->SetActivePlaceNodeClassName(node->GetActivePlaceNodeClassName());
   this->SetActiveCameraID (node->GetActiveCameraID());
+  this->SetActiveTableID (node->GetActiveTableID());
   this->SetActiveViewID (node->GetActiveViewID() );
   this->SetActiveLayoutID (node->GetActiveLayoutID() );
-
+  this->ModelHierarchyDisplayNodeClassName = node->ModelHierarchyDisplayNodeClassName;
   this->EndModify(disabledModify);
 }
 
@@ -369,9 +457,19 @@ void vtkMRMLSelectionNode::PrintSelf(ostream& os, vtkIndent indent)
       }
     }
   os << "ActiveCameraID: " << ( (this->ActiveCameraID) ? this->ActiveCameraID : "None" ) << "\n";
+  os << "ActiveTableID: " << ( (this->ActiveTableID) ? this->ActiveTableID : "None" ) << "\n";
   os << "ActiveViewID: " << ( (this->ActiveViewID) ? this->ActiveViewID : "None" ) << "\n";
   os << "ActiveLayoutID: " << ( (this->ActiveLayoutID) ? this->ActiveLayoutID : "None" ) << "\n";
 
+  if (this->ModelHierarchyDisplayNodeClassName.size() > 0)
+    {
+    os << "Mode lHierarchy Display Node Class Name: \n";
+    for (std::map<std::string, std::string>::const_iterator it = this->ModelHierarchyDisplayNodeClassName.begin();
+         it != this->ModelHierarchyDisplayNodeClassName.end(); it++)
+      {
+      os << indent.GetNextIndent() << it->first << " " << it->second << "\n";
+      }
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -488,6 +586,7 @@ std::string vtkMRMLSelectionNode::GetPlaceNodeResourceByIndex(int n)
 //----------------------------------------------------------------------------
 void vtkMRMLSelectionNode::GetUnitNodes(std::vector<vtkMRMLUnitNode*>& units)
 {
+  this->UpdateNodeReferences();
   for (NodeReferencesType::const_iterator it = this->NodeReferences.begin();
     it != this->NodeReferences.end(); ++it)
     {
@@ -496,8 +595,34 @@ void vtkMRMLSelectionNode::GetUnitNodes(std::vector<vtkMRMLUnitNode*>& units)
         it->second.size() > 0)
       {
       // there is only one referenced node per reference role
-      units.push_back(
-        vtkMRMLUnitNode::SafeDownCast(it->second[0]->ReferencedNode));
+      vtkMRMLNodeReference * reference = it->second[0];
+      if (reference)
+        {
+        units.push_back(
+          vtkMRMLUnitNode::SafeDownCast(reference->GetReferencedNode()));
+        }
+      }
+    }
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLSelectionNode::GetUnitNodeIDs(std::vector<const char*>& quantities,
+                                          std::vector<const char*>& units)
+{
+  for (NodeReferencesType::const_iterator it = this->NodeReferences.begin();
+    it != this->NodeReferences.end(); ++it)
+    {
+    if (it->first.compare(0, strlen(this->GetUnitNodeReferenceRole()),
+                          this->GetUnitNodeReferenceRole()) == 0 &&
+        it->second.size() > 0)
+      {
+      // there is only one referenced node per reference role
+      vtkMRMLNodeReference * reference = it->second[0];
+      if (reference)
+        {
+        quantities.push_back(&reference->GetReferenceRole()[strlen(this->GetUnitNodeReferenceRole())]);
+        units.push_back(reference->GetReferencedNodeID());
+        }
       }
     }
 }
@@ -597,4 +722,32 @@ void vtkMRMLSelectionNode::SetReferenceActivePlaceNodeClassName (const char *cla
 {
   this->SetActivePlaceNodeClassName(className);
   this->InvokeEvent(vtkMRMLSelectionNode::ActivePlaceNodeClassNameChangedEvent);
+}
+
+//----------------------------------------------------------------------------
+std::string
+vtkMRMLSelectionNode::GetModelHierarchyDisplayNodeClassName(const std::string& dispayableNodeClass)const
+{
+  std::map<std::string, std::string>::const_iterator it = this->ModelHierarchyDisplayNodeClassName.find(dispayableNodeClass);
+  return (it == this->ModelHierarchyDisplayNodeClassName.end() ? std::string() : it->second);
+}
+
+//----------------------------------------------------------------------------
+std::map<std::string, std::string>
+vtkMRMLSelectionNode::GetModelHierarchyDisplayNodeClassNames()const
+{
+  return this->ModelHierarchyDisplayNodeClassName;
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLSelectionNode::AddModelHierarchyDisplayNodeClassName(const std::string& dispayableNodeClass,
+                                                                 const std::string& displayNodeClass)
+{
+  this->ModelHierarchyDisplayNodeClassName[dispayableNodeClass] = displayNodeClass;
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLSelectionNode::ClearModelHierarchyDisplayNodeClassNames()
+{
+  this->ModelHierarchyDisplayNodeClassName.clear();
 }

@@ -5,11 +5,14 @@ if(Slicer_USE_CTKAPPLAUNCHER)
 
   # Sanity checks
   if(DEFINED CTKAPPLAUNCHER_DIR AND NOT EXISTS ${CTKAPPLAUNCHER_DIR})
-    message(FATAL_ERROR "CTKAPPLAUNCHER_DIR variable is defined but corresponds to non-existing directory")
+    message(FATAL_ERROR "CTKAPPLAUNCHER_DIR variable is defined but corresponds to nonexistent directory")
   endif()
 
   # Set dependency list
   set(${proj}_DEPENDENCIES "")
+  if(WIN32)
+    set(${proj}_DEPENDENCIES CTKResEdit)
+  endif()
 
   # Include dependent projects if any
   ExternalProject_Include_Dependencies(${proj} PROJECT_VAR proj DEPENDS_VAR ${proj}_DEPENDENCIES)
@@ -20,19 +23,19 @@ if(Slicer_USE_CTKAPPLAUNCHER)
 
   if(NOT DEFINED CTKAPPLAUNCHER_DIR)
     SlicerMacroGetOperatingSystemArchitectureBitness(VAR_PREFIX CTKAPPLAUNCHER)
-    set(launcher_version "0.1.11")
+    set(launcher_version "0.1.14")
     set(item_id "")
     # On windows, use i386 launcher unconditionally
     if("${CTKAPPLAUNCHER_OS}" STREQUAL "win")
       set(CTKAPPLAUNCHER_ARCHITECTURE "i386")
-      set(md5 "bd39716da9c2d5455ba95db561d3d883")
-      set(item_id "4165")
+      set(md5 "5511af8ea134e9d516070d85bdb890f3")
+      set(item_id "7565")
     elseif("${CTKAPPLAUNCHER_OS}" STREQUAL "linux")
-      set(md5 "fcbd0ca4eb01cc66d4691c08d8fa194c")
-      set(item_id "4166")
+      set(md5 "2bdd93a8b41f245902a38429e6b20ea4")
+      set(item_id "9838")
     elseif("${CTKAPPLAUNCHER_OS}" STREQUAL "macosx")
-      set(md5 "0af14c017ff7953b6fcca76f4f88c952")
-      set(item_id "4164")
+      set(md5 "06bff63508db30244467de64afae000b")
+      set(item_id "6112")
     endif()
 
     ExternalProject_Add(${proj}

@@ -16,14 +16,19 @@
 #include "vtkSeedTracts.h"
 
 // VTK includes
+#include <vtkAlgorithm.h>
+#include <vtkAlgorithmOutput.h>
 #include <vtkCellArray.h>
 #include <vtkCommand.h>
+#include <vtkInformation.h>
 #include <vtkMath.h>
 #include <vtkNew.h>
 #include <vtkPointData.h>
 #include <vtkPolyDataWriter.h>
+#include <vtkStreamingDemandDrivenPipeline.h>
 #include <vtkTimerLog.h>
 #include <vtkTransformPolyDataFilter.h>
+#include <vtkVersion.h>
 
 // STD includes
 #include <sstream>
@@ -42,13 +47,13 @@ vtkSeedTracts::vtkSeedTracts()
   this->TensorRotationMatrix = vtkMatrix4x4::New();
 
   // The user must set these for the class to function.
-  this->InputTensorField = NULL;
-  
+  this->InputTensorFieldConnection = NULL;
+
   // The user may need to set these, depending on class usage
-  this->InputROI = NULL;
+  this->InputROIConnection = NULL;
   this->InputROIValue = -1;
   this->InputMultipleROIValues = NULL;
-  this->InputROI2 = NULL;
+  this->InputROIConnection2 = NULL;
   this->IsotropicSeeding = 0;
   this->IsotropicSeedingResolution = 2;
   this->RandomGrid = 0;
@@ -86,18 +91,18 @@ vtkSeedTracts::~vtkSeedTracts()
   this->TensorRotationMatrix->Delete();
 
   // volumes
-  if (this->InputTensorField) this->InputTensorField->Delete();
-  if (this->InputROI) this->InputROI->Delete();
-  if (this->InputROI2) this->InputROI2->Delete();
+  if (this->InputTensorFieldConnection) this->InputTensorFieldConnection->Delete();
+  if (this->InputROIConnection) this->InputROIConnection->Delete();
+  if (this->InputROIConnection2) this->InputROIConnection2->Delete();
 
   // settings
-  if (this->VtkHyperStreamlineSettings) 
+  if (this->VtkHyperStreamlineSettings)
     this->VtkHyperStreamlineSettings->Delete();
-  if (this->VtkHyperStreamlinePointsSettings) 
+  if (this->VtkHyperStreamlinePointsSettings)
     this->VtkHyperStreamlinePointsSettings->Delete();
-  if (this->VtkPreciseHyperStreamlinePointsSettings) 
+  if (this->VtkPreciseHyperStreamlinePointsSettings)
     this->VtkPreciseHyperStreamlinePointsSettings->Delete();
-  if (this->VtkHyperStreamlineTeemSettings) 
+  if (this->VtkHyperStreamlineTeemSettings)
     this->VtkHyperStreamlineTeemSettings->Delete();
 
   // collection
@@ -106,11 +111,11 @@ vtkSeedTracts::~vtkSeedTracts()
     this->DeleteAllStreamlines();
     this->Streamlines->Delete();
     }
-  if (FileDirectoryName) 
+  if (FileDirectoryName)
     {
     delete [] FileDirectoryName;
     }
-  if (FilePrefix) 
+  if (FilePrefix)
     {
     delete [] FilePrefix;
     }
@@ -121,7 +126,7 @@ vtkSeedTracts::~vtkSeedTracts()
 // Elsewhere in this class, all are treated as vtkHyperStreamline *.
 // We copy settings from the example object that the user has access
 // to.
-// (It would be nicer if we required the hyperstreamline classes to 
+// (It would be nicer if we required the hyperstreamline classes to
 // implement a copy function.)
 //----------------------------------------------------------------------------
 vtkHyperStreamline * vtkSeedTracts::CreateHyperStreamline()
@@ -133,11 +138,11 @@ vtkHyperStreamline * vtkSeedTracts::CreateHyperStreamline()
 
   vtkDebugMacro(<< "in create HyperStreamline, type " << this->TypeOfHyperStreamline);
 
-  
+
   switch (this->TypeOfHyperStreamline)
     {
     case USE_VTK_HYPERSTREAMLINE:
-      if (this->VtkHyperStreamlineSettings) 
+      if (this->VtkHyperStreamlineSettings)
         {
           currHS=vtkHyperStreamline::New();
           return(currHS);
@@ -148,7 +153,7 @@ vtkHyperStreamline * vtkSeedTracts::CreateHyperStreamline()
         }
       break;
     case USE_VTK_HYPERSTREAMLINE_TEEM:
-      if (this->VtkHyperStreamlineTeemSettings) 
+      if (this->VtkHyperStreamlineTeemSettings)
         {
           // create object
           std::cout << "Creatng HST" << endl;
@@ -169,7 +174,7 @@ vtkHyperStreamline * vtkSeedTracts::CreateHyperStreamline()
         }
       break;
     case USE_VTK_HYPERSTREAMLINE_POINTS:
-      if (this->VtkHyperStreamlinePointsSettings) 
+      if (this->VtkHyperStreamlinePointsSettings)
         {
           // create object
           currHSP=vtkHyperStreamlineDTMRI::New();
@@ -187,7 +192,7 @@ vtkHyperStreamline * vtkSeedTracts::CreateHyperStreamline()
 
       break;
     case USE_VTK_PRECISE_HYPERSTREAMLINE_POINTS:
-      if (this->VtkPreciseHyperStreamlinePointsSettings) 
+      if (this->VtkPreciseHyperStreamlinePointsSettings)
         {
 
           // create object
@@ -201,10 +206,10 @@ vtkHyperStreamline * vtkSeedTracts::CreateHyperStreamline()
           // Terminal FA
           currPHSP->
             SetTerminalFractionalAnisotropy(this->VtkPreciseHyperStreamlinePointsSettings->GetTerminalFractionalAnisotropy());
-          // MaximumPropagationDistance 
+          // MaximumPropagationDistance
           currPHSP->
             SetMaximumPropagationDistance(this->VtkPreciseHyperStreamlinePointsSettings->GetMaximumPropagationDistance());
-          // MinimumPropagationDistance 
+          // MinimumPropagationDistance
           currPHSP->
             SetMinimumPropagationDistance(this->VtkPreciseHyperStreamlinePointsSettings->GetMinimumPropagationDistance());
           // TerminalEigenvalue
@@ -213,10 +218,10 @@ vtkHyperStreamline * vtkSeedTracts::CreateHyperStreamline()
           // IntegrationStepLength
           currPHSP->
             SetIntegrationStepLength(this->VtkPreciseHyperStreamlinePointsSettings->GetIntegrationStepLength());
-          // StepLength 
+          // StepLength
           currPHSP->
             SetStepLength(this->VtkPreciseHyperStreamlinePointsSettings->GetStepLength());
-          // Radius  
+          // Radius
           currPHSP->
             SetRadius(this->VtkPreciseHyperStreamlinePointsSettings->GetRadius());
           // NumberOfSides
@@ -246,7 +251,7 @@ vtkHyperStreamline * vtkSeedTracts::CreateHyperStreamline()
             SetLengthOfMaxAngle(this->VtkPreciseHyperStreamlinePointsSettings->GetLengthOfMaxAngle());
 
           return((vtkHyperStreamline *) currPHSP);
-          // 
+          //
         }
       else
         {
@@ -259,7 +264,7 @@ vtkHyperStreamline * vtkSeedTracts::CreateHyperStreamline()
 
 // Loop through all of the hyperstreamline objects and set their
 // parameters according to the current vtkHyperStreamline*Settings object
-// which the user can modify. 
+// which the user can modify.
 //----------------------------------------------------------------------------
 void vtkSeedTracts::UpdateAllHyperStreamlineSettings()
 {
@@ -300,24 +305,24 @@ void vtkSeedTracts::UpdateHyperStreamlinePointsSettings( vtkHyperStreamlineDTMRI
 {
 
   // Copy user's settings into this object:
-  
-  // MaximumPropagationDistance 
+
+  // MaximumPropagationDistance
   currHSP->SetMaximumPropagationDistance(this->VtkHyperStreamlinePointsSettings->GetMaximumPropagationDistance());
   // IntegrationStepLength
   currHSP->SetIntegrationStepLength(this->VtkHyperStreamlinePointsSettings->GetIntegrationStepLength());
   // RadiusOfCurvature
   currHSP->SetRadiusOfCurvature(this->VtkHyperStreamlinePointsSettings->GetRadiusOfCurvature());
-  
+
   // Stopping threshold
   currHSP->SetStoppingThreshold(this->VtkHyperStreamlinePointsSettings->GetStoppingThreshold());
-  
+
   // Stopping Mode
   currHSP->SetStoppingMode(this->VtkHyperStreamlinePointsSettings->GetStoppingMode());
-  
-  
+
+
   // Eigenvector to integrate
   currHSP->SetIntegrationEigenvector(this->VtkHyperStreamlinePointsSettings->GetIntegrationEigenvector());
-  
+
   // IntegrationDirection (set in this class, default both ways)
   currHSP->SetIntegrationDirection(this->IntegrationDirection);
 
@@ -336,26 +341,26 @@ void vtkSeedTracts::UpdateHyperStreamlineTeemSettings( vtkHyperStreamlineTeem *c
 
   // Potentially this should update the tendFiberContext class for the given volume,
   // instead of updating all streamlines.
-  
+
   // Copy user's settings into this object:
-  
-  // MaximumPropagationDistance 
+
+  // MaximumPropagationDistance
   currHST->SetMaximumPropagationDistance(this->VtkHyperStreamlineTeemSettings->GetMaximumPropagationDistance());
   // IntegrationStepLength
   currHST->SetIntegrationStepLength(this->VtkHyperStreamlineTeemSettings->GetIntegrationStepLength());
   // RadiusOfCurvature
   currHST->SetRadiusOfCurvature(this->VtkHyperStreamlineTeemSettings->GetRadiusOfCurvature());
-  
+
   // Stopping threshold
   currHST->SetStoppingThreshold(this->VtkHyperStreamlineTeemSettings->GetStoppingThreshold());
-  
+
   // Stopping Mode
   currHST->SetStoppingMode(this->VtkHyperStreamlineTeemSettings->GetStoppingMode());
-  
-  
+
+
   // Eigenvector to integrate
   currHST->SetIntegrationEigenvector(this->VtkHyperStreamlineTeemSettings->GetIntegrationEigenvector());
-  
+
   // IntegrationDirection (set in this class, default both ways)
   currHST->SetIntegrationDirection(this->IntegrationDirection);
 
@@ -369,12 +374,15 @@ void vtkSeedTracts::UpdateHyperStreamlineTeemSettings( vtkHyperStreamlineTeem *c
 //----------------------------------------------------------------------------
 int vtkSeedTracts::PointWithinTensorData(double *point, double *pointw)
 {
-  vtkFloatingPointType *bounds;
+  double *bounds;
   int inbounds;
 
-  bounds=this->InputTensorField->GetBounds();
+  vtkAlgorithm* producer = this->InputTensorFieldConnection->GetProducer();
+  vtkImageData* inputTensorField = vtkImageData::SafeDownCast(producer->GetOutputDataObject(0));
+  producer->Update();
+  bounds = inputTensorField->GetBounds();
   vtkDebugMacro("Bounds " << bounds[0] << " " << bounds[1] << " " << bounds[2] << " " << bounds[3] << " " << bounds[4] << " " << bounds[5]);
-  
+
   inbounds=1;
   if (point[0] < bounds[0]) inbounds = 0;
   if (point[0] > bounds[1]) inbounds = 0;
@@ -392,8 +400,8 @@ int vtkSeedTracts::PointWithinTensorData(double *point, double *pointw)
 }
 
 //----------------------------------------------------------------------------
-void vtkSeedTracts::SeedStreamlineFromPoint(double x, 
-                                            double y, 
+void vtkSeedTracts::SeedStreamlineFromPoint(double x,
+                                            double y,
                                             double z)
 
 {
@@ -401,10 +409,10 @@ void vtkSeedTracts::SeedStreamlineFromPoint(double x,
   vtkHyperStreamlineDTMRI *newStreamline;
 
   // test we have input
-  if (this->InputTensorField == NULL)
+  if (this->InputTensorFieldConnection == NULL)
     {
       vtkErrorMacro("No tensor data input.");
-      return;      
+      return;
     }
 
   pointw[0]=x;
@@ -424,12 +432,12 @@ void vtkSeedTracts::SeedStreamlineFromPoint(double x,
       vtkErrorMacro("Point " << x << ", " << y << ", " << z << " outside of tensor dataset.");
       return;
     }
-    
-    
+
+
   newStreamline=(vtkHyperStreamlineDTMRI *)this->CreateHyperStreamline();
-                      
+
   // Set its input information.
-  newStreamline->SetInput(this->InputTensorField);
+  newStreamline->SetInputConnection(this->InputTensorFieldConnection);
   newStreamline->SetStartPosition(point[0],point[1],point[2]);
   //newStreamline->DebugOn();
 
@@ -440,22 +448,22 @@ void vtkSeedTracts::SeedStreamlineFromPoint(double x,
   // Force it to execute
   newStreamline->Update();
 
-  double length = (newStreamline->GetOutput()->GetNumberOfPoints() - 1) * 
+  double length = (newStreamline->GetOutput()->GetNumberOfPoints() - 1) *
                         newStreamline->GetIntegrationStepLength();
- 
+
   if (length > this->MinimumPathLength)
     {
-    this->Streamlines->AddItem((vtkObject *)newStreamline);  
+    this->Streamlines->AddItem((vtkObject *)newStreamline);
     }
   else
     {
-    // Free allocated memory 
+    // Free allocated memory
     newStreamline->Delete();
     }
   //newStreamline->Delete();
 }
 
-// Seed in an ROI using a continous grid with the resolution given by 
+// Seed in an ROI using a continous grid with the resolution given by
 //this->IsotropicSeedingResolution.
 //----------------------------------------------------------------------------
 void vtkSeedTracts::SeedStreamlinesInROI()
@@ -472,28 +480,24 @@ void vtkSeedTracts::SeedStreamlinesInROI()
 
 
   // test we have input
-  if (this->InputROI == NULL)
+  if (this->InputROIConnection == NULL)
     {
       vtkErrorMacro("No ROI input.");
-      return;      
+      return;
     }
-  if (this->InputTensorField == NULL)
+  if (this->InputTensorFieldConnection == NULL)
     {
       vtkErrorMacro("No tensor data input.");
-      return;      
+      return;
     }
   // check ROI's value of interest
   if (this->InputROIValue <= 0)
     {
       vtkErrorMacro("Input ROI value has not been set or is 0. (value is "  << this->InputROIValue << ".");
-      return;      
+      return;
     }
   // make sure it is short type
-  if (this->InputROI->GetScalarType() != VTK_SHORT)
-    {
-      vtkErrorMacro("Input ROI is not of type VTK_SHORT");
-      return;      
-    }
+  // TODO
 
   vtkNew<vtkTransform> transform;
   transform->SetMatrix(this->WorldToTensorScaledIJK->GetMatrix());
@@ -507,19 +511,22 @@ void vtkSeedTracts::SeedStreamlinesInROI()
   // make sure we are creating objects with points
   this->UseVtkHyperStreamlinePoints();
  
-  int extent[6];
   double spacing[3];
-  
-  this->InputTensorField->GetWholeExtent(extent);
-  this->InputTensorField->GetSpacing(spacing);
 
-  // currently this filter is not multithreaded, though in the future 
+  vtkImageData* inputTensorField = vtkImageData::SafeDownCast(this->InputTensorFieldConnection->GetProducer()->GetOutputDataObject(0));
+  inputTensorField->GetSpacing(spacing);
+
+  // currently this filter is not multithreaded, though in the future
   // it could be (especially if it inherits from an image filter class)
-  this->InputROI->GetWholeExtent(inExt);
+  {
+    this->InputROIConnection->GetProducer()->Update();
+    vtkInformation *inInfo = this->InputROIConnection->GetProducer()->GetOutputInformation(0);
+    inInfo->Get(vtkStreamingDemandDrivenPipeline::WHOLE_EXTENT(), inExt);
+  }
 
   // find the region to loop over
   maxX = inExt[1] - inExt[0];
-  maxY = inExt[3] - inExt[2]; 
+  maxY = inExt[3] - inExt[2];
   maxZ = inExt[5] - inExt[4];
 
   //cout << "Dims: " << maxX << " " << maxY << " " << maxZ << endl;
@@ -531,24 +538,24 @@ void vtkSeedTracts::SeedStreamlinesInROI()
   // then converted to world space and to tensor IJK for seeding.  So for example if
   // we want to seed at 2mm resolution, and in the x direction the voxel size is 0.85
   // mm, then we want the increment of 2/0.85 = 2.35 voxel units in the x direction.
-  if (this->IsotropicSeeding) 
+  if (this->IsotropicSeeding)
     {
       gridIncX = this->IsotropicSeedingResolution/spacing[0];
       gridIncY = this->IsotropicSeedingResolution/spacing[1];
       gridIncZ = this->IsotropicSeedingResolution/spacing[2];
-    } 
-  else 
+    }
+  else
     {
       gridIncX = 1;
       gridIncY = 1;
       gridIncZ = 1;
     }
-  
+
   double tensor[3][3];
   double *m[3], w[3], *v[3];
   double m0[3], m1[3], m2[3];
   double v0[3], v1[3], v2[3];
-  m[0] = m0; m[1] = m1; m[2] = m2; 
+  m[0] = m0; m[1] = m1; m[2] = m2;
   v[0] = v0; v[1] = v1; v[2] = v2;
 
   // filename index
@@ -565,6 +572,8 @@ void vtkSeedTracts::SeedStreamlinesInROI()
   int progressCountMax = 100;
   double progress;
 
+  vtkImageData* inputROI = vtkImageData::SafeDownCast(this->InputROIConnection->GetProducer()->GetOutputDataObject(0));
+
   for (idxZ = 0; idxZ <= maxZ; idxZ+=gridIncZ)
     {
       // just output (fractional or integer) current slice number
@@ -573,7 +582,7 @@ void vtkSeedTracts::SeedStreamlinesInROI()
       //for (idxY = 0; !this->AbortExecute && idxY <= maxY; idxY++)
       for (idxY = 0; idxY <= maxY; idxY+=gridIncY)
         {
-          
+
           for (idxX = 0; idxX <= maxX; idxX+=gridIncX)
             {
               labelVoxelCount++;
@@ -582,8 +591,8 @@ void vtkSeedTracts::SeedStreamlinesInROI()
               pt[0]= (int) floor(idxX + 0.5);
               pt[1]= (int) floor(idxY + 0.5);
               pt[2]= (int) floor(idxZ + 0.5);
-              inPtr = (short *) this->InputROI->GetScalarPointer(pt);
-      
+              inPtr = (short *) inputROI->GetScalarPointer(pt);
+
               // If the point is equal to the ROI value then seed here.
               if (*inPtr == this->InputROIValue)
                 {
@@ -606,7 +615,7 @@ void vtkSeedTracts::SeedStreamlinesInROI()
                       int ridx;
                       for (ridx = 0; ridx < 3; ridx++)
                         {
-                          if (this->IsotropicSeeding) 
+                          if (this->IsotropicSeeding)
                             {
                               // rand was from [0 .. 1], now from +/- half grid spacing
                               rand = vtkMath::Random( - this->IsotropicSeedingResolution / 2.0, this->IsotropicSeedingResolution / 2.0 );
@@ -632,11 +641,11 @@ void vtkSeedTracts::SeedStreamlinesInROI()
                       {
                       // Check the tensor threshold
                       int  ijk[3];
-                      double  pcoords[3];   
-                      this->GetInputTensorField()->ComputeStructuredCoordinates  ( point, ijk, pcoords); 
-                      vtkIdType tensorId = this->GetInputTensorField()->ComputePointId  (ijk );
-                     
-                      vtkDataArray *inTensors = this->GetInputTensorField()->GetPointData()->GetTensors();
+                      double  pcoords[3];
+                      inputTensorField->ComputeStructuredCoordinates  ( point, ijk, pcoords);
+                      vtkIdType tensorId = inputTensorField->ComputePointId  (ijk );
+
+                      vtkDataArray *inTensors = inputTensorField->GetPointData()->GetTensors();
                       inTensors->GetTuple(tensorId,(double *)tensor);
                       for (int j=0; j<3; j++)
                         {
@@ -650,7 +659,7 @@ void vtkSeedTracts::SeedStreamlinesInROI()
                       //vtkMath::Jacobi(m, w, v);
                       vtkDiffusionTensorMathematics::TeemEigenSolver(m,w,v);
                       double cl = vtkDiffusionTensorMathematics::LinearMeasure(w);
-                      if (cl < this->StartingThreshold) 
+                      if (cl < this->StartingThreshold)
                         {
                         continue;
                         }
@@ -667,12 +676,12 @@ void vtkSeedTracts::SeedStreamlinesInROI()
                         {
                         progressCount++;
                         }
-                      // Now create a streamline 
-                      newStreamline=(vtkHyperStreamlineDTMRI *) 
+                      // Now create a streamline
+                      newStreamline=(vtkHyperStreamlineDTMRI *)
                         this->CreateHyperStreamline();
-                      
+
                       // Set its input information.
-                      newStreamline->SetInput(this->InputTensorField);
+                      newStreamline->SetInputConnection(this->InputTensorFieldConnection);
                       newStreamline->SetStartPosition(point[0],point[1],point[2]);
                       //newStreamline->DebugOn();
 
@@ -686,13 +695,13 @@ void vtkSeedTracts::SeedStreamlinesInROI()
                       // See if we like it enough to add to the collection
                       // This relies on the fact that the step length is in units of
                       // length (unlike fractions of a cell in vtkHyperStreamline).
-                      double length = 
-                        (newStreamline->GetOutput()->GetNumberOfPoints() - 1) * 
+                      double length =
+                        (newStreamline->GetOutput()->GetNumberOfPoints() - 1) *
                         newStreamline->GetIntegrationStepLength();
- 
+
                       if (length > this->MinimumPathLength)
                         {
-                        if (this->FileDirectoryName) 
+                        if (this->FileDirectoryName)
                           // write streamline to disk
                           {
                           if (this->FilePrefix == NULL)
@@ -700,10 +709,10 @@ void vtkSeedTracts::SeedStreamlinesInROI()
                             this->SetFilePrefix("line");
                             }
                           // transform model
-                          transformer->SetInput(newStreamline->GetOutput());
-                          
+                          transformer->SetInputConnection(newStreamline->GetOutputPort());
+
                           // Save the model to disk
-                          writer->SetInput(transformer->GetOutput());
+                          writer->SetInputConnection(transformer->GetOutputPort());
                           writer->SetFileType(2);
 
                           std::stringstream fileNameStr;
@@ -742,27 +751,27 @@ void vtkSeedTracts::SeedStreamlinesInROIWithMultipleValues()
 
   int numROIs;
   int initialROIValue = this->InputROIValue;
-  
+
   if (this->InputMultipleROIValues == NULL)
     {
       vtkErrorMacro(<<"No values to seed from. SetInputMultipleROIValues before trying.");
       return;
-    }  
-  
+    }
+
   numROIs=this->InputMultipleROIValues->GetNumberOfTuples();
-  
+
   // test we have input
-  if (this->InputROI == NULL)
+  if (this->InputROIConnection == NULL)
     {
       vtkErrorMacro("No ROI input.");
-      return;      
+      return;
     }
-  if (this->InputTensorField == NULL)
+  if (this->InputTensorFieldConnection == NULL)
     {
       vtkErrorMacro("No tensor data input.");
-      return;      
+      return;
     }
-    
+
   for (int i=0 ; i<numROIs ; i++)
     {
       this->InputROIValue = this->InputMultipleROIValues->GetValue(i);
@@ -770,15 +779,15 @@ void vtkSeedTracts::SeedStreamlinesInROIWithMultipleValues()
       if (this->InputROIValue <= 0)
         {
           vtkErrorMacro("Input ROI value has not been set or is 0. (value is "  << this->InputROIValue << ". Trying next value");
-          break;      
+          break;
         }
       this->SeedStreamlinesInROI();
     }
-    
+
   //Restore InputROIValue variable
-  this->InputROIValue = initialROIValue;   
-}       
-      
+  this->InputROIValue = initialROIValue;
+}
+
 void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *outFibers)
   {
 
@@ -787,7 +796,7 @@ void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *ou
     vtkErrorMacro("PolyData objects has not been allocated");
     return;
     }
-      
+
   // Create transformation matrix to place actors in scene
   // This is used to transform the models before writing them to disk
   vtkNew<vtkTransform> transform;
@@ -796,11 +805,11 @@ void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *ou
 
   vtkNew<vtkTransformPolyDataFilter> transformer;
   transformer->SetTransform(transform.GetPointer());
-  
+
   vtkHyperStreamline *streamline;
   int npts = 0;
   int ncells = 0;
-  //Loop throgh the collection and gather total number of points
+  //Loop through the collection and gather total number of points
   for (int i=0; i<this->Streamlines->GetNumberOfItems(); i++)
     {
     streamline = static_cast<vtkHyperStreamline*> (this->Streamlines->GetItemAsObject(i));
@@ -811,26 +820,23 @@ void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *ou
     {
     return;
     }
-  
+
   //Preallocate PolyData elements
-  vtkPoints *points = vtkPoints::New();
-  outFibers->SetPoints(points);
-  points->Delete();
+  vtkNew<vtkPoints> points;
+  outFibers->SetPoints(points.GetPointer());
   //outFibers->GetPoints()->SetNumberOfPoints(npts);
-  vtkIdTypeArray *cellArray;
-  vtkCellArray *outFibersCellArray = vtkCellArray::New();
-  outFibers->SetLines(outFibersCellArray);
-  outFibersCellArray->Delete();
+
+  vtkNew<vtkCellArray> outFibersCellArray;
+  outFibers->SetLines(outFibersCellArray.GetPointer());
   outFibersCellArray->SetNumberOfCells(this->Streamlines->GetNumberOfItems());
-  outFibersCellArray = outFibers->GetLines();
-  cellArray=outFibersCellArray->GetData();
+
+  vtkIdTypeArray *cellArray = outFibersCellArray->GetData();
   cellArray->SetNumberOfTuples(npts+ncells);
-  vtkFloatArray *newTensors = vtkFloatArray::New();
+
+  vtkNew<vtkFloatArray> newTensors;
   newTensors->SetNumberOfComponents(9);
   newTensors->Allocate(9*npts);
-  outFibers->GetPointData()->SetTensors(newTensors);
-  newTensors->Delete();
-  newTensors = static_cast<vtkFloatArray *> (outFibers->GetPointData()->GetTensors());
+  outFibers->GetPointData()->SetTensors(newTensors.GetPointer());
 
   int ptId=0;
   int cellId=0;
@@ -839,7 +845,7 @@ void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *ou
   for (int i=0; i<this->Streamlines->GetNumberOfItems(); i++)
     {
     streamline = static_cast<vtkHyperStreamline*> (this->Streamlines->GetItemAsObject(i));
-    transformer->SetInput(streamline->GetOutput());
+    transformer->SetInputConnection(streamline->GetOutputPort());
     transformer->Update();
 
     // Fill points and cells
@@ -848,7 +854,7 @@ void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *ou
       outFibers->GetPoints()->InsertNextPoint(transformer->GetOutput()->GetPoint(k));
       ptId++;
       }
-    vtkIdTypeArray *cellArrayTransf = transformer->GetOutput()->GetLines()->GetData(); 
+    vtkIdTypeArray *cellArrayTransf = transformer->GetOutput()->GetLines()->GetData();
     cellIndex = cellArrayTransf->GetNumberOfTuples()-1;
     cellArray->SetTupleValue(cellId, &cellIndex);
     cellId++;
@@ -867,10 +873,7 @@ void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *ou
     // -------------------------------------------------
     vtkDebugMacro("Rotating tensors");
     int numPts = transformer->GetOutput()->GetNumberOfPoints();
-    //vtkFloatArray *newTensors = vtkFloatArray::New();
-    //newTensors->SetNumberOfComponents(9);
-    //newTensors->Allocate(9*numPts);
-                          
+
     vtkDebugMacro("Rotating tensors: init");
     double (*matrix)[4] = this->TensorRotationMatrix->Element;
     double tensor[9];
@@ -886,8 +889,8 @@ void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *ou
           matrixTranspose3x3[row][col] = matrix[col][row];
         }
       }
-                          
-     vtkDebugMacro("Rotating tensors: get tensors from probe");        
+
+     vtkDebugMacro("Rotating tensors: get tensors from probe");
      vtkDataArray *oldTensors = transformer->GetOutput()->GetPointData()->GetTensors();
      vtkDebugMacro("Rotating tensors: rotate");
      for (vtkIdType ii = 0; ii < numPts; ii++)
@@ -901,7 +904,7 @@ void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *ou
                  tensor3x3[row][col] = tensor[idx];
                  idx++;
                }
-           }          
+           }
          // rotate by our matrix
          // R T R'
          vtkMath::Multiply3x3(matrix3x3,tensor3x3,temp3x3);
@@ -914,14 +917,13 @@ void vtkSeedTracts::TransformStreamlinesToRASAndAppendToPolyData(vtkPolyData *ou
                   tensor[idx] = tensor3x3[row][col];
                   idx++;
                 }
-            }  
+            }
           newTensors->InsertNextTuple(tensor);
         }
     // End of tensor rotation code.
     // -------------------------------------------------
     }
-  outFibers->SetLines(outFibersCellArray);
-  outFibers->GetPointData()->SetTensors(newTensors);
+
   // Remove the scalars if any, we don't need
   // to save anything but the tensors
   outFibers->GetPointData()->SetScalars(NULL);
@@ -945,38 +947,31 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
   vtkHyperStreamlineDTMRI *newStreamline;
 
   // time
-  vtkTimerLog *timer = vtkTimerLog::New();
+  vtkNew<vtkTimerLog> timer;
   timer->StartTimer();
 
   // test we have input
-  if (this->InputROI == NULL)
+  if (this->InputROIConnection == NULL)
     {
       vtkErrorMacro("No ROI input.");
-      return;      
+      return;
     }
-  if (this->InputTensorField == NULL)
+  // make sure it is short type
+  // TODO
+
+  if (this->InputTensorFieldConnection == NULL)
     {
       vtkErrorMacro("No tensor data input.");
-      return;      
+      return;
     }
-  if (this->InputROI2 == NULL)
+  // test we have input
+  if (this->InputROIConnection2 == NULL)
     {
       vtkErrorMacro("No ROI input.");
-      return;      
-    }
-
-  // make sure it is short type
-  if (this->InputROI->GetScalarType() != VTK_SHORT)
-    {
-      vtkErrorMacro("Input ROI is not of type VTK_SHORT");
-      return;      
+      return;
     }
   // make sure it is short type
-  if (this->InputROI2->GetScalarType() != VTK_SHORT)
-    {
-      vtkErrorMacro("Input ROI is not of type VTK_SHORT");
-      return;      
-    }
+  // TODO
 
   vtkNew<vtkTransform> transform;
   transform->SetMatrix(this->WorldToTensorScaledIJK->GetMatrix());
@@ -989,21 +984,24 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
 
   // Create transformation matrices to go backwards from streamline points to ROI space
   // This is used to access ROI2.
-  vtkTransform *WorldToROI2 = vtkTransform::New();
+  vtkNew<vtkTransform> WorldToROI2;
   WorldToROI2->SetMatrix(this->ROI2ToWorld->GetMatrix());
   WorldToROI2->Inverse();
-  vtkTransform *TensorScaledIJKToWorld = vtkTransform::New();
+  vtkNew<vtkTransform> TensorScaledIJKToWorld;
   TensorScaledIJKToWorld->SetMatrix(this->WorldToTensorScaledIJK->GetMatrix());
   TensorScaledIJKToWorld->Inverse();
 
-  // currently this filter is not multithreaded, though in the future 
+  // currently this filter is not multithreaded, though in the future
   // it could be (especially if it inherits from an image filter class)
-  this->InputROI->GetWholeExtent(inExt);
-  this->InputROI->GetContinuousIncrements(inExt, inIncX, inIncY, inIncZ);
+  vtkInformation *inInfo = this->InputROIConnection->GetProducer()->GetOutputInformation(0);
+  inInfo->Get(vtkStreamingDemandDrivenPipeline::WHOLE_EXTENT(), inExt);
+  vtkImageData* inputROI = vtkImageData::SafeDownCast(this->InputROIConnection->GetProducer()->GetOutputDataObject(0));
+  inputROI->GetContinuousIncrements(inExt, inIncX, inIncY, inIncZ);
+  vtkImageData* inputROI2 = vtkImageData::SafeDownCast(this->InputROIConnection2->GetProducer()->GetOutputDataObject(0));
 
   // find the region to loop over
   maxX = inExt[1] - inExt[0];
-  maxY = inExt[3] - inExt[2]; 
+  maxY = inExt[3] - inExt[2];
   maxZ = inExt[5] - inExt[4];
 
   //cout << "Dims: " << maxX << " " << maxY << " " << maxZ << endl;
@@ -1014,7 +1012,7 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
   //target++;
 
   // start point in input integer field
-  inPtr = (short *) this->InputROI->GetScalarPointerForExtent(inExt);
+  inPtr = (short *) inputROI->GetScalarPointerForExtent(inExt);
 
   // testing for seeding at a certain resolution.
   int increment = 1;
@@ -1034,7 +1032,7 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
                   // seed there and update
                   vtkDebugMacro( << "start streamline at: " << idxX << " " <<
                                  idxY << " " << idxZ);
-                      
+
                   // First transform to world space.
                   point[0]=idxX;
                   point[1]=idxY;
@@ -1050,12 +1048,12 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
                       newStreamline=(vtkHyperStreamlineDTMRI *) this->CreateHyperStreamline();
 
                       // Set its input information.
-                      newStreamline->SetInput(this->InputTensorField);
+                      newStreamline->SetInputConnection(this->InputTensorFieldConnection);
                       newStreamline->SetStartPosition(point[0],point[1],point[2]);
-                      
+
                       // Force it to update to access the path points
                       newStreamline->Update();
-                      
+
                       // for each point on the path, test
                       // the nearest voxel for path/ROI intersection.
                       vtkPoints * hs0
@@ -1076,7 +1074,7 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
                           pt[0]= (int) floor(point[0]+0.5);
                           pt[1]= (int) floor(point[1]+0.5);
                           pt[2]= (int) floor(point[2]+0.5);
-                          short *tmp = (short *) this->InputROI2->GetScalarPointer(pt);
+                          short *tmp = (short *) inputROI2->GetScalarPointer(pt);
                           if (tmp != NULL)
                             {
                               if (*tmp == this->InputROI2Value) {
@@ -1103,7 +1101,7 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
                           pt[0]= (int) floor(point[0]+0.5);
                           pt[1]= (int) floor(point[1]+0.5);
                           pt[2]= (int) floor(point[2]+0.5);
-                          short *tmp = (short *) this->InputROI2->GetScalarPointer(pt);
+                          short *tmp = (short *) inputROI2->GetScalarPointer(pt);
                           if (tmp != NULL)
                             {
                               if (*tmp == this->InputROI2Value) {
@@ -1111,25 +1109,25 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
                               }
                             }
                           ptidx++;
-                        }                          
+                        }
 
-                      // if it intersects with some ROI, then 
+                      // if it intersects with some ROI, then
                       // display it, otherwise delete it.
-                      if (intersects) 
+                      if (intersects)
                         {
-                        if (this->FileDirectoryName) 
+                        if (this->FileDirectoryName)
                           {
                           if (this->FilePrefix == NULL)
                             {
                             this->SetFilePrefix("line");
                             }
                           // transform model
-                          transformer->SetInput(newStreamline->GetOutput());
+                          transformer->SetInputConnection(newStreamline->GetOutputPort());
                           
                           // Save the model to disk
-                          writer->SetInput(transformer->GetOutput());
+                          writer->SetInputConnection(transformer->GetOutputPort());
                           writer->SetFileType(2);
-                          
+
                           std::stringstream fileNameStr;
                           fileNameStr << FileDirectoryName << "/" << FilePrefix << '_' << this->Streamlines->GetNumberOfItems()-1 << ".vtk";
                           writer->SetFileName(fileNameStr.str().c_str());
@@ -1141,7 +1139,7 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
                           newStreamline->Delete();
                           }
                         }
-                      else 
+                      else
                         {
                           newStreamline->Delete();
                         }
@@ -1163,7 +1161,6 @@ void vtkSeedTracts::SeedStreamlinesFromROIIntersectWithROI2()
 
   timer->StopTimer();
   std::cout << "Tractography in ROI time: " << timer->GetElapsedTime() << endl;
-  timer->Delete();
 }
 
 //----------------------------------------------------------------------------
@@ -1181,7 +1178,7 @@ void vtkSeedTracts::DeleteAllStreamlines()
       this->DeleteStreamline(0);
       i++;
     }
-  
+
 }
 
 // Delete one streamline and all of its associated objects.

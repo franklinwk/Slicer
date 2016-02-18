@@ -1,6 +1,7 @@
 
 #-----------------------------------------------------------------------------
 set(MODULE_NAME EditorLib)
+string(TOUPPER ${MODULE_NAME} MODULE_NAME_UPPER)
 
 #-----------------------------------------------------------------------------
 add_subdirectory(Logic)
@@ -39,6 +40,8 @@ set(MODULE_PYTHON_SCRIPTS
   EditUtil
   Effect
   HelperBox
+  LabelCreateDialog
+  LabelStructureListWidget
   ${EDITOR_BUILTIN_EFFECTS}
   )
 

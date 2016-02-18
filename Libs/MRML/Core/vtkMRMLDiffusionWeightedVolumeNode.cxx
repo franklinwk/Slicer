@@ -16,12 +16,14 @@ Version:   $Revision: 1.14 $
 #include "vtkMRMLDiffusionWeightedVolumeNode.h"
 #include "vtkMRMLDiffusionWeightedVolumeDisplayNode.h"
 #include "vtkMRMLNRRDStorageNode.h"
+#include "vtkMRMLScene.h"
 
-#include "vtkDoubleArray.h"
+#include <vtkDoubleArray.h>
 #include <vtkImageData.h>
 #include <vtkImageExtractComponents.h>
 #include <vtkMatrix4x4.h>
-#include "vtkObjectFactory.h"
+#include <vtkNew.h>
+#include <vtkObjectFactory.h>
 
 //------------------------------------------------------------------------------
 vtkMRMLNodeNewMacro(vtkMRMLDiffusionWeightedVolumeNode);
@@ -29,23 +31,21 @@ vtkMRMLNodeNewMacro(vtkMRMLDiffusionWeightedVolumeNode);
 //----------------------------------------------------------------------------
 vtkMRMLDiffusionWeightedVolumeNode::vtkMRMLDiffusionWeightedVolumeNode()
 {
-  this->NumberOfGradients = 7; //6 gradients + 1 baseline
   this->DiffusionGradients = vtkDoubleArray::New();
   this->DiffusionGradients->SetNumberOfComponents(3);
-  this->DiffusionGradients->SetNumberOfTuples(this->NumberOfGradients);
-  
   this->BValues = vtkDoubleArray::New();
-  this->BValues->SetNumberOfTuples(this->NumberOfGradients);
-  
-  for(int i=0; i<3; i++) 
+
+  this->SetNumberOfGradientsInternal(7); //6 gradients + 1 baseline
+
+  for(int i=0; i<3; i++)
     {
-    for(int j=0; j<3; j++) 
+    for(int j=0; j<3; j++)
       {
       this->MeasurementFrameMatrix[i][j] = (i == j) ? 1.0 : 0.0;
       }
     }
 
-  this->ExtractComponents = NULL; 
+  this->ExtractComponents = NULL;
 }
 
 //----------------------------------------------------------------------------
@@ -82,7 +82,7 @@ void vtkMRMLDiffusionWeightedVolumeNode::WriteXML(ostream& of, int nIndent)
     of << indent << " measurementFrameMatrix=\"" << ss.str() << "\"";
 
   ss.clear();
-  
+
   for(int g=0; g<this->DiffusionGradients->GetNumberOfTuples(); g++)
     {
     for (int k=0; k<3; k++)
@@ -90,11 +90,11 @@ void vtkMRMLDiffusionWeightedVolumeNode::WriteXML(ostream& of, int nIndent)
       ss << this->DiffusionGradients->GetComponent(g,k) << " ";
       }
     }
-  
+
   of << indent << " gradients=\"" << ss.str() << "\"";
-  
+
   ss.clear();
-  
+
   for (int g=0; g<this->BValues->GetNumberOfTuples(); g++)
     {
     ss << this->BValues->GetValue(g) << " ";
@@ -146,31 +146,30 @@ void vtkMRMLDiffusionWeightedVolumeNode::ReadXMLAttributes(const char** atts)
           }
         this->DiffusionGradients->InsertNextTuple(g);
         }
-      this->NumberOfGradients = this->DiffusionGradients->GetNumberOfTuples();  
       }
     if (!strcmp(attName, "bValues"))
       {
       std::stringstream ss;
-      double val;   
+      double val;
       this->BValues->Reset();
       while (!ss.eof())
         {
         ss >> val;
-        this->BValues->InsertNextValue(val);  
+        this->BValues->InsertNextValue(val);
         }
       }
-   }    
+   }
 
   this->EndModify(disabledModify);
 
-}  
+}
 
 //----------------------------------------------------------------------------
 void vtkMRMLDiffusionWeightedVolumeNode::SetMeasurementFrameMatrix(const double mf[3][3])
 {
-  for (int i=0; i<3; i++) 
+  for (int i=0; i<3; i++)
     {
-    for (int j=0; j<3; j++) 
+    for (int j=0; j<3; j++)
       {
       this->MeasurementFrameMatrix[i][j] = mf[i][j];
       }
@@ -180,9 +179,9 @@ void vtkMRMLDiffusionWeightedVolumeNode::SetMeasurementFrameMatrix(const double 
 //----------------------------------------------------------------------------
 void vtkMRMLDiffusionWeightedVolumeNode::GetMeasurementFrameMatrix(double mf[3][3])
 {
-  for (int i=0; i<3; i++) 
+  for (int i=0; i<3; i++)
     {
-    for (int j=0; j<3; j++) 
+    for (int j=0; j<3; j++)
       {
       mf[i][j] = this->MeasurementFrameMatrix[i][j];
       }
@@ -191,9 +190,10 @@ void vtkMRMLDiffusionWeightedVolumeNode::GetMeasurementFrameMatrix(double mf[3][
 
 
 //----------------------------------------------------------------------------
-void vtkMRMLDiffusionWeightedVolumeNode::SetMeasurementFrameMatrix(const double xr, const double xa, const double xs,
-                           const double yr, const double ya, const double ys,
-                           const double zr, const double za, const double zs)
+void vtkMRMLDiffusionWeightedVolumeNode::SetMeasurementFrameMatrix(
+    const double xr, const double xa, const double xs,
+    const double yr, const double ya, const double ys,
+    const double zr, const double za, const double zs)
 {
   MeasurementFrameMatrix[0][0] = xr;
   MeasurementFrameMatrix[0][1] = xa;
@@ -209,6 +209,10 @@ void vtkMRMLDiffusionWeightedVolumeNode::SetMeasurementFrameMatrix(const double 
 //----------------------------------------------------------------------------
 void vtkMRMLDiffusionWeightedVolumeNode::SetMeasurementFrameMatrix(vtkMatrix4x4 *mf)
 {
+  if (!mf)
+    {
+    return;
+    }
   for (int i=0; i<3; i++)
     {
     for (int j=0; j<3; j++)
@@ -221,7 +225,10 @@ void vtkMRMLDiffusionWeightedVolumeNode::SetMeasurementFrameMatrix(vtkMatrix4x4 
 //----------------------------------------------------------------------------
 void vtkMRMLDiffusionWeightedVolumeNode::GetMeasurementFrameMatrix(vtkMatrix4x4 *mf)
 {
-
+  if (!mf)
+    {
+    return;
+    }
   mf->Identity();
   for (int i=0; i<3; i++)
     {
@@ -235,71 +242,85 @@ void vtkMRMLDiffusionWeightedVolumeNode::GetMeasurementFrameMatrix(vtkMatrix4x4 
 //----------------------------------------------------------------------------
 void vtkMRMLDiffusionWeightedVolumeNode::SetNumberOfGradients(int val)
 {
-  if (this->NumberOfGradients != val)
+  if (this->GetNumberOfGradients() == val)
     {
-      this->DiffusionGradients->Reset();
-      this->BValues->Reset();
-      vtkDebugMacro ("setting num gradients to " << val);
-      // internal array for storage of gradient vectors
-      this->DiffusionGradients->SetNumberOfTuples(val);
-      this->BValues->SetNumberOfTuples(val);
-      // this class's info
-      this->NumberOfGradients = val;
-      this->Modified();
+    return;
     }
-}  
+  this->SetNumberOfGradientsInternal(val);
+  this->Modified();
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLDiffusionWeightedVolumeNode::SetNumberOfGradientsInternal(int val)
+{
+  vtkDebugMacro(<< "setting num gradients to " << val);
+  this->DiffusionGradients->Reset();
+  this->BValues->Reset();
+  // internal array for storage of gradient vectors
+  this->DiffusionGradients->SetNumberOfTuples(val);
+  this->BValues->SetNumberOfTuples(val);
+  for (int tupleIdx = 0; tupleIdx < val; ++tupleIdx)
+    {
+    for (int componentIdx = 0;
+         componentIdx < this->DiffusionGradients->GetNumberOfComponents();
+         ++componentIdx)
+      {
+      this->DiffusionGradients->SetComponent(tupleIdx, componentIdx, 0.0);
+      }
+    this->BValues->SetValue(tupleIdx, 0.0);
+    }
+}
+
+//----------------------------------------------------------------------------
+int vtkMRMLDiffusionWeightedVolumeNode::GetNumberOfGradients()
+{
+  return this->DiffusionGradients->GetNumberOfTuples();
+}
 
 //----------------------------------------------------------------------------
 void vtkMRMLDiffusionWeightedVolumeNode::SetDiffusionGradient(int num,const double grad[3])
 {
-  if (num < this->DiffusionGradients->GetNumberOfTuples())
+  if (num < 0 || num >= this->DiffusionGradients->GetNumberOfTuples())
     {
-    this->DiffusionGradients->SetComponent(num,0,grad[0]);
-    this->DiffusionGradients->SetComponent(num,1,grad[1]);
-    this->DiffusionGradients->SetComponent(num,2,grad[2]);
-    this->Modified();
+    vtkErrorMacro(<< "Gradient number is out of range. "
+                     "Allocate first the number of gradients with SetNumberOfGradients");
+    return;
     }
-  else
-    {
-    vtkErrorMacro("Gradient number is out of range. Allocate first the number of gradients with SetNumberOfGradients");
-    }
+  this->DiffusionGradients->SetComponent(num,0,grad[0]);
+  this->DiffusionGradients->SetComponent(num,1,grad[1]);
+  this->DiffusionGradients->SetComponent(num,2,grad[2]);
+  this->Modified();
 }
 
 //----------------------------------------------------------------------------
 void vtkMRMLDiffusionWeightedVolumeNode::SetDiffusionGradients(vtkDoubleArray *grad)
 {
   this->DiffusionGradients->DeepCopy(grad);
-  this->NumberOfGradients = this->DiffusionGradients->GetNumberOfTuples();
   this->Modified();
 }
 
 //----------------------------------------------------------------------------
 void vtkMRMLDiffusionWeightedVolumeNode::GetDiffusionGradient(int num,double grad[3])
-{  
-  if(num < this->DiffusionGradients->GetNumberOfTuples()) 
+{
+  if (num < 0 || num >= this->DiffusionGradients->GetNumberOfTuples())
     {
-    grad[0]=this->DiffusionGradients->GetComponent(num,0);
-    grad[1]=this->DiffusionGradients->GetComponent(num,1);
-    grad[2]=this->DiffusionGradients->GetComponent(num,2);
-    } 
-  else 
-    {
-    vtkErrorMacro("Gradient number is out of range");
+    vtkErrorMacro(<< "Gradient number is out of range.");
+    return;
     }
+  grad[0]=this->DiffusionGradients->GetComponent(num,0);
+  grad[1]=this->DiffusionGradients->GetComponent(num,1);
+  grad[2]=this->DiffusionGradients->GetComponent(num,2);
 }
 
 //----------------------------------------------------------------------------
 double *vtkMRMLDiffusionWeightedVolumeNode::GetDiffusionGradient(int num)
 {
-  if(num < this->DiffusionGradients->GetNumberOfTuples()) 
+  if (num < 0 || num >= this->DiffusionGradients->GetNumberOfTuples())
     {
-    return static_cast <double *> (this->DiffusionGradients->GetVoidPointer(num*3));
+    vtkErrorMacro(<< "Gradient number is out of range.");
+    return 0;
     }
-  else
-    {
-    vtkErrorMacro("Gradient number is out of range");
-    return NULL;
-    }
+  return static_cast <double *> (this->DiffusionGradients->GetVoidPointer(num*3));
 }
 
 //----------------------------------------------------------------------------
@@ -312,29 +333,25 @@ void vtkMRMLDiffusionWeightedVolumeNode::SetBValues(vtkDoubleArray *bValues)
 //----------------------------------------------------------------------------
 void vtkMRMLDiffusionWeightedVolumeNode::SetBValue(int num, const double b)
 {
-  if (num < this->BValues->GetNumberOfTuples())
+  if (num < 0 || num >= this->BValues->GetNumberOfTuples())
     {
-    this->BValues->SetValue(num,b);
-    this->Modified();
+    vtkErrorMacro(<< "B value number is out of range. "
+                     "Allocate first the number of gradients with SetNumberOfGradients");
+    return;
     }
-  else
-    {
-    vtkErrorMacro("B value number is out of range. Allocate first the number of gradients with SetNumberOfGradients");
-    }
+  this->BValues->SetValue(num,b);
+  this->Modified();
 }
 
 //----------------------------------------------------------------------------
 double vtkMRMLDiffusionWeightedVolumeNode::GetBValue(int num)
 {
-  if (num < this->BValues->GetNumberOfTuples())
+  if (num < 0 || num >= this->BValues->GetNumberOfTuples())
     {
-    return this->BValues->GetValue(num);
-    }
-  else
-    {
-    vtkErrorMacro("B value number is out of range");
+    vtkErrorMacro(<< "B value number is out of range.");
     return 0;
     }
+  return this->BValues->GetValue(num);
 }
 
 //----------------------------------------------------------------------------
@@ -348,14 +365,14 @@ void vtkMRMLDiffusionWeightedVolumeNode::Copy(vtkMRMLNode *anode)
   vtkMRMLDiffusionWeightedVolumeNode *node = (vtkMRMLDiffusionWeightedVolumeNode *) anode;
 
   // Matrices
-  for(int i=0; i<3; i++) 
+  for(int i=0; i<3; i++)
     {
-    for(int j=0; j<3; j++) 
+    for(int j=0; j<3; j++)
       {
       this->MeasurementFrameMatrix[i][j] = node->MeasurementFrameMatrix[i][j];
       }
     }
-    
+
   if (this->DiffusionGradients)
     {
     this->DiffusionGradients->DeepCopy(node->DiffusionGradients);
@@ -364,10 +381,7 @@ void vtkMRMLDiffusionWeightedVolumeNode::Copy(vtkMRMLNode *anode)
     {
     this->BValues->DeepCopy(node->BValues);
     }
-  this->NumberOfGradients= node->NumberOfGradients;
-
   this->EndModify(disabledModify);
-
 }
 
 //----------------------------------------------------------------------------
@@ -376,9 +390,9 @@ void vtkMRMLDiffusionWeightedVolumeNode::PrintSelf(ostream& os, vtkIndent indent
   Superclass::PrintSelf(os,indent);
 
   os << "MeasurementFrameMatrix:\n";
-  for(int i=0; i<3; i++) 
+  for(int i=0; i<3; i++)
     {
-    for(int j=0; j<3; j++) 
+    for(int j=0; j<3; j++)
       {
       os << indent << " " << this->MeasurementFrameMatrix[i][j];
       }
@@ -389,17 +403,17 @@ void vtkMRMLDiffusionWeightedVolumeNode::PrintSelf(ostream& os, vtkIndent indent
   os << "Gradients:\n";
   for (int g =0; g < this->DiffusionGradients->GetNumberOfTuples(); g++)
     {
-    for(int j=0; j<3; j++) 
+    for(int j=0; j < this->DiffusionGradients->GetNumberOfComponents(); j++)
       {
       os << indent << " " << this->DiffusionGradients->GetComponent(g,j);
       }
     os<< indent << "\n";
     }
   os << "\n";
-    
+
   os << "B-values:\n";
-  
-  for(int k=0; k<this->BValues->GetNumberOfTuples(); k++) 
+
+  for(int k=0; k<this->BValues->GetNumberOfTuples(); k++)
     {
     os << indent << " " << this->BValues->GetValue(k);
     }
@@ -415,4 +429,23 @@ vtkMRMLDiffusionWeightedVolumeDisplayNode* vtkMRMLDiffusionWeightedVolumeNode::G
 vtkMRMLStorageNode* vtkMRMLDiffusionWeightedVolumeNode::CreateDefaultStorageNode()
 {
   return vtkMRMLNRRDStorageNode::New();
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLDiffusionWeightedVolumeNode::CreateDefaultDisplayNodes()
+{
+  if (vtkMRMLDiffusionWeightedVolumeDisplayNode::SafeDownCast(this->GetDisplayNode())!=NULL)
+    {
+    // display node already exists
+    return;
+    }
+  if (this->GetScene()==NULL)
+    {
+    vtkErrorMacro("vtkMRMLDiffusionWeightedVolumeNode::CreateDefaultDisplayNodes failed: scene is invalid");
+    return;
+    }
+  vtkNew<vtkMRMLDiffusionWeightedVolumeDisplayNode> dispNode;
+  this->GetScene()->AddNode(dispNode.GetPointer());
+  dispNode->SetDefaultColorMap();
+  this->SetAndObserveDisplayNodeID(dispNode->GetID());
 }

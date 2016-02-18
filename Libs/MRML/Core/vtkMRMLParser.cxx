@@ -15,6 +15,7 @@ Version:   $Revision: 1.8 $
 // MRML includes
 #include "vtkMRMLParser.h"
 #include "vtkMRMLScene.h"
+#include "vtkMRMLStorageNode.h"
 #include "vtkMRMLNode.h"
 #include "vtkTagTable.h"
 
@@ -32,21 +33,21 @@ vtkStandardNewMacro(vtkMRMLParser);
 //------------------------------------------------------------------------------
 void vtkMRMLParser::StartElement(const char* tagName, const char** atts)
 {
-  if (!strcmp(tagName, "MRML")) 
+  if (!strcmp(tagName, "MRML"))
     {
     //--- BEGIN test of user tags
     //--- pull out any tags describing the scene and fill the scene's tagtable.
     const char* attName;
     const char* attValue;
-    while (*atts != NULL) 
+    while (*atts != NULL)
       {
       attName = *(atts++);
-      attValue = *(atts++);  
-      if (!strcmp(attName, "version")) 
+      attValue = *(atts++);
+      if (!strcmp(attName, "version"))
         {
         this->GetMRMLScene()->SetLastLoadedVersion(attValue);
         }
-      else if (!strcmp(attName, "userTags")) 
+      else if (!strcmp(attName, "userTags"))
         {
         if ( this->MRMLScene->GetUserTagTable() == NULL )
           {
@@ -74,9 +75,9 @@ void vtkMRMLParser::StartElement(const char* tagName, const char** atts)
                 this->MRMLScene->GetUserTagTable()->AddOrUpdateTag ( kwd.c_str(), val.c_str(), 0 );
                 }
               }
-            }        
+            }
           }
-        } //--- END test of user tags. 
+        } //--- END test of user tags.
       } // while
     return;
     } // MRML
@@ -103,12 +104,13 @@ void vtkMRMLParser::StartElement(const char* tagName, const char** atts)
     return;
     }
 
-  // It is needed to have the scene root dir set before ReadXMLAttributes is
+  // It is needed to have the scene set before ReadXMLAttributes is
   // called on storage nodes.
-  if (this->GetMRMLScene())
+  if (vtkMRMLStorageNode::SafeDownCast(node) != 0)
     {
-    node->SetSceneRootDir(this->GetMRMLScene()->GetRootDirectory());
+    node->SetScene(this->GetMRMLScene());
     }
+
   node->ReadXMLAttributes(atts);
 
   // Slicer3 snap shot nodes were hidden by default, show them so that
@@ -120,14 +122,32 @@ void vtkMRMLParser::StartElement(const char* tagName, const char** atts)
     }
 #endif
 
+  // Replace old-style label map nodes (vtkMRMLScalarVolumeNode with LabelMap custom attribute)
+  // with new-style vtkMRMLLabelMapVolumeNode
+  if (node->IsA("vtkMRMLScalarVolumeNode"))
+    {
+    const char* labelMapAttr = node->GetAttribute("LabelMap");
+    bool isLabelMap = labelMapAttr ? (atoi(labelMapAttr)!=0) : false;
+    if (isLabelMap)
+      {
+      // create a copy of the node of the correct class
+      vtkMRMLNode* newTypeLabelMapNode = this->MRMLScene->CreateNodeByClass( "vtkMRMLLabelMapVolumeNode" );
+      newTypeLabelMapNode->CopyWithScene(node); // copy all contents, including MRML node ID
+      newTypeLabelMapNode->RemoveAttribute("LabelMap"); // this attribute is obsolete
+      // replace the current node with the new one
+      node->Delete();
+      node=newTypeLabelMapNode;
+      }
+    }
+
   // ID will be set by AddNode
   /*
-  if (node->GetID() == NULL) 
+  if (node->GetID() == NULL)
     {
     node->SetID(this->MRMLScene->GetUniqueIDByClass(className));
     }
   */
-  if (!this->NodeStack.empty()) 
+  if (!this->NodeStack.empty())
     {
     vtkMRMLNode* parentNode = this->NodeStack.top();
     parentNode->ProcessChildNode(node);
@@ -137,7 +157,7 @@ void vtkMRMLParser::StartElement(const char* tagName, const char** atts)
 
   if (this->NodeCollection)
     {
-    if (node->GetAddToScene()) 
+    if (node->GetAddToScene())
       {
       this->NodeCollection->vtkCollection::AddItem((vtkObject *)node);
       }
@@ -153,13 +173,13 @@ void vtkMRMLParser::StartElement(const char* tagName, const char** atts)
 
 void vtkMRMLParser::EndElement (const char *name)
 {
-  if ( !strcmp(name, "MRML") || this->NodeStack.empty() ) 
+  if ( !strcmp(name, "MRML") || this->NodeStack.empty() )
     {
     return;
     }
 
   const char* className = this->MRMLScene->GetClassNameByTag(name);
-  if (className == NULL) 
+  if (className == NULL)
     {
     // check for a renamed node
     if (strcmp(name, "SceneSnapshot") == 0)

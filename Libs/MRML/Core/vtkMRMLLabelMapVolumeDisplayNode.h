@@ -17,6 +17,7 @@
 
 #include "vtkMRMLVolumeDisplayNode.h"
 
+class vtkImageAlgorithm;
 class vtkImageMapToColors;
 
 /// \brief MRML node for representing a volume display attributes.
@@ -31,27 +32,27 @@ class VTK_MRML_EXPORT vtkMRMLLabelMapVolumeDisplayNode : public vtkMRMLVolumeDis
 
   virtual vtkMRMLNode* CreateNodeInstance();
 
-  /// 
+  ///
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName() {return "LabelMapVolumeDisplay";};
 
-  /// 
+  ///
   /// alternative method to propagate events generated in Display nodes
-  virtual void ProcessMRMLEvents ( vtkObject * /*caller*/, 
-                                   unsigned long /*event*/, 
+  virtual void ProcessMRMLEvents ( vtkObject * /*caller*/,
+                                   unsigned long /*event*/,
                                    void * /*callData*/ );
-  /// 
-  /// set gray colormap
+  ///
+  /// set default labels colormap
   virtual void SetDefaultColorMap();
 
   /// Set the pipeline input
-  virtual void SetInputImageData(vtkImageData *imageData);
+  virtual void SetInputImageDataConnection(vtkAlgorithmOutput *imageDataConnection);
 
   /// Get the pipeline input
   virtual vtkImageData* GetInputImageData();
 
   /// Gets the pipeline output
-  virtual vtkImageData* GetOutputImageData();
+  virtual vtkAlgorithmOutput* GetOutputImageDataConnection();
 
   virtual void UpdateImageDataPipeline();
 

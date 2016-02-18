@@ -124,10 +124,10 @@ public:
   inline QStringList hideChildNodeTypes()const;
 
   /// Add node type attribute that filter the nodes to
-  /// display. For example, labelmaps are defined with the "LabelMap"
-  /// attribute. In the following, the combobox only display the volume nodes
-  /// that are labelmaps.
-  /// \code addAttribute("vtkMRMLScalarVolumeNode", "LabelMap", "1"); \endcode
+  /// display. For example, colormap categories are defined with the "Category"
+  /// attribute. In the following, the combobox only display Discrete colormap
+  /// nodes.
+  /// \code addAttribute("vtkMRMLColorNode", "Category", "Discrete"); \endcode
   /// \note The attributes are used for filtering but also when "AddNode" is
   /// called: the attributes will be set to the new node
   /// \note An undefined attributeValue will match any value as long as the node
@@ -136,12 +136,17 @@ public:
   Q_INVOKABLE void addAttribute(const QString& nodeType,
                                 const QString& attributeName,
                                 const QVariant& attributeValue = QVariant());
+  /// Remove node type attribute filtering the displayed nodes
+  /// \sa addAttribute
+  Q_INVOKABLE void removeAttribute(const QString& nodeType,
+                                const QString& attributeName);
 
   /// BaseName is the name used to generate a node name for all the new created
   /// nodes.
-  /// TODO: Support different basename depending on the node type
-  void setBaseName(const QString& baseName);
-  QString baseName()const;
+  /// If nodeType is not specified for setBaseName() then base name is set for all already defined node types.
+  /// If nodeType is not specified for baseName() then base name of the first node type is returned.
+  void setBaseName(const QString& baseName, const QString& nodeType = "");
+  QString baseName(const QString& nodeType = "")const;
 
   /// return the number of nodes. it can be different from count()
   /// as count includes the "AddNode", "Remove Node"... items
@@ -244,7 +249,7 @@ public:
   /// Checks for action text duplicates and doesn't add them.
   /// Also checks for action text that will be hidden by the default action
   /// texts and doesn't add it.
-  virtual void addMenuAction(QAction *newAction);
+  Q_INVOKABLE virtual void addMenuAction(QAction *newAction);
 
 public slots:
   /// Set the scene the combobox listens to. The scene is observed and when new
@@ -258,7 +263,7 @@ public slots:
   /// Use setCurrentNodeID instead
   void setCurrentNode(const QString& nodeID);
 
-  /// Select the node to be current. If \nodeId is invalid (or can't be found
+  /// Select the node to be current. If \a nodeID is invalid (or can't be found
   /// in the scene), the current node becomes 0.
   void setCurrentNodeID(const QString& nodeID);
 
@@ -268,8 +273,23 @@ public slots:
   /// \sa nodeCount, setCurrentNode(vtkMRMLNode* ), setCurrentNodeID(const QString&)
   void setCurrentNodeIndex(int index);
 
-  /// Creates a node of the same type than on the "node types" properties.
-  /// It's name is generated using \a basename.
+  /// \brief Creates a node of the same type as in the "node types" property.
+  ///
+  /// Its name is generated using \a basename.
+  ///
+  /// \return The new node or NULL if \a nodeType is not among the allowed
+  /// node types specified using setNodeTypes().
+  ///
+  /// \sa nodeTypes()
+  /// \sa baseName()
+  virtual vtkMRMLNode* addNode(QString nodeType);
+
+  /// \brief Creates a node of the same type as the first in the "node types" property.
+  ///
+  /// Its name is generated using \a basename.
+  ///
+  /// \sa nodeTypes()
+  /// \sa baseName()
   virtual vtkMRMLNode* addNode();
 
   /// Removes the current node from the scene. The node reference count gets
@@ -295,7 +315,7 @@ signals:
 
   /// Advanced function.
   /// This signal is sent when the user chooses a node in the combobox.
-  /// The item's node is passed. Note that this signal is sent even when the 
+  /// The item's node is passed. Note that this signal is sent even when the
   /// choice is not changed. If you need to know when the choice actually
   /// changes, use signal currentNodeChanged().
   /// \sa QComboBox::activated.

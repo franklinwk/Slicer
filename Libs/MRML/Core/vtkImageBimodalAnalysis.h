@@ -19,7 +19,7 @@
 #include "vtkMRML.h"
 
 // VTK includes
-#include <vtkImageToImageFilter.h>
+#include <vtkImageAlgorithm.h>
 
 #define VTK_BIMODAL_MODALITY_CT 0
 #define VTK_BIMODAL_MODALITY_MR 1
@@ -31,21 +31,21 @@
 /// \warning
 /// FIXME: only works on output floating point
 /// FIXME: should use vtkTemplateMacro
-class VTK_MRML_EXPORT vtkImageBimodalAnalysis : public vtkImageToImageFilter
+class VTK_MRML_EXPORT vtkImageBimodalAnalysis : public vtkImageAlgorithm
 {
 public:
   static vtkImageBimodalAnalysis *New();
-  vtkTypeMacro(vtkImageBimodalAnalysis,vtkImageToImageFilter);
+  vtkTypeMacro(vtkImageBimodalAnalysis,vtkImageAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
 
-  /// 
+  ///
   /// Set the type of data, if known
   vtkSetMacro(Modality, int);
   vtkGetMacro(Modality, int);
   void SetModalityToMR() {this->SetModality(VTK_BIMODAL_MODALITY_MR);};
   void SetModalityToCT() {this->SetModality(VTK_BIMODAL_MODALITY_CT);};
- 
-  /// 
+
+  ///
   /// Get stats
   vtkGetMacro(Threshold, int);
   vtkGetMacro(Window, int);
@@ -55,10 +55,10 @@ public:
   vtkGetVectorMacro(SignalRange, int, 2);
   vtkGetVectorMacro(ClipExtent, int, 6);
 
-    vtkGetMacro(Offset, int);
-    vtkSetMacro(Offset, int);
-    
-  /// 
+  vtkGetMacro(Offset, int);
+  vtkSetMacro(Offset, int);
+
+  ///
   /// Ideally this should not be public API
   vtkSetMacro(Threshold, int);
   vtkSetMacro(Window, int);
@@ -82,11 +82,10 @@ protected:
   int ClipExtent[6];
   int SignalRange[2];
 
-    int Offset;
+  int Offset;
 
-  void ExecuteInformation(vtkImageData *input, vtkImageData *output);
-  void ExecuteInformation(){this->Superclass::ExecuteInformation();};
-  void ExecuteData(vtkDataObject *);
+  virtual int RequestInformation(vtkInformation *, vtkInformationVector **, vtkInformationVector *);
+  void ExecuteDataWithInformation(vtkDataObject *, vtkInformation*);
 
 private:
   vtkImageBimodalAnalysis(const vtkImageBimodalAnalysis&);

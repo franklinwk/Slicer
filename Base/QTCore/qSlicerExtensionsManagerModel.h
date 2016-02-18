@@ -26,6 +26,7 @@
 #include <QStringList>
 #include <QUrl>
 #include <QSettings>
+#include <QUuid>
 #include <QVariantMap>
 
 // CTK includes
@@ -33,6 +34,7 @@
 
 // QtGUI includes
 #include "qSlicerBaseQTCoreExport.h"
+#include "qSlicerExtensionDownloadTask.h"
 
 class QNetworkReply;
 class qSlicerExtensionsManagerModelPrivate;
@@ -106,6 +108,27 @@ public:
   /// \sa setExtensionEnabled, extensionEnabledChanged, enabledExtensions
   Q_INVOKABLE bool isExtensionEnabled(const QString& extensionName)const;
 
+  /// Get the names of all extensions scheduled for update.
+  ///
+  /// \sa scheduleExtensionForUpdate, isExtensionScheduledForUpdate,
+  ///     extensionScheduledForUpdate
+  QStringList scheduledForUpdateExtensions() const;
+
+  /// Check if an update is known to be available for the specified extension.
+  ///
+  /// \return \c true if a previous check for updates has determined that an
+  ///         update is available for the specified extension.
+  ///
+  /// \sa checkForUpdates
+  Q_INVOKABLE bool isExtensionUpdateAvailable(const QString& extensionName)const;
+
+  /// Test if extension is scheduled to be updated.
+  ///
+  /// \return \c true if \p extensionName is scheduled to be updated.
+  ///
+  /// \sa updateScheduledExtensions();
+  Q_INVOKABLE bool isExtensionScheduledForUpdate(const QString& extensionName)const;
+
   /// \brief Return names of all extensions scheduled for uninstall
   /// \sa scheduleExtensionForUninstall, isExtensionScheduledForUninstall, extensionScheduledForUninstall
   QStringList scheduledForUninstallExtensions() const;
@@ -154,9 +177,24 @@ public:
   /// \sa setServerUrl
   Q_INVOKABLE ExtensionMetadataType retrieveExtensionMetadata(const QString& extensionId);
 
+  /// Install extension from the specified archive file.
+  ///
+  /// This attempts to install an extension given only the archive file
+  /// containing the extension. The archive file is inspected in order to
+  /// determine the extension name.
+  ///
+  /// \sa installExtension(const QString&,ExtensionMetadataType,const QString&)
+  Q_INVOKABLE bool installExtension(const QString &archiveFile);
+
+  /// Install extension.
+  ///
+  /// This attempts to install an extension with the specified name and
+  /// metadata from the specified archive file. If the metadata is empty, the
+  /// metadata from the extension description contained in the archive is used.
+  ///
   /// \sa downloadExtension, isExtensionScheduledForUninstall, extensionScheduledForUninstall
   Q_INVOKABLE bool installExtension(const QString& extensionName,
-                                    const ExtensionMetadataType &extensionMetadata,
+                                    ExtensionMetadataType extensionMetadata,
                                     const QString &archiveFile);
 
   /// \brief Extract \a archiveFile into \a destinationPath/extensionName directory
@@ -194,7 +232,7 @@ public slots:
   /// \brief Download and install \a extensionId
   /// The \a extensionId correponds to the identifier used on the extension server itself.
   /// \sa installExtension, scheduleExtensionForUninstall, uninstallScheduledExtensions
-  void downloadAndInstallExtension(const QString& extensionId);
+  bool downloadAndInstallExtension(const QString& extensionId);
 
   /// \brief Schedule \a extensionName of uninstall
   /// Tell the application to uninstall \a extensionName when it will restart
@@ -208,9 +246,59 @@ public slots:
   /// \sa scheduleExtensionForUninstall
   bool cancelExtensionScheduledForUninstall(const QString& extensionName);
 
-  /// \sa scheduleExtensionForUninstall, isExtensionScheduledForUninstall
-  bool uninstallScheduledExtensions();
+  /// Check for updates to installed extensions.
+  ///
+  /// This checks each installed extension to see if it is the latest version.
+  /// If \p installUpdates is \c true, available updates will be automatically
+  /// scheduled for installation.
+  void checkForUpdates(bool installUpdates);
+
+  /// Schedule \p extensionName to be updated (reinstalled).
+  ///
+  /// This records \p extensionName in the list of extensions scheduled to be
+  /// updated (which is done by reinstalling the extension at next startup).
+  ///
+  /// \sa isExtensionScheduledForUpdate, updateScheduledExtensions
+  bool scheduleExtensionForUpdate(const QString& extensionName);
+
+  /// \brief Cancel the uninstallation of \a extensionName
+  /// Tell the application to keep \a extensionName installed
+  /// \sa scheduleExtensionForUninstall
+  bool cancelExtensionScheduledForUpdate(const QString& extensionName);
+
+  /// Update extensions scheduled for update.
+  ///
+  /// \param updatedExtensions
+  ///   QStringList which received the list of extensions which are
+  ///   successfully updated.
+  /// \return \c true if all scheduled extensions are successfully updated.
+  ///
+  /// \sa scheduleExtensionForUpdate, isExtensionScheduledForUpdate
+  bool updateScheduledExtensions(QStringList &updatedExtensions);
+
+  /// Update extensions scheduled for update.
+  ///
+  /// \return \c true if all scheduled extensions are successfully updated.
+  ///
+  /// \sa scheduleExtensionForUpdate, isExtensionScheduledForUpdate
+  bool updateScheduledExtensions();
+
+  /// Uninstall extensions scheduled for uninstall.
+  ///
+  /// \param uninstalledExtensions
+  ///   QStringList which received the list of extensions which are
+  ///   successfully uninstalled.
+  /// \return \c true if all scheduled extensions are successfully uninstalled.
+  ///
+  /// \sa scheduleExtensionForUninstall, isExtensionScheduledForUninstall,
   bool uninstallScheduledExtensions(QStringList &uninstalledExtensions);
+
+  /// Uninstall extensions scheduled for uninstall.
+  ///
+  /// \return \c true if all scheduled extensions are successfully uninstalled.
+  ///
+  /// \sa scheduleExtensionForUninstall, isExtensionScheduledForUninstall,
+  bool uninstallScheduledExtensions();
 
   void identifyIncompatibleExtensions();
 
@@ -226,13 +314,24 @@ signals:
 
   void downloadFinished(QNetworkReply * reply);
 
+  void updateDownloadProgress(const QString& extensionName,
+                              qint64 received, qint64 total);
+
   void modelUpdated();
 
+  void extensionUpdateAvailable(const QString& extensionName);
+
   void extensionInstalled(const QString& extensionName);
+
+  void extensionUpdated(const QString& extensionName);
 
   void extensionScheduledForUninstall(const QString& extensionName);
 
   void extensionCancelledScheduleForUninstall(const QString& extensionName);
+
+  void extensionScheduledForUpdate(const QString& extensionName);
+
+  void extensionCancelledScheduleForUpdate(const QString& extensionName);
 
   void extensionUninstalled(const QString& extensionName);
 
@@ -247,7 +346,17 @@ signals:
 protected slots:
 
   /// \sa downloadAndInstallExtension
-  void onDownloadFinished(QNetworkReply* reply);
+  void onInstallDownloadFinished(qSlicerExtensionDownloadTask* task);
+
+  /// \sa scheduleExtensionForUpdate
+  void onUpdateDownloadFinished(qSlicerExtensionDownloadTask* task);
+
+  void onUpdateDownloadProgress(qSlicerExtensionDownloadTask* task,
+                                qint64 received, qint64 total);
+
+  void onUpdateCheckComplete(const QUuid& requestId,
+                             const QList<QVariantMap>& results);
+  void onUpdateCheckFailed(const QUuid& requestId);
 
 protected:
   QScopedPointer<qSlicerExtensionsManagerModelPrivate> d_ptr;

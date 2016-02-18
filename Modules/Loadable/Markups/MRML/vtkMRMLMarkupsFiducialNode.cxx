@@ -22,6 +22,7 @@
 #include "vtkMRMLScene.h"
 
 // VTK includes
+#include <vtkNew.h>
 #include <vtkObjectFactory.h>
 
 // STD includes
@@ -138,6 +139,25 @@ vtkMRMLStorageNode* vtkMRMLMarkupsFiducialNode::CreateDefaultStorageNode()
 }
 
 //-------------------------------------------------------------------------
+void vtkMRMLMarkupsFiducialNode::CreateDefaultDisplayNodes()
+{
+  if (this->GetDisplayNode() != NULL &&
+      vtkMRMLMarkupsDisplayNode::SafeDownCast(this->GetDisplayNode()) != NULL)
+    {
+    // display node already exists
+    return;
+    }
+  if (this->GetScene()==NULL)
+    {
+    vtkErrorMacro("vtkMRMLMarkupsFiducialNode::CreateDefaultDisplayNodes failed: scene is invalid");
+    return;
+    }
+  vtkNew<vtkMRMLMarkupsDisplayNode> dispNode;
+  this->GetScene()->AddNode(dispNode.GetPointer());
+  this->SetAndObserveDisplayNodeID(dispNode->GetID());
+}
+
+//-------------------------------------------------------------------------
 vtkMRMLMarkupsDisplayNode *vtkMRMLMarkupsFiducialNode::GetMarkupsDisplayNode()
 {
   vtkMRMLDisplayNode *displayNode = this->GetDisplayNode();
@@ -152,26 +172,35 @@ vtkMRMLMarkupsDisplayNode *vtkMRMLMarkupsFiducialNode::GetMarkupsDisplayNode()
 //-------------------------------------------------------------------------
 int vtkMRMLMarkupsFiducialNode::AddFiducial(double x, double y, double z)
 {
+  return this->AddFiducial(x, y, z, std::string());
+}
+
+//-------------------------------------------------------------------------
+int vtkMRMLMarkupsFiducialNode::AddFiducial(double x, double y, double z,
+                                            std::string label)
+{
   vtkVector3d point;
   point.SetX(x);
   point.SetY(y);
   point.SetZ(z);
-  return this->AddPointToNewMarkup(point);
+  return this->AddPointToNewMarkup(point, label);
 }
 
 //-------------------------------------------------------------------------
-int vtkMRMLMarkupsFiducialNode::AddFiducialFromArray(double pos[3])
+
+//-------------------------------------------------------------------------
+int vtkMRMLMarkupsFiducialNode::AddFiducialFromArray(double pos[3], std::string label)
 {
-  return this->AddFiducial(pos[0], pos[1], pos[2]);
+  return this->AddFiducial(pos[0], pos[1], pos[2], label);
 }
 
 //-------------------------------------------------------------------------
 void vtkMRMLMarkupsFiducialNode::GetNthFiducialPosition(int n, double pos[3])
 {
   vtkVector3d point= this->GetMarkupPointVector(n, 0);
-  pos[0] = point.X();
-  pos[1] = point.Y();
-  pos[2] = point.Z();
+  pos[0] = point.GetX();
+  pos[1] = point.GetY();
+  pos[2] = point.GetZ();
 }
 
 //-------------------------------------------------------------------------

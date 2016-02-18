@@ -1,7 +1,8 @@
 import os
 import unittest
 import math
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
+import logging
 
 #
 # FiducialLayoutSwitchBug1914
@@ -136,46 +137,7 @@ class FiducialLayoutSwitchBug1914Widget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent().parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-
-    # delete the old widget instance
-    if hasattr(globals()['slicer'].modules, widgetName):
-      getattr(globals()['slicer'].modules, widgetName).cleanup()
-
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
-    setattr(globals()['slicer'].modules, widgetName, globals()[widgetName.lower()])
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="FiducialLayoutSwitchBug1914"):
     try:
@@ -186,8 +148,8 @@ class FiducialLayoutSwitchBug1914Widget:
     except Exception, e:
       import traceback
       traceback.print_exc()
-      qt.QMessageBox.warning(slicer.util.mainWindow(),
-          "Reload and Test", 'Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace")
+      slicer.util.warningDisplay("Reload and Test", 'Exception!\n\n' + str(e) +
+                                 "\n\nSee Python Console for Stack Trace")
 
 
 #
@@ -202,24 +164,14 @@ class FiducialLayoutSwitchBug1914Logic:
   requiring an instance of the Widget
   """
   def __init__(self):
-    pass
-
-  def delayDisplay(self,message,msec=1000):
-    #
-    # logic version of delay display
-    #
-    print(message)
-    self.info = qt.QDialog()
-    self.infoLayout = qt.QVBoxLayout()
-    self.info.setLayout(self.infoLayout)
-    self.label = qt.QLabel(message,self.info)
-    self.infoLayout.addWidget(self.label)
-    qt.QTimer.singleShot(msec, self.info.close)
-    self.info.exec_()
+    # test difference in display location and then in RAS if this is too fine
+    self.maximumDisplayDifference = 1.0
+    # for future testing: take into account the volume voxel size
+    self.maximumRASDifference = 1.0;
 
   def takeScreenshot(self,name,description,type=-1):
     # show the message even if not taking a screen shot
-    self.delayDisplay(description)
+    slicer.util.delayDisplay(description)
 
     if self.enableScreenshots == 0:
       return
@@ -227,24 +179,26 @@ class FiducialLayoutSwitchBug1914Logic:
     lm = slicer.app.layoutManager()
     # switch on the type to get the requested window
     widget = 0
-    if type == -1:
-      # full window
-      widget = slicer.util.mainWindow()
-    elif type == slicer.qMRMLScreenShotDialog().FullLayout:
+    if type == slicer.qMRMLScreenShotDialog.FullLayout:
       # full layout
       widget = lm.viewport()
-    elif type == slicer.qMRMLScreenShotDialog().ThreeD:
+    elif type == slicer.qMRMLScreenShotDialog.ThreeD:
       # just the 3D window
       widget = lm.threeDWidget(0).threeDView()
-    elif type == slicer.qMRMLScreenShotDialog().Red:
+    elif type == slicer.qMRMLScreenShotDialog.Red:
       # red slice window
       widget = lm.sliceWidget("Red")
-    elif type == slicer.qMRMLScreenShotDialog().Yellow:
+    elif type == slicer.qMRMLScreenShotDialog.Yellow:
       # yellow slice window
       widget = lm.sliceWidget("Yellow")
-    elif type == slicer.qMRMLScreenShotDialog().Green:
+    elif type == slicer.qMRMLScreenShotDialog.Green:
       # green slice window
       widget = lm.sliceWidget("Green")
+    else:
+      # default to using the full window
+      widget = slicer.util.mainWindow()
+      # reset the type so that the node is set correctly
+      type = slicer.qMRMLScreenShotDialog.FullLayout
 
     # grab and convert to vtk image data
     qpixMap = qt.QPixmap().grabWidget(widget)
@@ -271,7 +225,7 @@ class FiducialLayoutSwitchBug1914Logic:
     Run the actual algorithm
     """
 
-    self.delayDisplay('Running the aglorithm')
+    slicer.util.delayDisplay('Running the algorithm',500)
 
     self.enableScreenshots = enableScreenshots
     self.screenshotScaleFactor = screenshotScaleFactor
@@ -281,7 +235,7 @@ class FiducialLayoutSwitchBug1914Logic:
     lm.setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView)
     # without this delayed display, when running from the cmd line Slicer starts
     # up in a different layout and the seed won't get rendered in the right spot
-    self.delayDisplay("Conventional view")
+    slicer.util.delayDisplay("Conventional view",500)
 
     # Download MRHead from sample data
     import SampleData
@@ -295,7 +249,7 @@ class FiducialLayoutSwitchBug1914Logic:
     fidIndex = markupsLogic.AddFiducial(eye[0], eye[1], eye[2])
     fidID = markupsLogic.GetActiveListID()
     fidNode = slicer.mrmlScene.GetNodeByID(fidID)
-    self.delayDisplay("Placed a fiducial")
+    slicer.util.delayDisplay("Placed a fiducial at %g, %g, %g" % (eye[0], eye[1], eye[2]),500)
 
     # Pan and zoom
     sliceWidget = slicer.app.layoutManager().sliceWidget('Red')
@@ -304,48 +258,61 @@ class FiducialLayoutSwitchBug1914Logic:
     sliceNode = sliceLogic.GetSliceNode()
     sliceNode.SetXYZOrigin(-71.7, 129.7, 0.0)
     sliceNode.SetFieldOfView(98.3, 130.5, 1.0)
-    self.delayDisplay("Panned and zoomed")
+    slicer.util.delayDisplay("Panned and zoomed",500)
 
     # Get the seed widget seed location
     startingSeedDisplayCoords = [0.0, 0.0, 0.0]
     helper = self.getFiducialSliceDisplayableManagerHelper('Red')
-    if helper != None:
+    if helper is not None:
      seedWidget = helper.GetWidget(fidNode)
      seedRepresentation = seedWidget.GetSeedRepresentation()
      handleRep = seedRepresentation.GetHandleRepresentation(fidIndex)
      startingSeedDisplayCoords = handleRep.GetDisplayPosition()
      print('Starting seed display coords = %d, %d, %d' % (startingSeedDisplayCoords[0], startingSeedDisplayCoords[1], startingSeedDisplayCoords[2]))
-    self.takeScreenshot('FiducialLayoutSwitchBug1914-StartingPosition','Fiducial starting position',slicer.qMRMLScreenShotDialog().Red)
+    self.takeScreenshot('FiducialLayoutSwitchBug1914-StartingPosition','Fiducial starting position',slicer.qMRMLScreenShotDialog.Red)
 
     # Switch to red slice only
     lm.setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUpRedSliceView)
-    self.delayDisplay("Red Slice only")
+    slicer.util.delayDisplay("Red Slice only",500)
 
     # Switch to conventional layout
+    print 'Calling set layout back to conventional'
     lm.setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView)
-    self.delayDisplay("Conventional layout")
+    print 'Done calling set layout back to conventional'
+    slicer.util.delayDisplay("Conventional layout",500)
 
     # Get the current seed widget seed location
     endingSeedDisplayCoords = [0.0, 0.0, 0.0]
     helper = self.getFiducialSliceDisplayableManagerHelper('Red')
-    if helper != None:
+    if helper is not None:
      seedWidget = helper.GetWidget(fidNode)
      seedRepresentation = seedWidget.GetSeedRepresentation()
      handleRep = seedRepresentation.GetHandleRepresentation(fidIndex)
      endingSeedDisplayCoords = handleRep.GetDisplayPosition()
      print('Ending seed display coords = %d, %d, %d' % (endingSeedDisplayCoords[0], endingSeedDisplayCoords[1], endingSeedDisplayCoords[2]))
-    self.takeScreenshot('FiducialLayoutSwitchBug1914-EndingPosition','Fiducial ending position',slicer.qMRMLScreenShotDialog().Red)
+    self.takeScreenshot('FiducialLayoutSwitchBug1914-EndingPosition','Fiducial ending position',slicer.qMRMLScreenShotDialog.Red)
 
     # Compare to original seed widget location
     diff = math.pow((startingSeedDisplayCoords[0] - endingSeedDisplayCoords[0]),2) + math.pow((startingSeedDisplayCoords[1] - endingSeedDisplayCoords[1]),2) + math.pow((startingSeedDisplayCoords[2] - endingSeedDisplayCoords[2]),2)
     if diff != 0.0:
       diff = math.sqrt(diff)
-    self.delayDisplay("Difference between starting and ending seed display coordinates = %g" % diff)
+    slicer.util.delayDisplay("Difference between starting and ending seed display coordinates = %g" % diff)
 
-    if diff > 1.0:
-      # raise Exception("Display coordinate difference is too large!\nExpected < 1.0 but got %g" % (diff))
-      print("Display coordinate difference is too large!\nExpected < 1.0 but got %g" % (diff))
-      return False
+    if diff > self.maximumDisplayDifference:
+      # double check against the RAS coordinates of the underlying volume since the display could have changed with a FOV adjustment.
+      sliceView = sliceWidget.sliceView()
+      volumeRAS = sliceView.convertXYZToRAS(endingSeedDisplayCoords)
+      seedRAS = [0,0,0]
+      fidNode.GetNthFiducialPosition(0,seedRAS)
+      rasDiff = math.pow((seedRAS[0] - volumeRAS[0]),2) + math.pow((seedRAS[1] - volumeRAS[1]),2) + math.pow((seedRAS[2] - volumeRAS[2]),2)
+      if rasDiff != 0.0:
+        rasDiff = math.sqrt(rasDiff)
+      print 'Checking the difference between fiducial RAS position',seedRAS,'and volume RAS as derived from the fiducial display position',volumeRAS,': ',rasDiff
+      if rasDiff > self.maximumRASDifference:
+        slicer.util.delayDisplay("RAS coordinate difference is too large as well!\nExpected < %g but got %g" % (self.maximumRASDifference, rasDiff))
+        return False
+      else:
+        slicer.util.delayDisplay("RAS coordinate difference is %g which is < %g, test passes." % (rasDiff, self.maximumRASDifference))
 
     if enableScreenshots == 1:
       # compare the screen snapshots
@@ -361,20 +328,20 @@ class FiducialLayoutSwitchBug1914Logic:
       shotDiff = imageMath.GetOutput()
       # save it as a scene view
       annotationLogic = slicer.modules.annotations.logic()
-      annotationLogic.CreateSnapShot("FiducialLayoutSwitchBug1914-Diff", "Difference between starting and ending fiducial seed positions",slicer.qMRMLScreenShotDialog().Red, screenshotScaleFactor, shotDiff)
+      annotationLogic.CreateSnapShot("FiducialLayoutSwitchBug1914-Diff", "Difference between starting and ending fiducial seed positions",slicer.qMRMLScreenShotDialog.Red, screenshotScaleFactor, shotDiff)
       # calculate the image difference
       imageStats = vtk.vtkImageHistogramStatistics()
       imageStats.SetInput(shotDiff)
       imageStats.GenerateHistogramImageOff()
       imageStats.Update()
       meanVal = imageStats.GetMean()
-      self.delayDisplay("Mean of image difference = %g" % meanVal)
+      slicer.util.delayDisplay("Mean of image difference = %g" % meanVal)
       if meanVal > 5.0:
         # raise Exception("Image difference is too great!\nExpected <= 5.0, but got %g" % (meanVal))
         print("Image difference is too great!\nExpected <= 5.0, but got %g" % (meanVal))
         return False
 
-    self.delayDisplay('Test passed!')
+    slicer.util.delayDisplay('Test passed!')
     return True
 
 
@@ -382,23 +349,6 @@ class FiducialLayoutSwitchBug1914Test(unittest.TestCase):
   """
   This is the test case for your scripted module.
   """
-
-  def delayDisplay(self,message,msec=1000):
-    """This utility method displays a small dialog and waits.
-    This does two things: 1) it lets the event loop catch up
-    to the state of the test so that rendering and widget updates
-    have all taken place before the test continues and 2) it
-    shows the user/developer/tester the state of the test
-    so that we'll know when it breaks.
-    """
-    print(message)
-    self.info = qt.QDialog()
-    self.infoLayout = qt.QVBoxLayout()
-    self.info.setLayout(self.infoLayout)
-    self.label = qt.QLabel(message,self.info)
-    self.infoLayout.addWidget(self.label)
-    qt.QTimer.singleShot(msec, self.info.close)
-    self.info.exec_()
 
   def setUp(self):
     """ Do whatever is needed to reset the state - typically a scene clear will be enough.
@@ -412,11 +362,13 @@ class FiducialLayoutSwitchBug1914Test(unittest.TestCase):
     self.test_FiducialLayoutSwitchBug19141()
 
   def test_FiducialLayoutSwitchBug19141(self):
+    logging.info("ctest, please don't truncate my output: CTEST_FULL_OUTPUT")
     logic = FiducialLayoutSwitchBug1914Logic()
     returnFlag = logic.run()
     if returnFlag == True:
-      self.delayDisplay('Test passed!')
+      slicer.util.delayDisplay('Test passed!')
     else:
-      self.delayDisplay('Test failed!')
+      slicer.util.delayDisplay('Test failed!')
+    self.assertTrue(returnFlag)
 
 

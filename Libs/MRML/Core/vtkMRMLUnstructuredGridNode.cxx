@@ -23,6 +23,7 @@ Version:   $Revision: 1.3 $
 #include "vtkObjectFactory.h"
 #include "vtkTransformFilter.h"
 #include "vtkUnstructuredGrid.h"
+#include <vtkVersion.h>
 
 // STD includes
 
@@ -47,7 +48,7 @@ vtkMRMLUnstructuredGridNode::~vtkMRMLUnstructuredGridNode()
 //-------------------------------
 void vtkMRMLUnstructuredGridNode::PrintSelf(ostream& os, vtkIndent indent)
 {
-  
+
   Superclass::PrintSelf(os,indent);
   if( this->UnstructuredGrid )
     {
@@ -74,7 +75,7 @@ void vtkMRMLUnstructuredGridNode::SetAndObserveUnstructuredGrid(vtkUnstructuredG
 {
 if (this->UnstructuredGrid != NULL)
     {
-    vtkEventBroker::GetInstance()->RemoveObservations( 
+    vtkEventBroker::GetInstance()->RemoveObservations(
       this->UnstructuredGrid, vtkCommand::ModifiedEvent, this, this->MRMLCallbackCommand );
     }
 
@@ -85,7 +86,7 @@ if (this->UnstructuredGrid != NULL)
 
   if (this->UnstructuredGrid != NULL)
     {
-    vtkEventBroker::GetInstance()->AddObservation( 
+    vtkEventBroker::GetInstance()->AddObservation(
       this->UnstructuredGrid, vtkCommand::ModifiedEvent, this, this->MRMLCallbackCommand );
     }
 
@@ -114,7 +115,7 @@ void vtkMRMLUnstructuredGridNode::UpdateScene(vtkMRMLScene *scene)
 
 //---------------------------------------------------------------------------
 void vtkMRMLUnstructuredGridNode::ProcessMRMLEvents ( vtkObject *caller,
-                                           unsigned long event, 
+                                           unsigned long event,
                                            void *callData )
 {
   Superclass::ProcessMRMLEvents(caller, event, callData);
@@ -130,7 +131,7 @@ bool vtkMRMLUnstructuredGridNode::CanApplyNonLinearTransforms()const
 void vtkMRMLUnstructuredGridNode::ApplyTransform(vtkAbstractTransform* transform)
 {
   vtkTransformFilter* transformFilter = vtkTransformFilter::New();
-  transformFilter->SetInput(this->GetUnstructuredGrid());
+  transformFilter->SetInputData(this->GetUnstructuredGrid());
   transformFilter->SetTransform(transform);
   transformFilter->Update();
 

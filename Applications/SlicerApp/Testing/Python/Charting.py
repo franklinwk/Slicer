@@ -4,7 +4,7 @@ import math
 import datetime
 import time
 import random
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # Charting
@@ -101,40 +101,7 @@ class ChartingWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="Charting"):
     self.onReload()
@@ -147,8 +114,8 @@ class ChartingWidget:
 #
 
 class ChartingLogic:
-  """This class should implement all the actual 
-  computation done by your module.  The interface 
+  """This class should implement all the actual
+  computation done by your module.  The interface
   should be such that other python code can import
   this class and make use of the functionality without
   requiring an instance of the Widget
@@ -157,14 +124,14 @@ class ChartingLogic:
     pass
 
   def hasImageData(self,volumeNode):
-    """This is a dummy logic method that 
+    """This is a dummy logic method that
     returns true if the passed in volume
     node has valid image data
     """
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -228,7 +195,7 @@ class ChartingTest(unittest.TestCase):
 
     #volumeNode = slicer.util.getNode(pattern="FA")
     #logic = ChartingLogic()
-    #self.assertTrue( logic.hasImageData(volumeNode) )
+    #self.assertIsNotNone( logic.hasImageData(volumeNode) )
 
     # Change the layout to one that has a chart.  This created the ChartView
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
@@ -236,7 +203,7 @@ class ChartingTest(unittest.TestCase):
 
     # Get the first ChartView node
     cvn = slicer.util.getNode(pattern='vtkMRMLChartViewNode*')
-    
+
     # Create arrays of data
     dn = slicer.mrmlScene.AddNode(slicer.vtkMRMLDoubleArrayNode())
     a = dn.GetArray()
@@ -256,7 +223,7 @@ class ChartingTest(unittest.TestCase):
       a.SetComponent(i, 1, math.cos(x[i]/50.0))
       a.SetComponent(i, 2, 0)
 
-    # Create the ChartNode, 
+    # Create the ChartNode,
     cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
 
     # Add data to the Chart
@@ -368,10 +335,10 @@ class ChartingTest(unittest.TestCase):
     # Set the chart to display
     cvn.SetChartNodeID(cn.GetID())
     self.delayDisplay('A chart with dates')
-    
+
 
     # Test using a color table to look up label names
-    # 
+    #
     #
 
     # Create another data array
@@ -387,7 +354,7 @@ class ChartingTest(unittest.TestCase):
     a.SetComponent(2, 1, 20)
     a.SetComponent(3, 0, 5)
     a.SetComponent(3, 1, 6)
-    
+
 
     # Create another ChartNode
     cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
@@ -406,7 +373,7 @@ class ChartingTest(unittest.TestCase):
     # Set the chart to display
     cvn.SetChartNodeID(cn.GetID())
     self.delayDisplay('A chart with labels')
-    
+
     # Test box plots
     #
     #
@@ -443,7 +410,7 @@ class ChartingTest(unittest.TestCase):
     for i in range(5):
       a.SetComponent(20+i, 0, 2)
       a.SetComponent(20+i, 1, 10.0*(2.0*random.random()-1.0) + 24.0)
-    
+
     # Create another ChartNode
     cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
 

@@ -8,19 +8,13 @@ set(VTKITKTESTVECTORREADER_SOURCE VTKITKVectorReader.cxx)
 add_executable(VTKITKVectorReader ${VTKITKTESTVECTORREADER_SOURCE})
 target_link_libraries(VTKITKVectorReader
   vtkITK)
+
+set_target_properties(VTKITKVectorReader PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+
 add_test(
   NAME VTKITKVectorReader
   COMMAND ${Slicer_LAUNCH_COMMAND} $<TARGET_FILE:VTKITKVectorReader>
     ${MRML_TEST_DATA_DIR}/fixed.nrrd
-  )
-
-set(VTKITKBSPLINETRANSFORM_SOURCE VTKITKBSplineTransform.cxx)
-add_executable(VTKITKBSplineTransform ${VTKITKBSPLINETRANSFORM_SOURCE})
-target_link_libraries(VTKITKBSplineTransform
-  vtkITK)
-add_test(
-  NAME VTKITKBSplineTransform
-  COMMAND ${Slicer_LAUNCH_COMMAND} $<TARGET_FILE:VTKITKBSplineTransform> VTKITKBSplineTransform
   )
 
 slicer_add_python_unittest(SCRIPT vtkITKArchetypeDiffusionTensorReaderFile.py)

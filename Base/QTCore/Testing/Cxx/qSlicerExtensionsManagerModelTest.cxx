@@ -458,7 +458,7 @@ void qSlicerExtensionsManagerModelTester::testServerKeysToIgnore_data()
   QTest::addColumn<QStringList>("expectedServerKeysToIgnore");
 
   QTest::newRow("0") << (QStringList()
-                         << "item_id" << "extension_id" << "bitstream_id"
+                         << "item_id" << "bitstream_id"
                          << "submissiontype" << "codebase" << "package"
                          << "size" << "date_creation");
 }
@@ -488,6 +488,7 @@ void qSlicerExtensionsManagerModelTester::testServerToExtensionDescriptionKey_da
   expected.insert("repository_type", "scm");
   expected.insert("repository_url", "scmurl");
   expected.insert("development_status", "status");
+  expected.insert("icon_url", "iconurl");
 
   QTest::newRow("0") << expected.keys() << expected.values();
 }
@@ -1724,7 +1725,7 @@ void qSlicerExtensionsManagerModelTester::testExtensionExtensionsSettingsUpdated
   QFETCH(ExtensionIdType, extensionIdToInstall);
   QFETCH(QStringList, libraryPaths);
   QFETCH(QStringList, paths);
-  QFETCH(QString, pythonPath);
+  QFETCH(QStringList, pythonPaths);
 
   qSlicerExtensionsManagerModel model;
   model.setExtensionsSettingsFilePath(QSettings().fileName());
@@ -1755,8 +1756,9 @@ void qSlicerExtensionsManagerModelTester::testExtensionExtensionsSettingsUpdated
       qSlicerExtensionsManagerModel::readArrayValues(extensionsSettings, "Paths", "path");
   QCOMPARE(currentPaths, paths);
 
-  QString currentPythonPath = extensionsSettings.value("EnvironmentVariables/PYTHONPATH").toString();
-  QCOMPARE(currentPythonPath, pythonPath);
+  QStringList currentPythonPaths =
+      qSlicerExtensionsManagerModel::readArrayValues(extensionsSettings, "PYTHONPATH", "path");
+  QCOMPARE(currentPythonPaths, pythonPaths);
 }
 
 // ----------------------------------------------------------------------------
@@ -1771,7 +1773,7 @@ void qSlicerExtensionsManagerModelTester::testExtensionExtensionsSettingsUpdated
   QTest::addColumn<ExtensionIdType>("extensionIdToInstall");
   QTest::addColumn<QStringList>("libraryPaths");
   QTest::addColumn<QStringList>("paths");
-  QTest::addColumn<QString>("pythonPath");
+  QTest::addColumn<QStringList>("pythonPaths");
 
   QString operatingSystem = Slicer_OS_LINUX_NAME;
   QString architecture("amd64");
@@ -1789,7 +1791,7 @@ void qSlicerExtensionsManagerModelTester::testExtensionExtensionsSettingsUpdated
             << this->Tmp.filePath("CLIExtensionTemplate/" + lib_dir)
             << this->Tmp.filePath("CLIExtensionTemplate/" + climodules_lib_dir))
         << (QStringList() << this->Tmp.filePath("CLIExtensionTemplate/" + climodules_lib_dir))
-        << QString();
+        << QStringList();
   }
 
 #ifdef Slicer_USE_PYTHONQT
@@ -1806,7 +1808,8 @@ void qSlicerExtensionsManagerModelTester::testExtensionExtensionsSettingsUpdated
             << this->Tmp.filePath("LoadableExtensionTemplate/" + lib_dir)
             << this->Tmp.filePath("LoadableExtensionTemplate/" + qtloadablemodules_lib_dir))
         << QStringList()
-        << QString("<PATHSEP>" + this->Tmp.filePath("LoadableExtensionTemplate/" + qtloadablemodules_python_lib_dir));
+        << (QStringList()
+            << this->Tmp.filePath("LoadableExtensionTemplate/" + qtloadablemodules_python_lib_dir));
   }
 #endif
 
@@ -1823,7 +1826,8 @@ void qSlicerExtensionsManagerModelTester::testExtensionExtensionsSettingsUpdated
         << ExtensionIdType(operatingSystem, extensionId)
         << (QStringList() << this->Tmp.filePath("ScriptedLoadableExtensionTemplate/" + lib_dir))
         << QStringList()
-        << QString("<PATHSEP>" + this->Tmp.filePath("ScriptedLoadableExtensionTemplate/" + qtscriptedmodules_lib_dir));
+        << (QStringList()
+            << this->Tmp.filePath("ScriptedLoadableExtensionTemplate/" + qtscriptedmodules_lib_dir));
   }
 
   {
@@ -1841,7 +1845,8 @@ void qSlicerExtensionsManagerModelTester::testExtensionExtensionsSettingsUpdated
             << this->Tmp.filePath("SuperBuildLoadableExtensionTemplate/" + lib_dir)
             << this->Tmp.filePath("SuperBuildLoadableExtensionTemplate/" + qtloadablemodules_lib_dir))
         << QStringList()
-        << QString("<PATHSEP>" + this->Tmp.filePath("SuperBuildLoadableExtensionTemplate/" + qtloadablemodules_python_lib_dir));
+        << (QStringList()
+            << this->Tmp.filePath("SuperBuildLoadableExtensionTemplate/" + qtloadablemodules_python_lib_dir));
   }
 #endif
 
@@ -1852,7 +1857,7 @@ void qSlicerExtensionsManagerModelTester::testExtensionExtensionsSettingsUpdated
         << ExtensionIdType("", -1)
         << QStringList()
         << QStringList()
-        << QString();
+        << QStringList();
   }
 }
 

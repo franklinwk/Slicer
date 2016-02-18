@@ -23,14 +23,13 @@
 #include "vtkRenderWindowInteractor.h"
 #include "vtkObjectFactory.h"
 #include "vtkWidgetEventTranslator.h"
-#include "vtkWidgetCallbackMapper.h" 
+#include "vtkWidgetCallbackMapper.h"
 #include "vtkEvent.h"
 #include "vtkWidgetEvent.h"
 #include "vtkRenderWindow.h"
 #include "vtkRenderer.h"
 
 
-vtkCxxRevisionMacro(vtkAnnotationROIWidget2D, "$Revision: 12141 $");
 vtkStandardNewMacro(vtkAnnotationROIWidget2D);
 
 //----------------------------------------------------------------------------
@@ -40,7 +39,7 @@ vtkAnnotationROIWidget2D::vtkAnnotationROIWidget2D()
 
 //----------------------------------------------------------------------------
 vtkAnnotationROIWidget2D::~vtkAnnotationROIWidget2D()
-{  
+{
 }
 
 //----------------------------------------------------------------------

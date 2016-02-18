@@ -26,6 +26,9 @@
 // QtCore includes
 #include "qSlicerSceneBundleReader.h"
 
+// CTK includes
+#include <ctkUtils.h>
+
 // MRML includes
 #include <vtkMRMLScene.h>
 
@@ -68,31 +71,37 @@ bool qSlicerSceneBundleReader::load(const qSlicerIO::IOProperties& properties)
   Q_ASSERT(properties.contains("fileName"));
   QString file = properties["fileName"].toString();
 
+  // check for a relative path as the unzip will need an absolute one
+  QFileInfo fileInfo(file);
+  if (fileInfo.isRelative())
+    {
+    fileInfo = QFileInfo(QDir::currentPath(), file);
+    file = fileInfo.absoluteFilePath();
+    }
+
   // TODO: switch to QTemporaryDir in Qt5.
-  // For now, create a named directory and use
-  // kwsys calls to remove it
-  QString unpackPath( QDir::tempPath() + 
-                        QString("/__BundleLoadTemp") + 
+  QString unpackPath( QDir::tempPath() +
+                        QString("/__BundleLoadTemp") +
                           QDateTime::currentDateTime().toString("yyyy-MM-dd_hh+mm+ss.zzz") );
 
-  qDebug() << "Unpacking bundle to " << unpackPath;
+  qDebug() << "Unpacking bundle " << file << " to " << unpackPath;
 
-  if (vtksys::SystemTools::FileIsDirectory(unpackPath.toLatin1()))
+  if (QFileInfo(unpackPath).isDir())
     {
-    if ( !vtksys::SystemTools::RemoveADirectory(unpackPath.toLatin1()) )
+    if (!ctk::removeDirRecursively(unpackPath))
       {
       return false;
       }
     }
 
-  if ( !vtksys::SystemTools::MakeDirectory(unpackPath.toLatin1()) )
+  if (!QDir().mkpath(unpackPath))
     {
     return false;
     }
 
   vtkNew<vtkMRMLApplicationLogic> appLogic;
   appLogic->SetMRMLScene( this->mrmlScene() );
-  std::string mrmlFile = appLogic->UnpackSlicerDataBundle( 
+  std::string mrmlFile = appLogic->UnpackSlicerDataBundle(
                                           file.toLatin1(), unpackPath.toLatin1() );
 
   this->mrmlScene()->SetURL(mrmlFile.c_str());
@@ -112,11 +121,20 @@ bool qSlicerSceneBundleReader::load(const qSlicerIO::IOProperties& properties)
     res = this->mrmlScene()->Import();
     }
 
-  if ( !vtksys::SystemTools::RemoveADirectory(unpackPath.toLatin1()) )
+  if (!ctk::removeDirRecursively(unpackPath))
     {
     return false;
     }
 
   qDebug() << "Loaded bundle from " << unpackPath;
+  // since the unpack path has been deleted, reset the scene to where the data bundle is
+  QString mrbDirectoryPath = QFileInfo(file).dir().absolutePath();
+  QString mrbBaseName = QFileInfo(file).baseName();
+  QString resetURL = mrbDirectoryPath + QString("/") + mrbBaseName + QString(".mrml");
+  this->mrmlScene()->SetURL(resetURL.toLatin1());
+  qDebug() << "Reset scene to point to the MRB directory " << this->mrmlScene()->GetURL();
+  // and mark storable nodes as modified since read
+  this->mrmlScene()->SetStorableNodesModifiedSinceRead();
+  // MRBs come with default scene views, but the paths of storage nodes in there can be still pointing to the bundle extraction directory that was removed. Clear out the file lists at least so that they get reset
   return res;
 }

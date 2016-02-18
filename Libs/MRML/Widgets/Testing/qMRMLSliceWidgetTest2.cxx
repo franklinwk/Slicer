@@ -59,9 +59,6 @@ vtkMRMLScalarVolumeNode* loadVolume(const char* volume, vtkMRMLScene* scene)
   scalarNode->SetName("foo");
   scalarNode->SetScene(scene);
   displayNode->SetScene(scene);
-  //vtkSlicerColorLogic *colorLogic = vtkSlicerColorLogic::New();
-  //displayNode->SetAndObserveColorNodeID(colorLogic->GetDefaultVolumeColorNodeID());
-  //colorLogic->Delete();
   scene->AddNode(storageNode.GetPointer());
   scene->AddNode(displayNode.GetPointer());
   scalarNode->SetAndObserveStorageNodeID(storageNode->GetID());
@@ -69,10 +66,11 @@ vtkMRMLScalarVolumeNode* loadVolume(const char* volume, vtkMRMLScene* scene)
   scene->AddNode(scalarNode.GetPointer());
   storageNode->ReadData(scalarNode.GetPointer());
 
-  vtkMRMLColorTableNode* colorNode = vtkMRMLColorTableNode::New();
+  // Default color tables are not present in the scene if there is no vtkMRMLColorLogic,
+  // therefore we need to create and set the color node manually.
+  vtkNew<vtkMRMLColorTableNode> colorNode;
   colorNode->SetTypeToGrey();
-  scene->AddNode(colorNode);
-  colorNode->Delete();
+  scene->AddNode(colorNode.GetPointer());
   displayNode->SetAndObserveColorNodeID(colorNode->GetID());
 
   return scalarNode.GetPointer();
@@ -124,7 +122,9 @@ int qMRMLSliceWidgetTest2(int argc, char * argv [] )
   QStringList expectedDisplayableManagerClassNames =
     QStringList() << "vtkMRMLVolumeGlyphSliceDisplayableManager"
                   << "vtkMRMLModelSliceDisplayableManager"
-                  << "vtkMRMLCrosshairDisplayableManager";
+                  << "vtkMRMLCrosshairDisplayableManager"
+                  << "vtkMRMLOrientationMarkerDisplayableManager"
+                  << "vtkMRMLRulerDisplayableManager";
   qMRMLSliceView *sliceView = const_cast<qMRMLSliceView*>(sliceWidget.sliceView());
   vtkNew<vtkCollection> collection;
   sliceView->getDisplayableManagers(collection.GetPointer());
@@ -140,8 +140,8 @@ int qMRMLSliceWidgetTest2(int argc, char * argv [] )
     }
   for (int i = 0; i < numManagers; ++i)
     {
-    vtkMRMLAbstractSliceViewDisplayableManager *sliceViewDM =
-      vtkMRMLAbstractSliceViewDisplayableManager::SafeDownCast(collection->GetItemAsObject(i));
+    vtkMRMLAbstractDisplayableManager *sliceViewDM =
+      vtkMRMLAbstractDisplayableManager::SafeDownCast(collection->GetItemAsObject(i));
     if (sliceViewDM)
       {
       std::cout << "\tDisplayable manager " << i << " class name = " << sliceViewDM->GetClassName() << std::endl;
@@ -170,5 +170,6 @@ int qMRMLSliceWidgetTest2(int argc, char * argv [] )
     {
     QTimer::singleShot(1000, &app, SLOT(quit()));
     }
+
   return app.exec();
 }

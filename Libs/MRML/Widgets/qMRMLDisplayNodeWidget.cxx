@@ -61,7 +61,7 @@ void qMRMLDisplayNodeWidgetPrivate::init()
 {
   Q_Q(qMRMLDisplayNodeWidget);
   this->setupUi(q);
-  
+
   QObject::connect(this->VisibilityCheckBox, SIGNAL(toggled(bool)),
                    q, SLOT(setVisibility(bool)));
   QObject::connect(this->SelectedCheckBox, SIGNAL(toggled(bool)),
@@ -261,6 +261,7 @@ void qMRMLDisplayNodeWidget::updateWidgetFromMRML()
     return;
     }
   d->VisibilityCheckBox->setChecked(d->MRMLDisplayNode->GetVisibility());
+  d->DisplayNodeViewComboBox->setMRMLDisplayNode(d->MRMLDisplayNode);
   d->SelectedCheckBox->setEnabled(d->MRMLDisplayNode->GetSelectable());
   d->SelectedCheckBox->setChecked(d->MRMLDisplayNode->GetSelected());
   d->ClippingCheckBox->setChecked(d->MRMLDisplayNode->GetClipping());

@@ -25,12 +25,24 @@
 #include "qSlicerApplication.h"
 #include "qSlicerCoreIOManager.h"
 #include "qSlicerNodeWriter.h"
+
 #include "vtkSlicerTransformLogic.h"
+#include "vtkMRMLSliceViewDisplayableManagerFactory.h"
+#include "vtkMRMLThreeDViewDisplayableManagerFactory.h"
 
 // Transforms includes
 #include "qSlicerTransformsModule.h"
 #include "qSlicerTransformsModuleWidget.h"
 #include "qSlicerTransformsReader.h"
+#include "vtkMRMLTransformsDisplayableManager2D.h"
+#include "vtkMRMLTransformsDisplayableManager3D.h"
+
+// VTK includes
+#include "vtkSmartPointer.h"
+
+// SubjectHierarchy Plugins includes
+#include "qSlicerSubjectHierarchyPluginHandler.h"
+#include "qSlicerSubjectHierarchyTransformsPlugin.h"
 
 //-----------------------------------------------------------------------------
 Q_EXPORT_PLUGIN2(qSlicerTransformsModule, qSlicerTransformsModule);
@@ -115,6 +127,8 @@ QStringList qSlicerTransformsModule::contributors()const
   moduleContributors << QString("Alex Yarmarkovich (Isomics)");
   moduleContributors << QString("Jean-Christophe Fillion-Robin (Kitware)");
   moduleContributors << QString("Julien Finet (Kitware)");
+  moduleContributors << QString("Andras Lasso (PerkLab, Queen's)");
+  moduleContributors << QString("Franklin King (PerkLab, Queen's)");
   return moduleContributors;
 }
 
@@ -132,5 +146,16 @@ void qSlicerTransformsModule::setup()
     new qSlicerTransformsReader(transformLogic, this));
   app->coreIOManager()->registerIO(new qSlicerNodeWriter(
     "Transforms", QString("TransformFile"),
-    QStringList() << "vtkMRMLTransformNode", this));
+    QStringList() << "vtkMRMLTransformNode", true, this));
+
+  // Use the displayable manager class to make sure the the containing library is loaded
+  vtkSmartPointer<vtkMRMLTransformsDisplayableManager2D> dm2d=vtkSmartPointer<vtkMRMLTransformsDisplayableManager2D>::New();
+  vtkSmartPointer<vtkMRMLTransformsDisplayableManager3D> dm3d=vtkSmartPointer<vtkMRMLTransformsDisplayableManager3D>::New();
+
+  // Register displayable managers
+  vtkMRMLSliceViewDisplayableManagerFactory::GetInstance()->RegisterDisplayableManager("vtkMRMLTransformsDisplayableManager2D");
+  vtkMRMLThreeDViewDisplayableManagerFactory::GetInstance()->RegisterDisplayableManager("vtkMRMLTransformsDisplayableManager3D");
+
+  // Register Subject Hierarchy core plugins
+  qSlicerSubjectHierarchyPluginHandler::instance()->registerPlugin(new qSlicerSubjectHierarchyTransformsPlugin());
 }

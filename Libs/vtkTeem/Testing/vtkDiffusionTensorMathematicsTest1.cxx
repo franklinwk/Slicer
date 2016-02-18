@@ -27,6 +27,7 @@
 #include <vtkMultiThreader.h>
 #include <vtkNew.h>
 #include <vtkPointData.h>
+#include <vtkVersion.h>
 
 //----------------------------------------------------------------------------
 int vtkDiffusionTensorMathematicsTest1(int vtkNotUsed(argc), char* vtkNotUsed(argv)[])
@@ -71,9 +72,7 @@ int vtkDiffusionTensorMathematicsTest1(int vtkNotUsed(argc), char* vtkNotUsed(ar
   maskImage->SetDimensions(dimensions);
   maskImage->SetSpacing(1.5, 10., 100.);
   maskImage->SetOrigin(-10., 40, 0.1);
-  maskImage->SetScalarTypeToShort();
-  maskImage->SetNumberOfScalarComponents(9);
-  maskImage->AllocateScalars();
+  maskImage->AllocateScalars(VTK_SHORT, 9);
 
   short* maskPtr = reinterpret_cast<short*>(maskImage->GetScalarPointer());
   for (int z=0; z < dimensions[2]; ++z )
@@ -92,7 +91,7 @@ int vtkDiffusionTensorMathematicsTest1(int vtkNotUsed(argc), char* vtkNotUsed(ar
 
   // Execute the filter
   vtkNew<vtkDiffusionTensorMathematics> filter;
-  filter->SetInput(tensorImage.GetPointer());
+  filter->SetInputData(tensorImage.GetPointer());
   filter->SetScalarMask(maskImage.GetPointer());
   filter->SetMaskLabelValue(0);  // mask all the labels different from 0
   filter->SetMaskWithScalars(1); // turn on masking
@@ -102,7 +101,7 @@ int vtkDiffusionTensorMathematicsTest1(int vtkNotUsed(argc), char* vtkNotUsed(ar
     {
     filter->SetOperation(i);
     filter->Update();
-    
+
     std::cout << "Operation " << i << ":" << std::endl;
     // Checkout the results
     vtkImageData* output = filter->GetOutput();

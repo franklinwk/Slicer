@@ -46,7 +46,7 @@
 #include "itkSubtractImageFilter.h"
 #include "itkRescaleIntensityImageFilter.h"
 #include "itkExtractImageFilter.h"
-#include "itkDifferenceImageFilter.h"
+#include "itkTestingComparisonImageFilter.h"
 #include "itkDifferenceDiffusionTensor3DImageFilter.h"
 #include "itkDiffusionTensor3D.h"
 #include "itkImageRegion.h"
@@ -55,9 +55,7 @@
 #include "itkFloatingPointExceptions.h"
 #include <itkTensorFractionalAnisotropyImageFilter.h>
 #include "itkPluginUtilities.h"
-#if ITK_VERSION_MAJOR > 3
-#  include <itkFactoryRegistration.h>
-#endif
+#include <itkFactoryRegistration.h>
 
 #define ITK_TEST_DIMENSION_MAX 6
 
@@ -68,10 +66,10 @@ std::map<std::string, MainFuncPointer> StringToTestFunctionMap;
   extern int test(int, char * [] ); \
   StringToTestFunctionMap[#test] = test
 
-int RegressionTestImage(const char *testImageFilename, 
+int RegressionTestImage(const char *testImageFilename,
                         const char *baselineImageFilename,
                         int reportErrors,
-                        double intensityTolerance = 2.0, 
+                        double intensityTolerance = 2.0,
                         ::itk::SizeValueType numberOfPixelsTolerance = 0,
                         unsigned int radiusTolerance = 0);
 
@@ -103,9 +101,7 @@ int main(int ac, char* av[] )
   typedef std::pair<char *, char *> ComparePairType;
   std::vector<ComparePairType> compareList;
 
-#if ITK_VERSION_MAJOR > 3
   itk::itkFactoryRegistration();
-#endif
 
   RegisterTests();
   std::string testToRun;
@@ -349,7 +345,7 @@ int RegressionTestImage(const char *testImageFilename,
   DiffusionImageType::Pointer diffusionBaselineImage;
   DiffusionImageType::Pointer diffusionTestImage;
   unsigned long               status = 0;
-  typedef itk::DifferenceImageFilter<ImageType, ImageType> DiffType;
+  typedef itk::Testing::ComparisonImageFilter<ImageType, ImageType> DiffType;
   DiffType::Pointer diff;
   typedef itk::DifferenceDiffusionTensor3DImageFilter<DiffusionImageType, ImageType> DiffusionDiffType;
   DiffusionDiffType::Pointer diffusiondiff;
@@ -374,7 +370,6 @@ int RegressionTestImage(const char *testImageFilename,
     diff->SetToleranceRadius( radiusTolerance );
     diff->UpdateLargestPossibleRegion();
 
-    itk::SizeValueType status = itk::NumericTraits<itk::SizeValueType>::Zero;
     status = diff->GetNumberOfPixelsWithDifferences();
 
     }
@@ -438,9 +433,7 @@ int RegressionTestImage(const char *testImageFilename,
 
     typedef itk::ExtractImageFilter<OutputType, DiffOutputType> ExtractType;
     ExtractType::Pointer extract = ExtractType::New();
-#if  ITK_VERSION_MAJOR >= 4
     extract->SetDirectionCollapseToGuess();  // ITKv3 compatible, but not recommended
-#endif
     extract->SetInput(rescale->GetOutput() );
     extract->SetExtractionRegion(region);
 

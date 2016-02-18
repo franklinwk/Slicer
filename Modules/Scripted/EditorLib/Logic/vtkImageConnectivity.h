@@ -7,7 +7,7 @@
 
 =========================================================================auto=*/
 ///  vtkImageConnectivity - Identify and process islands of similar pixels
-/// 
+///
 ///  The input data type must be shorts.
 /// .SECTION Warning
 /// You need to explicitely call Update
@@ -18,7 +18,8 @@
 #include "vtkSlicerEditorLibModuleLogicExport.h"
 
 // VTK includes
-#include <vtkImageToImageFilter.h>
+#include <vtkImageAlgorithm.h>
+#include <vtkVersion.h>
 
 #define CONNECTIVITY_IDENTIFY 1
 #define CONNECTIVITY_REMOVE 2
@@ -26,11 +27,11 @@
 #define CONNECTIVITY_MEASURE 4
 #define CONNECTIVITY_SAVE 5
 
-class VTK_SLICER_EDITORLIB_MODULE_LOGIC_EXPORT vtkImageConnectivity : public vtkImageToImageFilter
+class VTK_SLICER_EDITORLIB_MODULE_LOGIC_EXPORT vtkImageConnectivity : public vtkImageAlgorithm
 {
 public:
   static vtkImageConnectivity *New();
-  vtkTypeRevisionMacro(vtkImageConnectivity,vtkImageToImageFilter);
+  vtkTypeMacro(vtkImageConnectivity,vtkImageAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   /// Function
@@ -55,7 +56,7 @@ public:
   vtkGetMacro(LargestIslandSize, int);
   vtkSetMacro(LargestIslandSize, int);
 
-  /// 
+  ///
   vtkGetMacro(SliceBySlice, int);
   vtkSetMacro(SliceBySlice, int);
   vtkBooleanMacro(SliceBySlice, int);
@@ -89,7 +90,7 @@ protected:
   int Function;
   int SliceBySlice;
 
-  void ExecuteData(vtkDataObject *);
+  void ExecuteDataWithInformation(vtkDataObject *, vtkInformation *);
 
 private:
   vtkImageConnectivity(const vtkImageConnectivity&);

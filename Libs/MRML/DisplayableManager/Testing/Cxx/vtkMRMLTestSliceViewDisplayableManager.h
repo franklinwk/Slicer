@@ -26,13 +26,13 @@
 
 class vtkMRMLCameraNode;
 
-class vtkMRMLTestSliceViewDisplayableManager : 
+class vtkMRMLTestSliceViewDisplayableManager :
   public vtkMRMLAbstractSliceViewDisplayableManager
 {
 
 public:
   static vtkMRMLTestSliceViewDisplayableManager* New();
-  vtkTypeRevisionMacro(vtkMRMLTestSliceViewDisplayableManager,vtkMRMLAbstractSliceViewDisplayableManager);
+  vtkTypeMacro(vtkMRMLTestSliceViewDisplayableManager,vtkMRMLAbstractSliceViewDisplayableManager);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   // For testing
@@ -54,12 +54,12 @@ protected:
   //  virtual void OnMRMLSceneRestoredEvent(){}
   virtual void OnMRMLSceneNodeAdded(vtkMRMLNode* node);
   //  virtual void OnMRMLSceneNodeRemovedEvent(vtkMRMLNode* /*node*/){}
-  
+
 private:
 
   vtkMRMLTestSliceViewDisplayableManager(const vtkMRMLTestSliceViewDisplayableManager&);// Not implemented
   void operator=(const vtkMRMLTestSliceViewDisplayableManager&);                     // Not Implemented
-  
+
   class vtkInternal;
   vtkInternal * Internal;
 

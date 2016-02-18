@@ -121,11 +121,13 @@ public:
   vtkStdString GetText(int id);
   int DeleteText(int id);
   int GetNumberOfTexts();
+  void RemoveAllTexts();
 
   /// Invoke events when markups change, passing the markup index if applicable.
   /// Invoke the lock modified event when a markup's lock status is changed.
   /// Invoke the label format modified event when markup label format changes.
   /// Invoke the point modified event when a markup's location changes.
+  /// Invoke the point end interaction event when an interaction process finishes.
   /// Invoke the NthMarkupModifiedEvent event when a markup's non location value.
   /// Invoke the markup added event when adding a new markup to a markups node.
   /// Invoke the markup removed event when removing one or all markups from a node
@@ -135,6 +137,7 @@ public:
     LockModifiedEvent = 19000,
     LabelFormatModifiedEvent,
     PointModifiedEvent,
+    PointEndInteractionEvent,
     NthMarkupModifiedEvent,
     MarkupAddedEvent,
     MarkupRemovedEvent,
@@ -169,13 +172,14 @@ public:
   Markup * GetNthMarkup(int n);
   /// Initialise a markup to default values
   void InitMarkup(Markup *markup);
-  /// Add a markup to the end of the list
-  void AddMarkup(Markup markup);
+  /// Add a markup to the end of the list. Return index
+  /// of new markup, -1 on failure.
+  int AddMarkup(Markup markup);
   /// Create a new markup with n points, init points to (0,0,0). Return index
   /// of new markup, -1 on failure.
-  int AddMarkupWithNPoints(int n);
+  int AddMarkupWithNPoints(int n, std::string label = std::string());
   /// Create a new markup and add a point to it, returning the markup index
-  int AddPointToNewMarkup(vtkVector3d point);
+  int AddPointToNewMarkup(vtkVector3d point, std::string label = std::string());
   /// Add a point to the nth markup, returning the point index
   int AddPointToNthMarkup(vtkVector3d point, int n);
 
@@ -240,6 +244,10 @@ public:
 
   /// Get the id for the nth markup
   std::string GetNthMarkupID(int n = 0);
+  /// Get Markup index based on it's ID
+  int GetMarkupIndexByID(const char* markupID);
+  /// Get Markup based on it's ID
+  Markup* GetMarkupByID(const char* markupID);
 
   /// Get the Selected flag on the nth markup, returns false if markup doesn't
   /// exist
@@ -295,13 +303,10 @@ public:
   // Transform utility functions
 
   /// Returns true since can apply non linear transforms
-  /// \sa ApplyTransformMatrix, ApplyTransform
+  /// \sa ApplyTransform
   virtual bool CanApplyNonLinearTransforms()const;
-  /// Apply the passed transformation matrix to all of the markup points
-  /// \sa CanApplyNonLinearTransforms, ApplyTransform
-  virtual void ApplyTransformMatrix(vtkMatrix4x4* transformMatrix);
   /// Apply the passed transformation to all of the markup points
-  /// \sa CanApplyNonLinearTransforms, ApplyTransformMatrix
+  /// \sa CanApplyNonLinearTransforms
   virtual void ApplyTransform(vtkAbstractTransform* transform);
 
   /// Get the markup label format string that defines the markup names.

@@ -39,7 +39,6 @@
 
 //----------------------------------------------------------------------------
 vtkStandardNewMacro(vtkMRMLDisplayableManagerFactory);
-vtkCxxRevisionMacro(vtkMRMLDisplayableManagerFactory, "$Revision: 13859 $");
 
 //----------------------------------------------------------------------------
 class vtkMRMLDisplayableManagerFactory::vtkInternal
@@ -158,7 +157,7 @@ bool vtkMRMLDisplayableManagerFactory::UnRegisterDisplayableManager(const char* 
     vtkWarningMacro(<<"UnRegisterDisplayableManager - vtkClassOrScriptName is NULL");
     return false;
     }
-  
+
   // Check if the DisplayableManager is registered
   vtkInternal::DisplayableManagerClassNamesIt it = std::find(
       this->Internal->DisplayableManagerClassNames.begin(),

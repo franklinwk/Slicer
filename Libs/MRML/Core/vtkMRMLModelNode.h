@@ -21,7 +21,9 @@ class vtkMRMLModelDisplayNode;
 class vtkMRMLStorageNode;
 
 // VTK includes
+class vtkAlgorithmOutput;
 class vtkAssignAttributes;
+class vtkEventForwarderCommand;
 class vtkDataArray;
 class vtkPolyData;
 class vtkMRMLDisplayNode;
@@ -62,9 +64,20 @@ public:
   /// Get associated model display MRML node
   vtkMRMLModelDisplayNode* GetModelDisplayNode();
 
-  /// Set and observe poly data for this model
-  vtkGetObjectMacro(PolyData, vtkPolyData);
+  /// Set and observe poly data for this model.
+  /// \deprecated
+  /// \sa GetPolyData()
   virtual void SetAndObservePolyData(vtkPolyData *PolyData);
+
+  /// Return the input poly data
+  /// \sa SetAndObservePolyData()
+  virtual vtkPolyData* GetPolyData();
+  /// Set and observe poly data pipeline.
+  /// It is propagated to the display nodes.
+  /// \sa GetPolyDataConnection()
+  virtual void SetPolyDataConnection(vtkAlgorithmOutput *inputPort);
+  /// Return the input polydata pipeline.
+  vtkGetObjectMacro(PolyDataConnection, vtkAlgorithmOutput);
 
   /// PolyDataModifiedEvent is fired when PolyData is changed.
   /// While it is possible for the subclasses to fire PolyDataModifiedEvent
@@ -157,10 +170,19 @@ public:
   /// Get bounding box in global RAS the form (xmin,xmax, ymin,ymax, zmin,zmax).
   virtual void GetRASBounds(double bounds[6]);
 
+  /// Transforms bounds from the local coordinate system to the RAS (world)
+  /// coordinate system. Only the corner points are used for determining the
+  /// new bounds, therefore in case of non-linear transforms the transformed
+  /// bounds may not fully contain the transformed model points.
+  virtual void TransformBoundsToRAS(double inputBounds_Local[6], double outputBounds_RAS[6]);
+
   virtual bool CanApplyNonLinearTransforms()const;
   virtual void ApplyTransform(vtkAbstractTransform* transform);
 
   virtual vtkMRMLStorageNode* CreateDefaultStorageNode();
+
+  /// Create and observe default display node
+  virtual void CreateDefaultDisplayNodes();
 
   /// Reimplemented to take into account the modified time of the polydata.
   /// Returns true if the node (default behavior) or the polydata are modified
@@ -182,11 +204,11 @@ protected:
   virtual void UpdateDisplayNodePolyData(vtkMRMLDisplayNode *dnode);
 
   ///
-  /// Called when a node reference ID is added (list size increased). 
+  /// Called when a node reference ID is added (list size increased).
   virtual void OnNodeReferenceAdded(vtkMRMLNodeReference *reference);
 
   ///
-  /// Called when a node reference ID is modified. 
+  /// Called when a node reference ID is modified.
   virtual void OnNodeReferenceModified(vtkMRMLNodeReference *reference);
 
 
@@ -199,7 +221,8 @@ protected:
   virtual void SetPolyDataToDisplayNode(vtkMRMLModelDisplayNode* modelDisplayNode);
 
   /// Data
-  vtkPolyData *PolyData;
+  vtkAlgorithmOutput* PolyDataConnection;
+  vtkEventForwarderCommand* DataEventForwarder;
 };
 
 #endif

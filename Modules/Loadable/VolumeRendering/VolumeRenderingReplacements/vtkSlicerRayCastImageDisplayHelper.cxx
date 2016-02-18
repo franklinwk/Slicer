@@ -13,22 +13,10 @@
 
 =========================================================================*/
 #include "vtkSlicerRayCastImageDisplayHelper.h"
-#include "vtkSlicerVolumeRenderingFactory.h"
+#include <vtkObjectFactory.h>
+#include <vtkVersion.h>
 
-vtkCxxRevisionMacro(vtkSlicerRayCastImageDisplayHelper, "$Revision: 1.4 $");
-
-//----------------------------------------------------------------------------
-// Needed when we don't use the vtkStandardNewMacro.
-vtkInstantiatorNewMacro(vtkSlicerRayCastImageDisplayHelper);
-
-//----------------------------------------------------------------------------
-vtkSlicerRayCastImageDisplayHelper* vtkSlicerRayCastImageDisplayHelper::New()
-{
-  // First try to create the object from the vtkObjectFactory
-  vtkObject* ret=vtkSlicerVolumeRenderingFactory::CreateInstance("vtkSlicerRayCastImageDisplayHelper");
-  return (vtkSlicerRayCastImageDisplayHelper*)ret;
-}
-
+vtkAbstractObjectFactoryNewMacro(vtkSlicerRayCastImageDisplayHelper);
 
 // Construct a new vtkSlicerRayCastImageDisplayHelper with default values
 vtkSlicerRayCastImageDisplayHelper::vtkSlicerRayCastImageDisplayHelper()
@@ -45,10 +33,10 @@ vtkSlicerRayCastImageDisplayHelper::~vtkSlicerRayCastImageDisplayHelper()
 void vtkSlicerRayCastImageDisplayHelper::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os,indent);
-  
+
   os << indent << "PreMultiplied Colors: "
      << (this->PreMultipliedColors ? "On" : "Off") << endl;
-  
+
   os << indent << "Pixel Scale: " << this->PixelScale << endl;
 }
 

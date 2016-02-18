@@ -35,6 +35,8 @@ vtkMRMLNodeNewMacro(vtkMRMLUnitNode);
 //----------------------------------------------------------------------------
 vtkMRMLUnitNode::vtkMRMLUnitNode()
 {
+  this->HideFromEditors = 1;
+
   this->Prefix = 0;
   this->Suffix = 0;
   this->Precision = 3;
@@ -200,6 +202,7 @@ const char* vtkMRMLUnitNode
 ::GetDisplayValueStringFromDisplayValue(double displayValue)
 {
   std::stringstream strstream;
+  strstream.setf(ios::fixed,ios::floatfield);
   strstream.precision(this->Precision);
   strstream << displayValue;
   strstream >> this->LastValueString;
@@ -292,13 +295,13 @@ void vtkMRMLUnitNode::Copy(vtkMRMLNode *anode)
 }
 
 //----------------------------------------------------------------------------
-void vtkMRMLUnitNode::Reset()
+void vtkMRMLUnitNode::Reset(vtkMRMLNode* defaultNode)
 {
   if (this->GetSingletonTag() != 0)
     {
     return;
     }
-  this->Superclass::Reset();
+  this->Superclass::Reset(defaultNode);
 }
 
 //----------------------------------------------------------------------------

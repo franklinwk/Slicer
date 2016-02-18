@@ -33,12 +33,11 @@
 #include <vtkImageMapToColors.h>
 #include <vtkImageAppendComponents.h>
 #include <vtkNew.h>
+#include <vtkVersion.h>
 
 // ITK includes
 #include <itkConfigure.h>
-#if ITK_VERSION_MAJOR > 3
-#  include <itkFactoryRegistration.h>
-#endif
+#include <itkFactoryRegistration.h>
 
 //-----------------------------------------------------------------------------
 vtkMRMLScalarVolumeNode* loadVolume2(const char* volume, vtkMRMLScene* scene)
@@ -80,9 +79,7 @@ vtkMRMLScalarVolumeNode* loadVolume2(const char* volume, vtkMRMLScene* scene)
 //-----------------------------------------------------------------------------
 int vtkMRMLSliceLogicTest4(int argc, char * argv [] )
 {
-#if ITK_VERSION_MAJOR > 3
   itk::itkFactoryRegistration();
-#endif
 
   if( argc < 2 )
     {
@@ -102,19 +99,19 @@ int vtkMRMLSliceLogicTest4(int argc, char * argv [] )
     }
 
   vtkImageData* img = scalarNode->GetImageData();
-  
+
   vtkNew<vtkImageReslice> resliceMask;
   resliceMask->SetOutputExtent(0, 400, 0, 500, 0, 0);
-  resliceMask->SetInput(img);
+  resliceMask->SetInputData(img);
 
   vtkNew<vtkImageMapToColors> colors;
-  colors->SetInput(resliceMask->GetOutput());
+  colors->SetInputConnection(resliceMask->GetOutputPort());
   vtkNew<vtkColorTransferFunction> ctf;
   ctf->AddRGBPoint(0, 1., 0., 0.);
   colors->SetLookupTable(ctf.GetPointer());
 
   vtkNew<vtkImageAppendComponents> append;
-  append->SetInputConnection(0, colors->GetOutput()->GetProducerPort());
+  append->SetInputConnection(0, colors->GetOutputPort());
 
   //vtkImageBlend* blend = vtkImageBlend::New();
   //blend->AddInput(append->GetOutput());
@@ -129,6 +126,6 @@ int vtkMRMLSliceLogicTest4(int argc, char * argv [] )
   //append->Update();
   resliceMask->SetOutputExtent(0, 400, 0, 300, 0, 0);
   colors->Update();
-  
+
   return EXIT_SUCCESS;
 }

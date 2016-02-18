@@ -44,7 +44,7 @@ class  VTK_SLICER_MARKUPS_MODULE_MRMLDISPLAYABLEMANAGER_EXPORT vtkMRMLMarkupsDis
 public:
 
   static vtkMRMLMarkupsDisplayableManager2D *New();
-  vtkTypeRevisionMacro(vtkMRMLMarkupsDisplayableManager2D, vtkMRMLAbstractSliceViewDisplayableManager);
+  vtkTypeMacro(vtkMRMLMarkupsDisplayableManager2D, vtkMRMLAbstractSliceViewDisplayableManager);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   /// Hide/Show a widget so that the node's display node visibility setting
@@ -56,8 +56,6 @@ public:
   virtual void PropagateMRMLToWidget(vtkMRMLMarkupsNode* node, vtkAbstractWidget * widget);
   /// Propagate properties of widget to MRML node.
   virtual void PropagateWidgetToMRML(vtkAbstractWidget * widget, vtkMRMLMarkupsNode* node);
-  /// Get the sliceNode, if registered.
-  vtkMRMLSliceNode * GetSliceNode();
 
   /// Check if the displayCoordinates are inside the viewport and if not,
   /// correct the displayCoordinates. Coordinates are reset if the normalized

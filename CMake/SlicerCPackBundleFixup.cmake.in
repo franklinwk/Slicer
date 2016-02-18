@@ -71,10 +71,12 @@ function(gp_item_default_embedded_path_override item default_embedded_path_var)
   set(Slicer_USE_PYTHONQT_WITH_TCL "@Slicer_USE_PYTHONQT_WITH_TCL@")
   if(Slicer_USE_PYTHONQT_WITH_TCL)
     # Tcl libraries
-    if(item MATCHES "tcl-build/lib/lib[^/]+\\.dylib$"
-       OR item MATCHES "libitcl3\\.2\\.dylib$"
-       OR item MATCHES "libitk3\\.2\\.dylib$")
+    if(item MATCHES "tcl-build/lib/lib[^/]+\\.dylib$")
       set(path "@fixup_path@/lib/TclTk/lib")
+    endif()
+    # Itcl library
+    if(item MATCHES "libitcl[^/]+\\.dylib$")
+      set(path "@fixup_path@/lib/TclTk/lib/itcl4.0.1")
     endif()
   endif()
 
@@ -120,7 +122,7 @@ endfunction()
 
 macro(_fixup_paths_append list var)
   if(NOT EXISTS "${var}")
-    message(FATAL_ERROR "Path append to list [${list}] does NOT exist !")
+    message(FATAL_ERROR "Path append to list [${list}] failed - Path [${var}:${${var}}] does NOT exist !")
   endif()
 
   list(APPEND ${list} ${var})
@@ -139,15 +141,16 @@ function(fixup_bundle_with_plugins app)
   # Sanity checks
   foreach(path Slicer_BUILD_DIR Slicer_SUPERBUILD_DIR)
     if(NOT EXISTS ${${path}})
-      message(FATAL_ERROR "${path} variable is defined but corresponds to non-existing directory: ${${path}}")
+      message(FATAL_ERROR "${path} variable is defined but corresponds to nonexistent directory: ${${path}}")
     endif()
   endforeach()
 
   set(candiates_pattern
     "${app_dir}/Contents/@Slicer_ITKFACTORIES_DIR@/*Plugin.dylib"
     "${app_dir}/Contents/@Slicer_QtPlugins_DIR@/designer/*Plugins.so"
+    "${app_dir}/Contents/@Slicer_QtPlugins_DIR@/designer/*.dylib"
     "${app_dir}/Contents/@Slicer_QtPlugins_DIR@/iconengines/*Plugin.so"
-    "${app_dir}/Contents/@Slicer_QtPlugins_DIR@/styles/*Plugin.so"
+    "${app_dir}/Contents/@Slicer_QtPlugins_DIR@/styles/*Plugins.so"
     "${app_dir}/Contents/@Slicer_QtPlugins_DIR@/imageformats/*${suffix}"
     "${app_dir}/Contents/@Slicer_QtPlugins_DIR@/sqldrivers/*${suffix}"
     )
@@ -234,12 +237,6 @@ function(fixup_bundle_with_plugins app)
   if(Slicer_BUILD_EXTENSIONMANAGER_SUPPORT)
     _fixup_paths_append(libs_path "@LibArchive_DIR@/lib")
   endif()
-  set(Slicer_USE_BatchMake "@Slicer_USE_BatchMake@")
-  if(Slicer_USE_BatchMake)
-    foreach(dir "@BatchMake_LIBRARY_DIRS@")
-      _fixup_paths_append(libs_path ${dir})
-    endforeach()
-  endif()
   set(Slicer_USE_OpenIGTLink "@Slicer_USE_OpenIGTLink@")
   if(Slicer_USE_OpenIGTLink)
     foreach(dir "@OpenIGTLink_LIBRARY_DIRS@")
@@ -316,7 +313,7 @@ function(fixup_bundle_with_plugins app)
   set(inner_re "1|a|bat|bmp|c|cc|cfg|cmake|conf|css|ctypes|cxx|dat|def|doc|dylib|egg-info|enc")
   set(inner_re "${inner_re}|eps|example|f|f90|fits|gif|gz|h|hxx|i|icns|ico|in|ini|itk|log|md5")
   set(inner_re "${inner_re}|mhd|mrml|mrml_remote|msg|nhdr|nib|nrrd|pkl|plist|png|ps|py|pyc|pyf")
-  set(inner_re "${inner_re}|pyw|pyx|raw|sample|so|supp|tcl|txt|ui|xml")
+  set(inner_re "${inner_re}|pyw|pyx|raw|sample|so|supp|tcl|txt|ui|xml|exe|mexw32|mexw64")
   set(GP_IS_FILE_EXECUTABLE_EXCLUDE_REGEX "\\.(${inner_re})$")
 
   fixup_bundle(

@@ -23,6 +23,7 @@
 
 // CTK includes
 #include <ctkPimpl.h>
+#include <vtkVersion.h>
 
 // qMRMLWidget includes
 #include "qMRMLWidget.h"
@@ -39,10 +40,12 @@ class vtkMRMLSliceLogic;
 class vtkMRMLSliceNode;
 class vtkMRMLSliceCompositeNode;
 
+class vtkAlgorithmOutput;
 class vtkImageData;
 class vtkInteractorObserver;
 class vtkCornerAnnotation;
 class vtkCollection;
+
 class QMRML_WIDGETS_EXPORT qMRMLSliceWidget : public qMRMLWidget
 {
   Q_OBJECT
@@ -71,7 +74,7 @@ public:
 
   /// \sa qMRMLSliceControllerWidget::imageData()
   /// \sa setImageData();
-  Q_INVOKABLE vtkImageData* imageData()const;
+  Q_INVOKABLE vtkAlgorithmOutput* imageDataConnection()const;
 
   /// \sa qMRMLSliceControllerWidget::mrmlSliceCompositeNode()
   Q_INVOKABLE vtkMRMLSliceCompositeNode* mrmlSliceCompositeNode()const;
@@ -116,7 +119,7 @@ public:
   /// A const ctkVTKSliceView pointer is returned as you shouldn't
   /// mess too much with it. If you do, be aware that you are probably
   /// unsynchronizing the view from the nodes/logics.
-  Q_INVOKABLE const qMRMLSliceView* sliceView()const;
+  Q_INVOKABLE qMRMLSliceView* sliceView()const;
 
   //virtual bool eventFilter(QObject* object, QEvent* event);
 public slots:
@@ -129,8 +132,8 @@ public slots:
 
   /// \sa qMRMLSliceControllerWidget::setImageData()
   /// \sa imageData()
-  void setImageData(vtkImageData* newImageData);
-  
+  void setImageDataConnection(vtkAlgorithmOutput* newImageDataConnection);
+
   /// \sa qMRMLSliceControllerWidget::setSliceOrientation()
   /// \sa sliceOrientation()
   void setSliceOrientation(const QString& orienation);
@@ -140,6 +143,13 @@ public slots:
 
 protected:
   QScopedPointer<qMRMLSliceWidgetPrivate> d_ptr;
+
+  /// Constructor allowing derived class to specify a specialized pimpl.
+  ///
+  /// \note You are responsible to call init() in the constructor of
+  /// derived class. Doing so ensures the derived class is fully
+  /// instantiated in case virtual method are called within init() itself.
+  qMRMLSliceWidget(qMRMLSliceWidgetPrivate* obj, QWidget* parent);
 
 private:
   Q_DECLARE_PRIVATE(qMRMLSliceWidget);

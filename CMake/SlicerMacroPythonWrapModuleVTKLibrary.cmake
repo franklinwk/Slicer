@@ -41,6 +41,11 @@ macro(SlicerMacroPythonWrapModuleVTKLibrary)
     ${ARGN}
     )
 
+  if(Slicer_USE_PYTHONQT AND NOT VTK_WRAP_PYTHON)
+    message(FATAL_ERROR "Since Slicer_USE_PYTHONQT is ON, VTK_WRAP_PYTHON is expected to be ON. "
+                        "Re-configure VTK with python wrapping.")
+  endif()
+
   # --------------------------------------------------------------------------
   # Sanity checks
   # --------------------------------------------------------------------------
@@ -58,18 +63,12 @@ macro(SlicerMacroPythonWrapModuleVTKLibrary)
     endif()
   endforeach()
 
-  set(VTK_PYTHON_WRAPPED_LIBRARIES)
-  foreach(lib ${VTK_LIBRARIES})
-    list(APPEND VTK_PYTHON_WRAPPED_LIBRARIES ${lib}PythonD)
-  endforeach()
-
   set(Slicer_Libs_VTK_PYTHON_WRAPPED_LIBRARIES)
   foreach(lib ${Slicer_Libs_VTK_WRAPPED_LIBRARIES})
     list(APPEND Slicer_Libs_VTK_PYTHON_WRAPPED_LIBRARIES ${lib}PythonD)
   endforeach()
 
   set(PYTHONWRAPMODULEVTKLIBRARY_Wrapped_LIBRARIES
-    ${VTK_PYTHON_WRAPPED_LIBRARIES}
     ${Slicer_Libs_VTK_PYTHON_WRAPPED_LIBRARIES}
     ${PYTHONWRAPMODULEVTKLIBRARY_WRAPPED_TARGET_LIBRARIES}
     )

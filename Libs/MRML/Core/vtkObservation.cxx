@@ -20,7 +20,6 @@
 #include <vtkCallbackCommand.h>
 #include <vtkObjectFactory.h>
 
-vtkCxxRevisionMacro(vtkObservation, "$Revision: 1.9.12.1 $");
 vtkStandardNewMacro(vtkObservation);
 vtkCxxSetObjectMacro(vtkObservation, CallbackCommand, vtkCallbackCommand);
 vtkCxxSetObjectMacro(vtkObservation, EventBroker, vtkEventBroker);
@@ -42,7 +41,7 @@ vtkObservation::vtkObservation()
   this->ObserverDeleteEventTag = 0;
 
   this->ObservationCallbackCommand = vtkCallbackCommand::New();
-  this->ObservationCallbackCommand->SetCallback( vtkEventBroker::Callback ); 
+  this->ObservationCallbackCommand->SetCallback( vtkEventBroker::Callback );
   this->ObservationCallbackCommand->SetClientData( reinterpret_cast<void *> (this) );
 
   this->LastElapsedTime = 0.0;
@@ -74,7 +73,7 @@ vtkObservation::~vtkObservation()
 void vtkObservation::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->vtkObject::PrintSelf(os, indent);
-  
+
 
   if ( this->CallbackCommand ) os << indent << "EventBroker: " << this->EventBroker << "\n";
   else os << indent << "EventBroker: " << "(none) \n";

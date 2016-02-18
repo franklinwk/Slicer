@@ -50,7 +50,6 @@
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro(vtkMRMLViewDisplayableManager );
-vtkCxxRevisionMacro(vtkMRMLViewDisplayableManager, "$Revision: 13525 $");
 
 //---------------------------------------------------------------------------
 class vtkMRMLViewDisplayableManager::vtkInternal
@@ -106,7 +105,7 @@ void vtkMRMLViewDisplayableManager::vtkInternal::CreateAxis()
   // Create the default bounding box
   vtkNew<vtkOutlineSource> boxSource;
   vtkNew<vtkPolyDataMapper> boxMapper;
-  boxMapper->SetInput(boxSource->GetOutput());
+  boxMapper->SetInputConnection(boxSource->GetOutputPort());
 
   this->BoxAxisActor = vtkSmartPointer<vtkActor>::New();
   this->BoxAxisActor->SetMapper(boxMapper.GetPointer());
@@ -124,7 +123,7 @@ void vtkMRMLViewDisplayableManager::vtkInternal::CreateAxis()
     axisText->SetText(labels[i]);
 
     vtkNew<vtkPolyDataMapper> axisMapper;
-    axisMapper->SetInput(axisText->GetOutput());
+    axisMapper->SetInputConnection(axisText->GetOutputPort());
 
     vtkNew<vtkFollower> axisActor;
     axisActor->SetMapper(axisMapper.GetPointer());
@@ -155,7 +154,7 @@ void vtkMRMLViewDisplayableManager::vtkInternal::AddAxis(vtkRenderer * renderer)
 //---------------------------------------------------------------------------
 void vtkMRMLViewDisplayableManager::vtkInternal::UpdateRASBounds(double bounds[6])
 {
-  //Bounds is x-min, x-max, y-min, y-max, z-min, z-max 
+  //Bounds is x-min, x-max, y-min, y-max, z-min, z-max
   vtkMath::UninitializeBounds(bounds);
 
   if (this->External->GetMRMLViewNode() == 0)
@@ -297,7 +296,7 @@ void vtkMRMLViewDisplayableManager::vtkInternal::UpdateAxis(vtkRenderer * render
     boxSource->SetBounds(bounds);
 
     vtkNew<vtkPolyDataMapper> boxMapper;
-    boxMapper->SetInput(boxSource->GetOutput());
+    boxMapper->SetInputConnection(boxSource->GetOutputPort());
 
     this->BoxAxisActor->SetMapper(boxMapper.GetPointer());
     this->BoxAxisActor->SetScale(1.0, 1.0, 1.0);

@@ -1,6 +1,6 @@
 import os
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # ScenePerformance
@@ -46,9 +46,8 @@ class ScenePerformanceWidget:
   def setup(self):
 
     loader = qt.QUiLoader()
-    moduleName = 'ScenePerformance' #scriptedModulesPath = '/Users/exxos/Work/Slicer/Slicer4/Slicer-Debug/Slicer-build/lib/Slicer-4.3/qt-scripted-modules'
-    scriptedModulesPath = eval('slicer.modules.%s.path' % moduleName.lower())
-    scriptedModulesPath = os.path.dirname(scriptedModulesPath)
+    moduleName = 'ScenePerformance'
+    scriptedModulesPath = os.path.dirname(slicer.util.modulePath(moduleName))
     path = os.path.join(scriptedModulesPath, 'Resources', 'UI', 'ScenePerformance.ui')
 
     qfile = qt.QFile(path)
@@ -116,7 +115,7 @@ class ScenePerformanceWidget:
       node = self.MRMLNodeComboBox.currentNode()
       results = tester.modifyNode(node)
       self.ResultsTextEdit.append(results)
-  
+
   def updateActionProperties(self):
     enableAddData = True if self.ActionComboBox.currentIndex == 0 else False
     self.ActionPathLineEdit.setEnabled(enableAddData)
@@ -145,40 +144,7 @@ class ScenePerformanceWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
 
 
@@ -189,12 +155,12 @@ class ScenePerformanceLogic:
   def __init__(self):
     pass
 
-  
+
   def hasImageData(self,volumeNode):
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -203,7 +169,7 @@ class ScenePerformanceLogic:
     downloads = (
         (downloadURL, downloadFileName),
         )
-    
+
     import urllib
     for url,name in downloads:
       filePath = slicer.app.temporaryPath + '/' + name
@@ -214,7 +180,7 @@ class ScenePerformanceLogic:
   def startTiming(self):
     self.Timer = qt.QTime()
     self.Timer.start()
-  
+
   def stopTiming(self):
     return self.Timer.elapsed()
 
@@ -239,10 +205,10 @@ class ScenePerformanceTest(unittest.TestCase):
 
   def setRepeat(self, repeat):
     self.Repeat = repeat
-  
+
   def runTest(self):
     self.testAll()
-  
+
   def testAll(self):
     self.setUp()
 
@@ -276,7 +242,7 @@ class ScenePerformanceTest(unittest.TestCase):
     message = '%s (%s) took %s msecs ' % (action, property, time)
     self.delayDisplay(message)
     return message
-  
+
   def addURLData(self, url, file):
     logic = ScenePerformanceLogic()
     file = logic.downloadFile(url, file)
@@ -312,7 +278,7 @@ class ScenePerformanceTest(unittest.TestCase):
   def restoreSceneView(self, sceneViewIndex):
     node = slicer.mrmlScene.GetNthNodeByClass(sceneViewIndex, 'vtkMRMLSceneViewNode')
     return self.restoreSceneViewNode(node)
-  
+
   def restoreSceneViewNode(self, node):
     self.delayDisplay("Starting the Restore Scene test")
     logic = ScenePerformanceLogic()
@@ -343,7 +309,7 @@ class ScenePerformanceTest(unittest.TestCase):
   def addNodeByID(self, nodeID):
     node = slicer.mrmlScene.GetNodeByID(nodeID)
     return self.addNode(node)
-  
+
   def addNode(self, node):
     self.delayDisplay("Starting the add node test")
     logic = ScenePerformanceLogic()
@@ -363,7 +329,7 @@ class ScenePerformanceTest(unittest.TestCase):
   def modifyNodeByID(self, nodeID):
     node = slicer.mrmlScene.GetNodeByID(nodeID)
     return self.modifyNode(node)
-  
+
   def modifyNode(self, node):
     self.delayDisplay("Starting the modify node test")
     logic = ScenePerformanceLogic()

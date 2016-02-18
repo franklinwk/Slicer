@@ -1,15 +1,20 @@
 import os
-from __main__ import vtk
-from __main__ import ctk
-from __main__ import qt
-from __main__ import slicer
-from EditOptions import EditOptions
-from EditorLib import EditorLib
+import vtk
+import ctk
+import qt
+import slicer
+from EditOptions import HelpButton
+from EditUtil import EditUtil
 import LabelEffect
 import numpy
 from math import sqrt
 
-
+__all__ = [
+  'PaintEffectOptions',
+  'PaintEffectTool',
+  'PaintEffectLogic',
+  'PaintEffect'
+  ]
 
 #########################################################
 #
@@ -34,19 +39,11 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
   """
 
   def __init__(self, parent=0):
-    super(PaintEffectOptions,self).__init__(parent)
-    # option to use 'min' or 'diag'
-    # - min means pixel radius is min spacing
-    # - diag means corner to corner length
-    self.radiusPixelMode = 'min'
 
-  def __del__(self):
-    super(PaintEffectOptions,self).__del__()
-
-  def create(self):
-    super(PaintEffectOptions,self).create()
-
-    labelVolume = self.editUtil.getLabelVolume()
+    # get pixel-size-dependent parameters
+    # calculate this before calling superclass init
+    # so it can be used to set mrml defaults if needed
+    labelVolume = EditUtil.getLabelVolume()
     if labelVolume and labelVolume.GetImageData():
       spacing = labelVolume.GetSpacing()
       dimensions = labelVolume.GetImageData().GetDimensions()
@@ -57,6 +54,20 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
       self.minimumRadius = 0.01
       self.maximumRadius = 100
 
+    super(PaintEffectOptions,self).__init__(parent)
+
+    # option to use 'min' or 'diag'
+    # - min means pixel radius is min spacing
+    # - diag means corner to corner length
+    self.radiusPixelMode = 'min'
+
+
+  def __del__(self):
+    super(PaintEffectOptions,self).__del__()
+
+  def create(self):
+    super(PaintEffectOptions,self).create()
+
     self.radiusFrame = qt.QFrame(self.frame)
     self.radiusFrame.setLayout(qt.QHBoxLayout())
     self.frame.layout().addWidget(self.radiusFrame)
@@ -66,6 +77,7 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
     self.radiusFrame.layout().addWidget(self.radiusLabel)
     self.widgets.append(self.radiusLabel)
     self.radiusSpinBox = slicer.qMRMLSpinBox(self.radiusFrame)
+    self.radiusSpinBox.objectName = 'SpinBox_Radius'
     self.radiusSpinBox.setToolTip("Set the radius of the paint brush in millimeters")
     self.radiusSpinBox.quantity = "length"
     # QFlags not wrapped in python. Equivalent to Prefix | Suffix
@@ -81,6 +93,7 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
     self.radiusFrame.layout().addWidget(self.radiusSpinBox)
     self.widgets.append(self.radiusSpinBox)
     self.radiusUnitsToggle = qt.QPushButton("px:")
+    self.radiusUnitsToggle.objectName = 'PushButton_RadiusUnitsToggle'
     self.radiusUnitsToggle.setToolTip("Toggle radius quick set buttons between mm and label volume pixel size units")
     self.radiusUnitsToggle.setFixedWidth(35)
     self.radiusFrame.layout().addWidget(self.radiusUnitsToggle)
@@ -91,12 +104,14 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
                  (10, self.onQuickie10Clicked), (20, self.onQuickie20Clicked) )
     for rad,callback in quickies:
       self.radiusQuickies[rad] = qt.QPushButton(str(rad))
+      self.radiusQuickies[rad].objectName = 'PushButton_QuickRadius_{0}'.format(rad)
       self.radiusFrame.layout().addWidget(self.radiusQuickies[rad])
       self.radiusQuickies[rad].setFixedWidth(25)
       self.radiusQuickies[rad].connect('clicked()', callback)
       self.radiusQuickies[rad].setToolTip("Set radius based on mm or label voxel size units depending on toggle value")
 
     self.radius = ctk.ctkDoubleSlider(self.frame)
+    self.radius.objectName = 'DoubleSlider_Radius'
     self.radius.minimum = self.minimumRadius
     self.radius.maximum = self.maximumRadius
     self.radius.orientation = 1
@@ -105,21 +120,24 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
     self.widgets.append(self.radius)
 
     self.sphere = qt.QCheckBox("Sphere", self.frame)
+    self.sphere.objectName = 'CheckBox_Sphere'
     self.sphere.setToolTip("Use a 3D spherical brush rather than a 2D circular brush.")
     self.frame.layout().addWidget(self.sphere)
     self.widgets.append(self.sphere)
 
     self.smudge = qt.QCheckBox("Smudge", self.frame)
+    self.smudge.objectName = 'CheckBox_Smudge'
     self.smudge.setToolTip("Set the label number automatically by sampling the pixel location where the brush stroke starts.")
     self.frame.layout().addWidget(self.smudge)
     self.widgets.append(self.smudge)
 
     self.pixelMode = qt.QCheckBox("Pixel Mode", self.frame)
+    self.pixelMode.objectName = 'CheckBox_PixelMode'
     self.pixelMode.setToolTip("Paint exactly the pixel under the cursor, ignoring the radius, threshold, and paint over.")
     self.frame.layout().addWidget(self.pixelMode)
     self.widgets.append(self.pixelMode)
 
-    EditorLib.HelpButton(self.frame, "Use this tool to paint with a round brush of the selected radius")
+    HelpButton(self.frame, "Use this tool to paint with a round brush of the selected radius")
 
     self.connections.append( (self.sphere, 'clicked()', self.updateMRMLFromGUI) )
     self.connections.append( (self.smudge, 'clicked()', self.updateMRMLFromGUI) )
@@ -131,7 +149,7 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
     self.frame.layout().addStretch(1)
 
     # set the node parameters that are dependent on the input data
-    self.parameterNode.SetParameter( "PaintEffect,radius", str(self.minimumRadius * 10) )
+    # self.parameterNode.SetParameter( "PaintEffect,radius", str(self.minimumRadius * 10) )
 
   def destroy(self):
     super(PaintEffectOptions,self).destroy()
@@ -140,7 +158,7 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
   # in each leaf subclass so that "self" in the observer
   # is of the correct type
   def updateParameterNode(self, caller, event):
-    node = self.editUtil.getParameterNode()
+    node = EditUtil.getParameterNode()
     if node != self.parameterNode:
       if self.parameterNode:
         node.RemoveObserver(self.parameterNodeTag)
@@ -152,7 +170,7 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
     disableState = self.parameterNode.GetDisableModifiedEvent()
     self.parameterNode.SetDisableModifiedEvent(1)
     defaults = (
-      ("radius", "5"),
+      ("radius", str(self.minimumRadius * 50)),
       ("sphere", "0"),
       ("smudge", "0"),
       ("pixelMode", "0"),
@@ -213,7 +231,7 @@ class PaintEffectOptions(LabelEffect.LabelEffectOptions):
     self.setQuickieRadius(20)
 
   def setQuickieRadius(self,radius):
-    labelVolume = self.editUtil.getLabelVolume()
+    labelVolume = EditUtil.getLabelVolume()
     if labelVolume:
       if self.radiusUnitsToggle.text == 'px:':
         spacing = labelVolume.GetSpacing()
@@ -284,7 +302,7 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
 
     # configuration variables
     self.delayedPaint = True
-    self.parameterNode = self.editUtil.getParameterNode()
+    self.parameterNode = EditUtil.getParameterNode()
     self.sphere = not (0 == int(self.parameterNode.GetParameter("PaintEffect,sphere")))
     self.smudge = not (0 == int(self.parameterNode.GetParameter("PaintEffect,smudge")))
     self.pixelMode = not (0 == int(self.parameterNode.GetParameter("PaintEffect,pixelMode")))
@@ -304,7 +322,7 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
     self.createGlyph(self.brush)
     self.mapper = vtk.vtkPolyDataMapper2D()
     self.actor = vtk.vtkActor2D()
-    self.mapper.SetInput(self.brush)
+    self.mapper.SetInputData(self.brush)
     self.actor.SetMapper(self.mapper)
     self.actor.VisibilityOff()
 
@@ -325,8 +343,8 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
   def getLabelPixel(self,xy):
     sliceLogic = self.sliceWidget.sliceLogic()
     labelLogic = sliceLogic.GetLabelLayer()
-    xyToIJK = labelLogic.GetXYToIJKTransform().GetMatrix()
-    i,j,k,l = xyToIJK.MultiplyPoint( xy + (0, 1) )
+    xyToIJK = labelLogic.GetXYToIJKTransform()
+    i,j,k = xyToIJK.TransformDoublePoint( xy + (0,) )
     i = int(round(i))
     j = int(round(j))
     k = int(round(k))
@@ -354,7 +372,7 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
         self.cursorOff()
       xy = self.interactor.GetEventPosition()
       if self.smudge:
-        self.editUtil.setLabel(self.getLabelPixel(xy))
+        EditUtil.setLabel(self.getLabelPixel(xy))
       self.paintAddPoint(xy[0], xy[1])
       self.abortEvent(event)
     elif event == "LeftButtonReleaseEvent":
@@ -505,7 +523,7 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
     sliceLogic = self.sliceWidget.sliceLogic()
     labelLogic = sliceLogic.GetLabelLayer()
     labelNode = labelLogic.GetVolumeNode()
-    self.editUtil.markVolumeNodeAsModified(labelNode)
+    EditUtil.markVolumeNodeAsModified(labelNode)
 
   def paintPixel(self, x, y):
     """
@@ -520,8 +538,8 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
       # if there's no label, we can't paint
       return
 
-    xyToIJK = labelLogic.GetXYToIJKTransform().GetMatrix()
-    ijkFloat = xyToIJK.MultiplyPoint( (x, y, 0, 1) )
+    xyToIJK = labelLogic.GetXYToIJKTransform()
+    ijkFloat = xyToIJK.TransformDoublePoint( (x, y, 0) )
     ijk = []
     for e in ijkFloat:
       try:
@@ -534,10 +552,10 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
       if e < 0 or e >= d:
         return
 
-    parameterNode = self.editUtil.getParameterNode()
+    parameterNode = EditUtil.getParameterNode()
     paintLabel = int(parameterNode.GetParameter("label"))
     labelImage.SetScalarComponentFromFloat(ijk[0],ijk[1],ijk[2],0, paintLabel)
-    self.editUtil.markVolumeNodeAsModified(labelNode)
+    EditUtil.markVolumeNodeAsModified(labelNode)
 
   def paintBrush(self, x, y):
     """
@@ -572,11 +590,11 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
     bottom = y + bounds[2]
     top = y + bounds[3]
 
-    xyToIJK = labelLogic.GetXYToIJKTransform().GetMatrix()
-    tlIJK = xyToIJK.MultiplyPoint( (left, top, 0, 1) )
-    trIJK = xyToIJK.MultiplyPoint( (right, top, 0, 1) )
-    blIJK = xyToIJK.MultiplyPoint( (left, bottom, 0, 1) )
-    brIJK = xyToIJK.MultiplyPoint( (right, bottom, 0, 1) )
+    xyToIJK = labelLogic.GetXYToIJKTransform()
+    tlIJK = xyToIJK.TransformDoublePoint( (left, top, 0) )
+    trIJK = xyToIJK.TransformDoublePoint( (right, top, 0) )
+    blIJK = xyToIJK.TransformDoublePoint( (left, bottom, 0) )
+    brIJK = xyToIJK.TransformDoublePoint( (right, bottom, 0) )
 
     dims = labelImage.GetDimensions()
 
@@ -595,40 +613,54 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
       tr[i] = int(round(trIJK[i]))
       if tr[i] < 0:
         tr[i] = 0
-      if tr[i] > dims[i]:
+      if tr[i] >= dims[i]:
         tr[i] = dims[i] - 1
       bl[i] = int(round(blIJK[i]))
       if bl[i] < 0:
         bl[i] = 0
-      if bl[i] > dims[i]:
+      if bl[i] >= dims[i]:
         bl[i] = dims[i] - 1
       br[i] = int(round(brIJK[i]))
       if br[i] < 0:
         br[i] = 0
-      if br[i] > dims[i]:
+      if br[i] >= dims[i]:
         br[i] = dims[i] - 1
 
+    # If the region is smaller than a pixel then paint it using paintPixel mode,
+    # to make sure at least one pixel is filled on each click
+    maxRowDelta = 0
+    maxColumnDelta = 0
+    for i in xrange(3):
+      d = abs(tr[i] - tl[i])
+      if d > maxColumnDelta:
+        maxColumnDelta = d
+      d = abs(br[i] - bl[i])
+      if d > maxColumnDelta:
+        maxColumnDelta = d
+      d = abs(bl[i] - tl[i])
+      if d > maxRowDelta:
+        maxRowDelta = d
+      d = abs(br[i] - tr[i])
+      if d > maxRowDelta:
+        maxRowDelta = d
+    if maxRowDelta<=1 or maxColumnDelta<=1 :
+      self.paintPixel(x,y)
+      return
 
     #
     # get the layers and nodes
     # and ijk to ras matrices including transforms
     #
-    labelLogic = self.sliceLogic.GetLabelLayer()
-    labelNode = labelLogic.GetVolumeNode()
-    backgroundLogic = self.sliceLogic.GetLabelLayer()
-    backgroundNode = backgroundLogic.GetVolumeNode()
     backgroundIJKToRAS = self.logic.getIJKToRASMatrix(backgroundNode)
     labelIJKToRAS = self.logic.getIJKToRASMatrix(labelNode)
-
 
     xyToRAS = sliceNode.GetXYToRAS()
     brushCenter = xyToRAS.MultiplyPoint( (x, y, 0, 1) )[:3]
 
-
     brushRadius = self.radius
     bSphere = self.sphere
 
-    parameterNode = self.editUtil.getParameterNode()
+    parameterNode = EditUtil.getParameterNode()
     paintLabel = int(parameterNode.GetParameter("label"))
     paintOver = int(parameterNode.GetParameter("LabelEffect,paintOver"))
     paintThreshold = int(parameterNode.GetParameter("LabelEffect,paintThreshold"))
@@ -680,7 +712,7 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
         if distanceSpannedBy100Slices==0:
             zVoxelSize_mm=1
         else:
-            zVoxelSize_mm = 100/distanceSpannedBy100Slices
+            zVoxelSize_mm = distanceSpannedBy100Slices/100
         # --
         # Compute number of slices spanned by sphere
         nNumSlicesInEachDirection=brushRadius / zVoxelSize_mm;
@@ -697,10 +729,10 @@ class PaintEffectTool(LabelEffect.LabelEffectTool):
             self.painter.SetBrushRadius( brushRadiusOffset )
 
             # --
-            tlIJKtemp = xyToIJK.MultiplyPoint( (left, top, iSliceOffset, 1) )
-            trIJKtemp = xyToIJK.MultiplyPoint( (right, top, iSliceOffset, 1) )
-            blIJKtemp = xyToIJK.MultiplyPoint( (left, bottom, iSliceOffset, 1) )
-            brIJKtemp = xyToIJK.MultiplyPoint( (right, bottom, iSliceOffset, 1) )
+            tlIJKtemp = xyToIJK.TransformDoublePoint( (left, top, iSliceOffset) )
+            trIJKtemp = xyToIJK.TransformDoublePoint( (right, top, iSliceOffset) )
+            blIJKtemp = xyToIJK.TransformDoublePoint( (left, bottom, iSliceOffset) )
+            brIJKtemp = xyToIJK.TransformDoublePoint( (right, bottom, iSliceOffset) )
             # clamp the top, bottom, left, right to the
             # valid dimensions of the label image
             tltemp = [0,0,0]

@@ -29,15 +29,15 @@
 
 class vtkMRMLCameraNode;
 
-class VTK_MRML_DISPLAYABLEMANAGER_EXPORT vtkMRMLCameraDisplayableManager : 
+class VTK_MRML_DISPLAYABLEMANAGER_EXPORT vtkMRMLCameraDisplayableManager :
   public vtkMRMLAbstractThreeDViewDisplayableManager
 {
 
 public:
   static vtkMRMLCameraDisplayableManager* New();
-  vtkTypeRevisionMacro(vtkMRMLCameraDisplayableManager,vtkMRMLAbstractThreeDViewDisplayableManager);
+  vtkTypeMacro(vtkMRMLCameraDisplayableManager,vtkMRMLAbstractThreeDViewDisplayableManager);
   void PrintSelf(ostream& os, vtkIndent indent);
-  
+
   virtual void RemoveMRMLObservers();
 
   void UpdateCameraNode();
@@ -81,7 +81,7 @@ private:
 
   vtkMRMLCameraDisplayableManager(const vtkMRMLCameraDisplayableManager&);// Not implemented
   void operator=(const vtkMRMLCameraDisplayableManager&);                     // Not Implemented
-  
+
   class vtkInternal;
   vtkInternal * Internal;
 

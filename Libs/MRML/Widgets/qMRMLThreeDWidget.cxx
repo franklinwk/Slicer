@@ -48,7 +48,7 @@ protected:
 public:
   qMRMLThreeDWidgetPrivate(qMRMLThreeDWidget& object);
   ~qMRMLThreeDWidgetPrivate();
-  
+
   void init();
 
   qMRMLThreeDView*       ThreeDView;
@@ -73,7 +73,7 @@ qMRMLThreeDWidgetPrivate::~qMRMLThreeDWidgetPrivate()
 void qMRMLThreeDWidgetPrivate::init()
 {
   Q_Q(qMRMLThreeDWidget);
-  
+
   QVBoxLayout* layout = new QVBoxLayout(q);
   layout->setSpacing(0);
   layout->setContentsMargins(0, 0, 0, 0);
@@ -83,7 +83,7 @@ void qMRMLThreeDWidgetPrivate::init()
 
   this->ThreeDView = new qMRMLThreeDView;
   layout->addWidget(this->ThreeDView);
-  
+
   this->ThreeDController->setThreeDView(this->ThreeDView);
 
   QObject::connect(q, SIGNAL(mrmlSceneChanged(vtkMRMLScene*)),
@@ -134,6 +134,13 @@ qMRMLThreeDView* qMRMLThreeDWidget::threeDView()const
 {
   Q_D(const qMRMLThreeDWidget);
   return d->ThreeDView;
+}
+
+// --------------------------------------------------------------------------
+qMRMLThreeDViewControllerWidget * qMRMLThreeDWidget::threeDController() const
+{
+  Q_D(const qMRMLThreeDWidget);
+  return d->ThreeDController;
 }
 
 //---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 import os
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # Slicer4Minute
@@ -97,40 +97,7 @@ class Slicer4MinuteWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="Slicer4Minute"):
     self.onReload()
@@ -143,8 +110,8 @@ class Slicer4MinuteWidget:
 #
 
 class Slicer4MinuteLogic:
-  """This class should implement all the actual 
-  computation done by your module.  The interface 
+  """This class should implement all the actual
+  computation done by your module.  The interface
   should be such that other python code can import
   this class and make use of the functionality without
   requiring an instance of the Widget
@@ -153,14 +120,14 @@ class Slicer4MinuteLogic:
     pass
 
   def hasImageData(self,volumeNode):
-    """This is a dummy logic method that 
+    """This is a dummy logic method that
     returns true if the passed in volume
     node has valid image data
     """
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -202,7 +169,7 @@ class Slicer4MinuteTest(unittest.TestCase):
   def test_Slicer4Minute1(self):
     """ Tests parts of the Slicer4Minute tutorial.
 
-    Currently testing 'Part 2' which covers volumes, models, visibility and clipping. 
+    Currently testing 'Part 2' which covers volumes, models, visibility and clipping.
     """
 
     self.delayDisplay("Starting the test")
@@ -228,11 +195,11 @@ class Slicer4MinuteTest(unittest.TestCase):
     #
     #
     self.delayDisplay('Testing Part 2 of the Tutorial')
-    
+
     # check volume is loaded out of scene
     volumeNode = slicer.util.getNode(pattern="grayscale")
     logic = Slicer4MinuteLogic()
-    self.assertTrue( logic.hasImageData(volumeNode) )
+    self.assertIsNotNone( logic.hasImageData(volumeNode) )
 
     # check the slice planes
     red = slicer.util.getNode(pattern="vtkMRMLSliceNode1")
@@ -263,14 +230,14 @@ class Slicer4MinuteTest(unittest.TestCase):
     hemispheric_white_matter = slicer.util.getNode(pattern='hemispheric_white_matter.vtk')
     hemispheric_white_matter.GetDisplayNode().SetClipping(1)
 
-    clip = slicer.util.getNode(pattern='vtkMRMLClipModelsNode1')
+    clip = slicer.util.getNode('ClipModelsParameters1')
     clip.SetRedSliceClipState(0)
     clip.SetYellowSliceClipState(0)
     clip.SetGreenSliceClipState(2)
 
     # Can we make this more than just a Smoke Test?
     self.delayDisplay('Optic chiasm should be visible. Front part of white matter should be clipped.')
-    
+
     # Done
     #
     #

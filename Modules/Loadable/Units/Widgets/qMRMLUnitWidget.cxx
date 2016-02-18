@@ -40,7 +40,7 @@ protected:
 public:
   qMRMLUnitWidgetPrivate(qMRMLUnitWidget& obj);
 
-  virtual void setupUi(qMRMLUnitWidget*);
+  void setupUi(qMRMLUnitWidget*);
   void clear();
   void updatePropertyWidgets();
 
@@ -98,7 +98,7 @@ void qMRMLUnitWidgetPrivate::setupUi(qMRMLUnitWidget* q)
   QObject::connect(this->MaximumSpinBox, SIGNAL(valueChanged(double)),
     q, SLOT(setMaximum(double)));
   QObject::connect(this->MaximumSpinBox, SIGNAL(valueChanged(double)),
-    q, SIGNAL(minimumChanged(double)));
+    q, SIGNAL(maximumChanged(double)));
 
   QObject::connect(this->CoefficientSpinBox, SIGNAL(valueChanged(double)),
     q, SLOT(setCoefficient(double)));

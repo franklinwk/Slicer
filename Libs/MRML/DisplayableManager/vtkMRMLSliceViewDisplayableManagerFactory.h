@@ -40,7 +40,7 @@ class VTK_MRML_DISPLAYABLEMANAGER_EXPORT vtkMRMLSliceViewDisplayableManagerFacto
 {
 public:
 
-  vtkTypeRevisionMacro(vtkMRMLSliceViewDisplayableManagerFactory,
+  vtkTypeMacro(vtkMRMLSliceViewDisplayableManagerFactory,
                        vtkMRMLDisplayableManagerFactory);
   void PrintSelf(ostream& os, vtkIndent indent);
 
@@ -67,8 +67,10 @@ private:
 
 };
 
+//BTX
 VTK_SINGLETON_DECLARE_INITIALIZER(VTK_MRML_DISPLAYABLEMANAGER_EXPORT,
                                   vtkMRMLSliceViewDisplayableManagerFactory);
+//ETX
 
 #endif
 

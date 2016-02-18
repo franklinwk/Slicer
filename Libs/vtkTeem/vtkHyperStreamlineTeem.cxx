@@ -4,9 +4,9 @@
 #include "vtkObjectFactory.h"
 #include "vtkPointData.h"
 #include "vtkImageData.h"
+#include <vtkVersion.h>
 
 
-vtkCxxRevisionMacro(vtkHyperStreamlineTeem, "$Revision: 1.5 $");
 vtkStandardNewMacro(vtkHyperStreamlineTeem);
 
 
@@ -19,17 +19,18 @@ vtkHyperStreamlineTeem::~vtkHyperStreamlineTeem()
 }
 
 
-
-void vtkHyperStreamlineTeem::Execute()
+int vtkHyperStreamlineTeem::RequestData(vtkInformation* vtkNotUsed(request),
+                                        vtkInformationVector** vtkNotUsed(inInfoVec),
+                                        vtkInformationVector* vtkNotUsed(outInfoVec))
 {
   this->DebugOn();
-  
+
   // This approach may cause problems depending on how slicer handles multiple datasets
   // because swapping back and forth between two dataset will cause new fibercontexts to be
   // regenerated each time. Is this a problem? Dunno. Needs to be tested... but should be
   // fine for now (for beta-testing purposes) where only 1 dataset used.
   static tenFiberContext *context = NULL;
-  
+
   if( !context )
   {
     context = ProduceFiberContext();
@@ -39,24 +40,25 @@ void vtkHyperStreamlineTeem::Execute()
       // TODO: Clean up after previous context here
       context = ProduceFiberContext();
     }
-  
+
   StartFiberFrom( StartPosition, context );
-  
+
   vtkDebugMacro( << "Done!");
   this->DebugOff();
+  return 1;
 }
 
 
-void vtkHyperStreamlineTeem::StartFiberFrom( const vtkFloatingPointType position[3], tenFiberContext *context )
+void vtkHyperStreamlineTeem::StartFiberFrom( const double position[3], tenFiberContext *context )
 {
   vtkDebugMacro( << "Starting fiber from ("<< position[0] <<","<< position[1] <<"," << position[2] <<")");
-  
+
   double start[3];
   start[0] = position[0];
   start[1] = position[1];
   start[2] = position[2];
   //real2index( position, start );
-  
+
   Nrrd *output = nrrdNew();
   if (tenFiberTrace( context, output, start )) {
     //char *err = biffGetDone(TEN);
@@ -67,12 +69,12 @@ void vtkHyperStreamlineTeem::StartFiberFrom( const vtkFloatingPointType position
     return;
   }
   vtkDebugMacro( << "Found "  << output->axis[1].size << " points in fiber" );
-  
+
   if ( output->data )
   {
     VisualizeFibers( output );
   }
-  
+
   vtkDebugMacro( << "Cleaning up");
   nrrdNuke( output );
 }
@@ -82,27 +84,26 @@ void vtkHyperStreamlineTeem::VisualizeFibers( const Nrrd *fibers )
   Streamers = new vtkTractographyArray[1];
   NumberOfStreamers = 1;
   Streamers[0].Direction = 1;
-  
+
   const size_t fibercount = fibers->axis[1].size;
   size_t pos[2];
   for( size_t fiber = 0; fiber < fibercount; fiber++ )
   {
       pos[1] = fiber;
-      vtkFloatingPointType indexPoints[3];
-      
+      double indexPoints[3];
       for( int axis = 0; axis < 3; axis++ )
       {
           pos[0] = axis;
           nrrdSample_nva( &indexPoints[axis], fibers, pos );
       }
-      
+
       vtkTractographyPoint *point = Streamers[0].InsertNextTractographyPoint();
       point->X[0] = indexPoints[0];
       point->X[1] = indexPoints[1];
       point->X[2] = indexPoints[2];
       //index2real( indexPoints, point->X );
       //vtkDebugMacro( << "Point in fiber(" << indexPoints[0] << "," << indexPoints[1] << "," << indexPoints[2] << ")");
-      
+
       // Measure distance between points
       if( fiber > 1 )
       {
@@ -113,13 +114,9 @@ void vtkHyperStreamlineTeem::VisualizeFibers( const Nrrd *fibers )
       {
           point->D = 0.0;
       }
-#if (VTK_MAJOR_VERSION >= 5)
       point->CellId = this->GetPolyDataInput(0)->FindPoint(point->X);
-#else
-      point->CellId = this->GetInput()->FindPoint( point->X );
-#endif
     }
-  
+
   vtkDebugMacro( << "Building lines");
   BuildLines(vtkDataSet::SafeDownCast(this->GetInput(0)),this->GetOutput());
 }
@@ -164,15 +161,15 @@ tenFiberContext *vtkHyperStreamlineTeem::ProduceFiberContext()
   vtkDataArray *array = dataset->GetPointData()->GetTensors();
   {
     int position[3];
-    vtkFloatingPointType tensor[3][3];
+    double tensor[3][3];
     for( position[2] = 0; position[2] < size[2]; position[2]++ )
       for( position[1] = 0; position[1] < size[1]; position[1]++ )
     for( position[0] = 0; position[0] < size[0]; position[0]++ )
       {
-        array->GetTuple( dataset->ComputePointId( position ), (vtkFloatingPointType*) tensor );
-            
+        array->GetTuple( dataset->ComputePointId( position ), (double*) tensor );
+
         *(data++) = 1.0f; // Confidence mask
-        
+
         *(data++) = (float) tensor[0][0]; // Dxx
         *(data++) = (float) tensor[0][1]; // Dxy
         *(data++) = (float) tensor[0][2]; // Dxz
@@ -181,7 +178,7 @@ tenFiberContext *vtkHyperStreamlineTeem::ProduceFiberContext()
         *(data++) = (float) tensor[2][2]; // Dzz
       }
   }
-  
+
   tenFiberContext *context = tenFiberContextNew( nrrd );
   if ( !context ) {
     //char *err = biffGetDone(TEN);

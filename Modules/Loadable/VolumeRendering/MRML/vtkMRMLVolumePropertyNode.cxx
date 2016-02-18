@@ -13,6 +13,7 @@
 #include <vtkVolumeProperty.h>
 
 // STD includes
+#include <algorithm>
 #include <cassert>
 #include <limits>
 #include <sstream>
@@ -175,7 +176,7 @@ void vtkMRMLVolumePropertyNode::Copy(vtkMRMLNode *anode)
   this->Superclass::Copy(anode);
 
   this->CopyParameterSet(anode);
-  
+
   this->EndModify(disabledModify);
 }
 

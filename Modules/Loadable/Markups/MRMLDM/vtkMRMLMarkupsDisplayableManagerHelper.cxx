@@ -29,6 +29,7 @@
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
 #include <vtkProperty.h>
+#include <vtkPickingManager.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkSeedRepresentation.h>
 #include <vtkSeedWidget.h>
@@ -46,7 +47,6 @@
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro (vtkMRMLMarkupsDisplayableManagerHelper);
-vtkCxxRevisionMacro (vtkMRMLMarkupsDisplayableManagerHelper, "$Revision: 1.0 $");
 
 //---------------------------------------------------------------------------
 void vtkMRMLMarkupsDisplayableManagerHelper::PrintSelf(ostream& os, vtkIndent indent)
@@ -489,6 +489,16 @@ void vtkMRMLMarkupsDisplayableManagerHelper::PlaceSeed(double x, double y, vtkRe
     //seed widget
     vtkSeedWidget * seedWidget = vtkSeedWidget::New();
     seedWidget->SetRepresentation(rep.GetPointer());
+
+    if (interactor->GetPickingManager())
+      {
+      if (!(interactor->GetPickingManager()->GetEnabled()))
+        {
+        // if the picking manager is not already turned on for this
+        // interactor, enable it
+        interactor->GetPickingManager()->EnabledOn();
+        }
+      }
 
     seedWidget->SetInteractor(interactor);
     seedWidget->SetCurrentRenderer(renderer);

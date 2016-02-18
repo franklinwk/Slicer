@@ -16,7 +16,7 @@
 #define __vtkMRMLStorableNode_h
 
 // MRML includes
-#include "vtkMRMLTransformableNode.h"
+#include "vtkMRMLNode.h"
 class vtkMRMLStorageNode;
 
 // VTK includes
@@ -27,68 +27,57 @@ class vtkTagTable;
 
 /// \brief MRML node to represent a 3D surface model.
 ///
-/// Model nodes describe polygonal data.  Models 
-/// are assumed to have been constructed with the orientation and voxel 
+/// Model nodes describe polygonal data.  Models
+/// are assumed to have been constructed with the orientation and voxel
 /// dimensions of the original segmented volume.
-class VTK_MRML_EXPORT vtkMRMLStorableNode : public vtkMRMLTransformableNode
+class VTK_MRML_EXPORT vtkMRMLStorableNode : public vtkMRMLNode
 {
 public:
-  vtkTypeMacro(vtkMRMLStorableNode,vtkMRMLTransformableNode);
+  vtkTypeMacro(vtkMRMLStorableNode,vtkMRMLNode);
   void PrintSelf(ostream& os, vtkIndent indent);
-  
+
   //--------------------------------------------------------------------------
   /// Methods for user-specified metadata
   //--------------------------------------------------------------------------
   vtkGetObjectMacro ( UserTagTable, vtkTagTable );
-  
+
   //--------------------------------------------------------------------------
   /// MRMLNode methods
   //--------------------------------------------------------------------------
-  
+
   virtual vtkMRMLNode* CreateNodeInstance() = 0;
 
   virtual const char* GetNodeTagName() = 0;
 
-  /// 
+  ///
   /// Read node attributes from XML file
   virtual void ReadXMLAttributes( const char** atts);
-  
-  /// 
+
+  ///
   /// Write this node's information to a MRML file in XML format.
   virtual void WriteXML(ostream& of, int indent);
 
-  /// 
+  ///
   /// Copy the node's attributes to this object
   virtual void Copy(vtkMRMLNode *node);
 
-  /// 
+  ///
   /// Finds the storage node and read the data
   virtual void UpdateScene(vtkMRMLScene *scene);
 
-  /// 
+  ///
   /// alternative method to propagate events generated in Storage nodes
-  virtual void ProcessMRMLEvents ( vtkObject * /*caller*/, 
-                                   unsigned long /*event*/, 
+  virtual void ProcessMRMLEvents ( vtkObject * /*caller*/,
+                                   unsigned long /*event*/,
                                    void * /*callData*/ );
 
-  /// 
+  ///
   /// String ID of the storage MRML node
-  void SetAndObserveStorageNodeID(const char *storageNodeID)
-  {
-    this->SetAndObserveNodeReferenceID(this->GetStorageNodeReferenceRole(), storageNodeID);
-  }
+  void SetAndObserveStorageNodeID(const char *storageNodeID);
+  void AddAndObserveStorageNodeID(const char *storageNodeID);
+  void SetAndObserveNthStorageNodeID(int n, const char *storageNodeID);
 
-  void AddAndObserveStorageNodeID(const char *storageNodeID)
-  {
-    this->AddAndObserveNodeReferenceID(this->GetStorageNodeReferenceRole(), storageNodeID);
-  }
-
-  void SetAndObserveNthStorageNodeID(int n, const char *storageNodeID)
-  {
-    this->SetAndObserveNthNodeReferenceID(this->GetStorageNodeReferenceRole(), n, storageNodeID);
-  }
-
-  /// 
+  ///
   /// This is describes the type of data stored in the nodes storage node(s).
   /// It's an informatics metadata mechanism so that Slicer knows what kinds
   /// of nodes to create to receive downloaded datasets, and works around
@@ -98,31 +87,19 @@ public:
   /// are hidden from editors like scalar overlays.
   void SetSlicerDataType ( const char *type );
   const char *GetSlicerDataType ();
-  
-  int GetNumberOfStorageNodes()
-  {
-    return this->GetNumberOfNodeReferences(this->GetStorageNodeReferenceRole());
-  }
 
-  const char *GetNthStorageNodeID(int n)
-  {
-    return this->GetNthNodeReferenceID(this->GetStorageNodeReferenceRole(), n);
-  }
+  int GetNumberOfStorageNodes();
+  const char *GetNthStorageNodeID(int n);
+  const char *GetStorageNodeID();
 
-  const char *GetStorageNodeID()
-  {
-  return this->GetNthStorageNodeID(0);
-  }
-
-  /// 
+  ///
   /// Get associated display MRML node
   vtkMRMLStorageNode* GetNthStorageNode(int n);
-
   vtkMRMLStorageNode* GetStorageNode();
 
-  //std::vector<vtkMRMLStorageNode*> GetStorageNodes()const;
-
-  /// Create a storage node for this node type or NULL if it doesn't have one.
+  /// Create a storage node for this node type.
+  /// If it returns NULL then it means the node can be stored
+  /// in the scene (in XML), without using a storage node.
   /// Null by default.
   /// This must be overwritten by subclasses that use storage nodes.
   virtual vtkMRMLStorageNode* CreateDefaultStorageNode();
@@ -145,7 +122,7 @@ public:
   /// Allows external code to mark that the storable has been modified
   /// and should therefore be selected for saving by default.
   /// \sa GetStoredTime() StorableModifiedTime Modified() GetModifiedSinceRead()
-  virtual void StorableModified() {this->StorableModifiedTime.Modified();};
+  virtual void StorableModified();
 
  protected:
   vtkMRMLStorableNode();
@@ -161,7 +138,7 @@ public:
 
   vtkTagTable *UserTagTable;
 
-  /// 
+  ///
   /// SlicerDataType records the kind of storage node that
   /// holds the data. Set in each subclass.
   std::string SlicerDataType;

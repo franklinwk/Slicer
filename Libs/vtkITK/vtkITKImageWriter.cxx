@@ -19,9 +19,13 @@
 #include <vtkFloatArray.h>
 #include <vtkImageExport.h>
 #include <vtkImageFlip.h>
+#include <vtkInformation.h>
+#include <vtkInformationVector.h>
 #include <vtkITKUtility.h>
 #include <vtkNew.h>
 #include <vtkPointData.h>
+#include <vtkStreamingDemandDrivenPipeline.h>
+#include <vtkVersion.h>
 
 // VTKsys includes
 #include <vtksys/SystemTools.hxx>
@@ -36,7 +40,6 @@
 
 
 vtkStandardNewMacro(vtkITKImageWriter);
-vtkCxxRevisionMacro(vtkITKImageWriter, "$Revision$")
 
 // helper function
 template <class  TPixelType, int Dimension>
@@ -127,8 +130,8 @@ void ITKWriteVTKImage(vtkITKImageWriter *self, vtkImageData *inputImage, char *f
   typename ImageImportType::Pointer itkImporter = ImageImportType::New();
 
   // vtk export for  vtk image
-  vtkImageExport* vtkExporter = vtkImageExport::New();
-  vtkImageFlip* vtkFlip = vtkImageFlip::New();
+  vtkNew<vtkImageExport> vtkExporter;
+  vtkNew<vtkImageFlip> vtkFlip;
 
   // writer
   typedef typename itk::ImageFileWriter<ImageType> ImageWriterType;
@@ -145,13 +148,12 @@ void ITKWriteVTKImage(vtkITKImageWriter *self, vtkImageData *inputImage, char *f
 
 
   // set pipeline for the image
-  vtkFlip->SetInput( inputImage );
+  vtkFlip->SetInputData( inputImage );
+  vtkExporter->SetInputData ( inputImage );
   vtkFlip->SetFilteredAxis(1);
   vtkFlip->FlipAboutOriginOn();
 
-  vtkExporter->SetInput ( inputImage );
-
-  ConnectPipelines(vtkExporter, itkImporter);
+  ConnectPipelines(vtkExporter.GetPointer(), itkImporter);
 
   // write image
   if(self->GetImageIOClassName())
@@ -217,9 +219,6 @@ void ITKWriteVTKImage(vtkITKImageWriter *self, vtkImageData *inputImage, char *f
     exception.Print(std::cerr);
     throw exception;
     }
-  // clean up
-  vtkExporter->Delete();
-  vtkFlip->Delete();
 }
 
 //----------------------------------------------------------------------------
@@ -281,25 +280,6 @@ void vtkITKImageWriter::PrintSelf(ostream& os, vtkIndent indent)
 
 
 //----------------------------------------------------------------------------
-void vtkITKImageWriter::SetInput(vtkImageData *input)
-{
-  this->vtkProcessObject::SetNthInput(0, input);
-}
-
-//----------------------------------------------------------------------------
-vtkImageData *vtkITKImageWriter::GetInput()
-{
-  if (this->NumberOfInputs < 1)
-    {
-    return NULL;
-    }
-
-  return (vtkImageData *)(this->Inputs[0]);
-}
-
-
-
-//----------------------------------------------------------------------------
 // This function sets the name of the file.
 void vtkITKImageWriter::SetFileName(const char *name)
 {
@@ -325,10 +305,13 @@ void vtkITKImageWriter::SetFileName(const char *name)
 // Writes all the data from the input.
 void vtkITKImageWriter::Write()
 {
-  vtkImageData *inputImage = this->GetInput();
+  vtkImageData *inputImage = this->GetImageDataInput(0);
+  vtkPointData* pointData = inputImage->GetPointData();
 
-  if ( inputImage == NULL )
+  if ( inputImage == NULL ||
+       pointData == NULL )
     {
+    vtkErrorMacro(<<"vtkITKImageWriter: No image to write");
     return;
     }
   if ( ! this->FileName )
@@ -337,15 +320,26 @@ void vtkITKImageWriter::Write()
     return;
     }
 
-  inputImage->UpdateInformation();
-  inputImage->SetUpdateExtent(inputImage->GetWholeExtent());
-
-  int inputNumberOfScalarComponents = inputImage->GetNumberOfScalarComponents();
+  this->UpdateInformation();
+  this->SetUpdateExtent(this->GetOutputInformation(0)->Get(
+                        vtkStreamingDemandDrivenPipeline::WHOLE_EXTENT()));
+  int inputDataType =
+    pointData->GetScalars() ? pointData->GetScalars()->GetDataType() :
+    pointData->GetTensors() ? pointData->GetTensors()->GetDataType() :
+    pointData->GetVectors() ? pointData->GetVectors()->GetDataType() :
+    pointData->GetNormals() ? pointData->GetNormals()->GetDataType() :
+    0;
+  int inputNumberOfScalarComponents =
+    pointData->GetScalars() ? pointData->GetScalars()->GetNumberOfComponents() :
+    pointData->GetTensors() ? pointData->GetTensors()->GetNumberOfComponents() :
+    pointData->GetVectors() ? pointData->GetVectors()->GetNumberOfComponents() :
+    pointData->GetNormals() ? pointData->GetNormals()->GetNumberOfComponents() :
+    0;
 
   if (inputNumberOfScalarComponents == 1)
     {
     // take into consideration the scalar type
-    switch (inputImage->GetScalarType())
+    switch (inputDataType)
       {
       case VTK_DOUBLE:
         {
@@ -405,7 +399,7 @@ void vtkITKImageWriter::Write()
   else if (inputNumberOfScalarComponents == 3)
     {
     // take into consideration the scalar type
-    switch (inputImage->GetScalarType())
+    switch (inputDataType)
       {
       case VTK_DOUBLE:
         {
@@ -439,7 +433,7 @@ void vtkITKImageWriter::Write()
   else if (inputNumberOfScalarComponents == 4)
     {
     // take into consideration the scalar type
-    switch (inputImage->GetScalarType())
+    switch (inputDataType)
       {
       case VTK_DOUBLE:
         {
@@ -473,19 +467,16 @@ void vtkITKImageWriter::Write()
   else if (inputNumberOfScalarComponents == 9)
     {
     // take into consideration the scalar type
-    switch (inputImage->GetScalarType())
+    switch (inputDataType)
       {
       case VTK_FLOAT:
         {
         typedef itk::DiffusionTensor3D<float> TensorPixelType;
         vtkNew<vtkImageData> outImage;
         outImage->SetDimensions(inputImage->GetDimensions());
-        outImage->SetWholeExtent(inputImage->GetWholeExtent());
         outImage->SetOrigin(0, 0, 0);
         outImage->SetSpacing(1, 1, 1);
-        outImage->SetNumberOfScalarComponents(6);
-        outImage->SetScalarTypeToFloat();
-        outImage->AllocateScalars();
+        outImage->AllocateScalars(VTK_FLOAT, 6);
         vtkFloatArray* out = vtkFloatArray::SafeDownCast(outImage->GetPointData()->GetScalars());
         vtkFloatArray* in = vtkFloatArray::SafeDownCast(inputImage->GetPointData()->GetTensors());
         float inValue[9];

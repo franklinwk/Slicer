@@ -71,8 +71,10 @@ class Q_SLICER_BASE_QTCORE_EXPORT qSlicerAbstractModuleFactoryManager : public Q
   /// A module can be a library (dll, so),
   /// an executable (exe), a python file (py) or any other file type supported
   /// by the registered factories.
-  /// The search is not recursive (\tdb?), you need to provide each subdirectory
+  /// The search is not recursive, you need to provide each subdirectory
   /// manually.
+  ///
+  /// \todo In qSlicerAbstractModuleFactoryManager, should the module search recursively descend \a searchPaths
   Q_PROPERTY(QStringList searchPaths READ searchPaths WRITE setSearchPaths)
 
   /// This property holds the name of the modules to ignore at registration time.
@@ -145,6 +147,8 @@ public:
   /// using one of the registered factories.
   void registerModules();
 
+  Q_INVOKABLE void registerModule(const QFileInfo& file);
+
   /// Convenient method returning the list of all registered module names
   Q_INVOKABLE QStringList registeredModuleNames() const;
 
@@ -209,7 +213,6 @@ protected:
   QScopedPointer<qSlicerAbstractModuleFactoryManagerPrivate> d_ptr;
 
   void registerModules(const QString& directoryPath);
-  void registerModule(const QFileInfo& file);
 
   /// Instantiate a module given its \a name
   qSlicerAbstractCoreModule* instantiateModule(const QString& name);

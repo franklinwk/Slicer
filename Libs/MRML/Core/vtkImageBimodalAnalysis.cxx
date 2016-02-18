@@ -13,7 +13,11 @@
 =========================================================================auto=*/
 #include "vtkImageBimodalAnalysis.h"
 
+#include "vtkDataSetAttributes.h"
+#include "vtkInformation.h"
+#include "vtkInformationVector.h"
 #include "vtkObjectFactory.h"
+#include "vtkStreamingDemandDrivenPipeline.h"
 #include "vtkImageData.h"
 
 //#include <math.h>
@@ -33,7 +37,7 @@ vtkImageBimodalAnalysis::vtkImageBimodalAnalysis()
   this->Min       = 0;
   this->Max       = 0;
   this->Offset    = 0;
-  
+
   for (int i = 0; i < 2; ++i)
     {
     this->SignalRange[i] = 0;
@@ -45,9 +49,16 @@ vtkImageBimodalAnalysis::vtkImageBimodalAnalysis()
 }
 
 //----------------------------------------------------------------------------
-void vtkImageBimodalAnalysis::ExecuteInformation(vtkImageData *, vtkImageData *output)
+int vtkImageBimodalAnalysis::RequestInformation(
+  vtkInformation * vtkNotUsed(request),
+  vtkInformationVector **vtkNotUsed(inputVector),
+  vtkInformationVector *outputVector)
 {
-  output->SetScalarType(VTK_FLOAT);
+  // get the info objects
+  vtkInformation* outInfo = outputVector->GetInformationObject(0);
+
+  vtkDataObject::SetPointDataActiveScalarInfo(outInfo, VTK_FLOAT, 1);
+  return 1;
 }
 
 //----------------------------------------------------------------------------
@@ -62,10 +73,10 @@ static void vtkImageBimodalAnalysisExecute(vtkImageBimodalAnalysis *self,
   int noise = 1, width = 5;
   float fwidth = 1.0 / 5.0;
   T tmp, minSignal, maxSignal;
-  vtkFloatingPointType sum, wsum;
+  double sum, wsum;
   int ct = (self->GetModality() == VTK_BIMODAL_MODALITY_CT) ? 1 : 0;
   int centroid, noiseCentroid, trough, window, threshold, min, max;
-  vtkFloatingPointType origin[3], spacing[3];
+  double origin[3], spacing[3];
 
   // Process x dimension only
   outData->GetExtent(min0, max0, min1, max1, min2, max2);
@@ -108,9 +119,12 @@ static void vtkImageBimodalAnalysisExecute(vtkImageBimodalAnalysis *self,
   // Smooth
   for (x = min; x <= max; x++)
     {
-    for (k=0; k < width; k++) 
+    for (k=0; k < width; k++)
       {
-      outPtr[x] += (float)inPtr[x+k];
+      if (x+k <= max0) // skip any that would be outside range of outPtr see Bug #3429
+        {
+        outPtr[x] += (float)inPtr[x+k];
+        }
       }
     outPtr[x] *= fwidth;
     }
@@ -131,7 +145,7 @@ static void vtkImageBimodalAnalysisExecute(vtkImageBimodalAnalysis *self,
           }
         }
       }
-    else 
+    else
       {
       if (outPtr[x] < outPtr[x+1])
         {
@@ -147,8 +161,8 @@ static void vtkImageBimodalAnalysisExecute(vtkImageBimodalAnalysis *self,
   for (x=min; x <= trough; x++)
     {
     tmp = inPtr[x];
-    wsum += (vtkFloatingPointType)x*tmp;
-    sum  += (vtkFloatingPointType)  tmp;
+    wsum += (double)x*tmp;
+    sum  += (double)  tmp;
     }
   if (sum)
     {
@@ -174,8 +188,8 @@ static void vtkImageBimodalAnalysisExecute(vtkImageBimodalAnalysis *self,
       {
       minSignal = tmp;
       }
-    wsum += (vtkFloatingPointType)x*tmp;
-    sum  += (vtkFloatingPointType)  tmp;
+    wsum += (double)x*tmp;
+    sum  += (double)  tmp;
     }
   if (sum)
     {
@@ -188,14 +202,14 @@ static void vtkImageBimodalAnalysisExecute(vtkImageBimodalAnalysis *self,
 
   // Threshold
   threshold = trough;
-  
+
   // Compute the window as twice the width as the smaller half
   // of the signal lobe
   if (centroid - noiseCentroid < max - centroid)
     {
     window = (centroid - noiseCentroid)*2;
     }
-  else 
+  else
     {
     window = (max - centroid)*2;
     }
@@ -215,26 +229,23 @@ static void vtkImageBimodalAnalysisExecute(vtkImageBimodalAnalysis *self,
   self->SetClipExtent(clipExt);
 }
 
-    
+
 
 //----------------------------------------------------------------------------
 // This method is passed a input and output Data, and executes the filter
 // algorithm to fill the output from the input.
 // It just executes a switch statement to call the correct function for
 // the Datas data types.
-void vtkImageBimodalAnalysis::ExecuteData(vtkDataObject *out)
+void vtkImageBimodalAnalysis::ExecuteDataWithInformation(vtkDataObject *out, vtkInformation* outInfo)
 {
-  vtkImageData *outData = vtkImageData::SafeDownCast(out);
-  vtkImageData *inData = this->GetInput();
-  void *inPtr;
-  float *outPtr;
-  
-  outData->SetExtent(outData->GetWholeExtent());
-  outData->AllocateScalars();
+    vtkImageData *inData = vtkImageData::SafeDownCast(this->GetInput());
+    void *inPtr;
+    float *outPtr;
+    vtkImageData *outData = this->AllocateOutputData(out, outInfo);
 
   inPtr  = inData->GetScalarPointer();
   outPtr = (float *)outData->GetScalarPointer();
-  
+
   // Components turned into x, y and z
   int c = inData->GetNumberOfScalarComponents();
   if (c > 1)
@@ -250,48 +261,12 @@ void vtkImageBimodalAnalysis::ExecuteData(vtkDataObject *out)
       << " must be float\n");
     return;
     }
+
   switch (inData->GetScalarType())
-  {
-    case VTK_CHAR:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (char *)(inPtr), outData, outPtr);
-      break;
-    case VTK_UNSIGNED_CHAR:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (unsigned char *)(inPtr), outData, outPtr);
-      break;
-    case VTK_SHORT:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (short *)(inPtr), outData, outPtr);
-      break;
-    case VTK_UNSIGNED_SHORT:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (unsigned short *)(inPtr), outData, outPtr);
-      break;
-    case VTK_INT:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (int *)(inPtr), outData, outPtr);
-      break;
-    case VTK_UNSIGNED_INT:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (unsigned int *)(inPtr), outData, outPtr);
-      break;
-    case VTK_LONG:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (long *)(inPtr), outData, outPtr);
-      break;
-    case VTK_UNSIGNED_LONG:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (unsigned long *)(inPtr), outData, outPtr);
-      break;
-    case VTK_FLOAT:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (float *)(inPtr), outData, outPtr);
-      break;
-    case VTK_DOUBLE:
-      vtkImageBimodalAnalysisExecute(this, 
-              inData, (double *)(inPtr), outData, outPtr);
-      break;
+    {
+    vtkTemplateMacro(vtkImageBimodalAnalysisExecute(this, inData,
+                                                    static_cast<VTK_TT *>(inPtr),
+                                                    outData, outPtr));
     default:
       vtkErrorMacro(<< "ExecuteData: Unsupported ScalarType");
       return;
@@ -312,6 +287,6 @@ void vtkImageBimodalAnalysis::PrintSelf(ostream& os, vtkIndent indent)
   os << indent << "Max: " << this->Max << "\n";
   os << indent << "ClipExtent: " << this->ClipExtent[0] << "," << this->ClipExtent[1] << "," << this->ClipExtent[2] << "," << this->ClipExtent[3] << "," << this->ClipExtent[4] << "," << this->ClipExtent[5] << "\n";
   os << indent << "SignalRange: " << this->SignalRange[0] << "," << this->SignalRange[1] << "\n";
-    
+
 }
 

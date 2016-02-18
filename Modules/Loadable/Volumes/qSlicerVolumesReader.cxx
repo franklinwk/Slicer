@@ -30,6 +30,7 @@
 #include "vtkSlicerVolumesLogic.h"
 
 // MRML includes
+#include <vtkMRMLLabelMapVolumeNode.h>
 #include <vtkMRMLScalarVolumeNode.h>
 #include <vtkMRMLSelectionNode.h>
 
@@ -163,8 +164,7 @@ bool qSlicerVolumesReader::load(const IOProperties& properties)
       appLogic ? appLogic->GetSelectionNode() : 0;
     if (selectionNode)
       {
-      if (vtkMRMLScalarVolumeNode::SafeDownCast(node) &&
-          vtkMRMLScalarVolumeNode::SafeDownCast(node)->GetLabelMap())
+      if (vtkMRMLLabelMapVolumeNode::SafeDownCast(node))
         {
         selectionNode->SetReferenceActiveLabelVolumeID(node->GetID());
         }
@@ -174,9 +174,7 @@ bool qSlicerVolumesReader::load(const IOProperties& properties)
         }
       if (appLogic)
         {
-        appLogic->PropagateVolumeSelection();
-        // TODO: slices should probably be fitting automatically..
-        appLogic->FitSliceToAll();
+        appLogic->PropagateVolumeSelection(); // includes FitSliceToAll by default
         }
       }
     this->setLoadedNodes(QStringList(QString(node->GetID())));

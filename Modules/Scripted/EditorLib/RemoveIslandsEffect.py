@@ -1,25 +1,30 @@
 import os
-from __main__ import vtk
+import vtk
 import vtkITK
-from __main__ import ctk
-from __main__ import qt
-from __main__ import slicer
-from EditOptions import EditOptions
-from EditorLib import EditorLib
+import ctk
+import qt
+import slicer
+from EditOptions import HelpButton
 import Effect
 import IslandEffect
 
+__all__ = [
+  'RemoveIslandsEffectOptions',
+  'RemoveIslandsEffectTool',
+  'RemoveIslandsEffectLogic',
+  'RemoveIslandsEffect'
+  ]
 
 #########################################################
 #
-# 
+#
 comment = """
 
   RemoveIslandsEffect is a subclass of IslandEffect
   to remove small islands that might, for example, be
   cause by noise after thresholding.
 
-# TODO : 
+# TODO :
 """
 #
 #########################################################
@@ -57,7 +62,7 @@ class RemoveIslandsEffectOptions(IslandEffect.IslandEffectOptions):
     self.connections.append( (self.applyConnectivity, 'clicked()', self.onApplyConnectivity) )
     self.connections.append( (self.applyMorphology, 'clicked()', self.onApplyMorphology) )
 
-    EditorLib.HelpButton(self.frame, "Remove connected regions (islands) that are fully enclosed by the current label color and are smaller than the given minimum size.")
+    HelpButton(self.frame, "Remove connected regions (islands) that are fully enclosed by the current label color and are smaller than the given minimum size.")
 
     # Add vertical spacer
     self.frame.layout().addStretch(1)
@@ -75,7 +80,7 @@ class RemoveIslandsEffectOptions(IslandEffect.IslandEffectOptions):
 
   # note: this method needs to be implemented exactly as-is
   # in each leaf subclass so that "self" in the observer
-  # is of the correct type 
+  # is of the correct type
   def updateParameterNode(self, caller, event):
     node = self.editUtil.getParameterNode()
     if node != self.parameterNode:
@@ -96,7 +101,7 @@ class RemoveIslandsEffectOptions(IslandEffect.IslandEffectOptions):
 #
 # RemoveIslandsEffectTool
 #
- 
+
 class RemoveIslandsEffectTool(IslandEffect.IslandEffectTool):
   """
   One instance of this will be created per-view when the effect
@@ -109,7 +114,7 @@ class RemoveIslandsEffectTool(IslandEffect.IslandEffectTool):
 
   def __init__(self, sliceWidget):
     super(RemoveIslandsEffectTool,self).__init__(sliceWidget)
-    
+
   def cleanup(self):
     """
     call superclass to clean up actors
@@ -122,13 +127,13 @@ class RemoveIslandsEffectTool(IslandEffect.IslandEffectTool):
 #
 # RemoveIslandsEffectLogic
 #
- 
+
 class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
   """
   This class contains helper methods for a given effect
   type.  It can be instanced as needed by an RemoveIslandsEffectTool
   or RemoveIslandsEffectOptions instance in order to compute intermediate
-  results (say, for user feedback) or to implement the final 
+  results (say, for user feedback) or to implement the final
   segmentation editing operation.  This class is split
   from the RemoveIslandsEffectTool so that the operations can be used
   by other code without the need for a view context.
@@ -139,7 +144,7 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
 
 
   def findNonZeroBorderPixel(self, imageData):
-    """ search the border of the image data looking for the first 
+    """ search the border of the image data looking for the first
     - usually whole border will be nonzero, but in some cases
       it may not be.  So check corners first, and then
       if can't find it, give up and use 1 (to avoid exhaustive search)
@@ -175,13 +180,13 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
     preThresh.ReplaceInOn()
     preThresh.ReplaceOutOn()
     preThresh.ThresholdBetween( label,label )
-    preThresh.SetInput( self.getScopedLabelInput() )
+    preThresh.SetInputData( self.getScopedLabelInput() )
     preThresh.SetOutputScalarTypeToUnsignedLong()
 
     # now identify the islands in the inverted volume
     # and find the pixel that corresponds to the background
     islandMath = vtkITK.vtkITKIslandMath()
-    islandMath.SetInput( preThresh.GetOutput() )
+    islandMath.SetInputConnection( preThresh.GetOutputPort() )
     islandMath.SetFullyConnected( fullyConnected )
     islandMath.SetMinimumSize( minimumSize )
     # TODO: $this setProgressFilter $islandMath "Calculating Islands..."
@@ -203,7 +208,7 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
     postThresh.ReplaceOutOn()
     postThresh.ThresholdBetween( bgPixel, bgPixel )
     postThresh.SetOutputScalarTypeToShort()
-    postThresh.SetInput( islandMath.GetOutput() )
+    postThresh.SetInputConnection( islandMath.GetOutputPort() )
     postThresh.SetOutput( self.getScopedLabelOutput() )
     # TODO $this setProgressFilter $postThresh "Applying to Label Map..."
     postThresh.Update()
@@ -213,7 +218,7 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
 
 
     if False:
-      # some code for debugging - leave it in 
+      # some code for debugging - leave it in
       layerLogic = self.sliceLogic.GetLabelLayer()
       labelNode = layerLogic.GetVolumeNode()
       volumesLogic = slicer.modules.volumes.logic()
@@ -222,15 +227,13 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
       thresh2 = volumesLogic.CloneVolume(slicer.mrmlScene, labelNode, 'thres2')
       cast = vtk.vtkImageCast()
       cast.SetOutputScalarTypeToShort()
-      cast.SetInput(preThresh.GetOutput())
-      cast.Update()
-      thresh1.SetAndObserveImageData(cast.GetOutput())
+      cast.SetInputConnection(preThresh.GetOutputPort())
+      thresh1.SetImageDataConnection(cast.GetOutputPort())
       cast2 = vtk.vtkImageCast()
       cast2.SetOutputScalarTypeToShort()
-      cast2.SetInput(islandMath.GetOutput())
-      cast2.Update()
-      islands.SetAndObserveImageData(cast2.GetOutput())
-      thresh2.SetAndObserveImageData(postThresh.GetOutput())
+      cast2.SetInputConnection(islandMath.GetOutputPort())
+      islands.SetImageDataConnection(cast2.GetOutputPort())
+      thresh2.SetImageDataConnection(postThresh.GetOutputPort())
 
   def removeIslandsMorphology(self):
     """
@@ -269,7 +272,7 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
     # make binary mask foregroundLabel->1, backgroundLabel->0
     #
     binThresh = vtk.vtkImageThreshold()
-    binThresh.SetInput( image )
+    binThresh.SetInputData( image )
     binThresh.ThresholdBetween(foregroundLabel,foregroundLabel)
     binThresh.SetInValue( 1 )
     binThresh.SetOutValue( 0 )
@@ -281,7 +284,7 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
     eroder = slicer.vtkImageErode()
     eroderImage = vtk.vtkImageData()
     eroderImage.DeepCopy(binThresh.GetOutput())
-    eroder.SetInput(eroderImage)
+    eroder.SetInputData(eroderImage)
     for iteration in range(iterations):
       eroder.SetForeground( 1 )
       eroder.SetBackground( 0 )
@@ -297,20 +300,20 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
     # note that island operation happens in unsigned long space
     # but the slicer editor works in Short
     castIn = vtk.vtkImageCast()
-    castIn.SetInput( eroderImage )
+    castIn.SetInputConnection( eroder.GetInputConnection(0,0) )
     castIn.SetOutputScalarTypeToUnsignedLong()
 
     # now identify the islands in the inverted volume
     # and find the pixel that corresponds to the background
     islandMath = vtkITK.vtkITKIslandMath()
-    islandMath.SetInput( castIn.GetOutput() )
+    islandMath.SetInputConnection( castIn.GetOutputPort() )
     islandMath.SetFullyConnected( self.fullyConnected )
     islandMath.SetMinimumSize( self.minimumSize )
 
     # note that island operation happens in unsigned long space
     # but the slicer editor works in Short
     castOut = vtk.vtkImageCast()
-    castOut.SetInput( islandMath.GetOutput() )
+    castOut.SetInputConnection( islandMath.GetOutputPort() )
     castOut.SetOutputScalarTypeToShort()
 
     castOut.Update()
@@ -324,7 +327,7 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
     #
 
     thresh = vtk.vtkImageThreshold()
-    thresh.SetInput( castOut.GetOutput() )
+    thresh.SetInputConnection( castOut.GetOutputPort() )
     thresh.ThresholdByUpper(1)
     thresh.SetInValue( 1 )
     thresh.SetOutValue( 0 )
@@ -336,7 +339,7 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
     dilater = slicer.vtkImageErode()
     dilaterImage = vtk.vtkImageData()
     dilaterImage.DeepCopy(thresh.GetOutput())
-    dilater.SetInput(dilaterImage)
+    dilater.SetInputData(dilaterImage)
     for iteration in range(1+iterations):
       dilater.SetForeground( 0 )
       dilater.SetBackground( 1 )
@@ -349,8 +352,8 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
     #
 
     logic = vtk.vtkImageLogic()
-    logic.SetInput1(dilaterImage)
-    logic.SetInput2(binThresh.GetOutput())
+    logic.SetInputConnection(0, dilater.GetInputConnection(0,0))
+    logic.SetInputConnection(1, binThresh.GetOutputPort())
     #if foregroundLabel == 0:
     #  logic.SetOperationToNand()
     #else:
@@ -362,7 +365,7 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
     # convert from binary mask to 1->foregroundLabel, 0->backgroundLabel
     #
     unbinThresh = vtk.vtkImageThreshold()
-    unbinThresh.SetInput( logic.GetOutput() )
+    unbinThresh.SetInputConnection( logic.GetOutputPort() )
     unbinThresh.ThresholdBetween( 1,1 )
     unbinThresh.SetInValue( foregroundLabel )
     unbinThresh.SetOutValue( backgroundLabel )
@@ -373,7 +376,7 @@ class RemoveIslandsEffectLogic(IslandEffect.IslandEffectLogic):
 
 
 #
-# The RemoveIslandsEffect class definition 
+# The RemoveIslandsEffect class definition
 #
 
 class RemoveIslandsEffect(IslandEffect.IslandEffect):

@@ -15,6 +15,8 @@ set(${KIT}_SRCS
   qSlicerQTGUIPlugins.cxx
   qSlicerQTGUIPlugins.h
 
+  qSlicerDirectoryListViewPlugin.cxx
+  qSlicerDirectoryListViewPlugin.h
   qSlicerModulePanelPlugin.cxx
   qSlicerModulePanelPlugin.h
   qSlicerModulesListViewPlugin.cxx
@@ -30,6 +32,7 @@ set(${KIT}_MOC_SRCS
   qSlicerQTGUIPlugins.h
 
   qSlicerQTGUIAbstractPlugin.h
+  qSlicerDirectoryListViewPlugin.h
   qSlicerModulePanelPlugin.h
   qSlicerModulesListViewPlugin.h
   qSlicerMouseModeToolBarPlugin.h
@@ -48,6 +51,7 @@ endif()
 ctkMacroBuildQtDesignerPlugin(
   NAME ${PROJECT_NAME}
   EXPORT_DIRECTIVE ${${KIT}_EXPORT}
+  FOLDER "Core-Base"
   SRCS ${${KIT}_SRCS}
   MOC_SRCS ${${KIT}_MOC_SRCS}
   TARGET_LIBRARIES ${${KIT}_TARGET_LIBRARIES}

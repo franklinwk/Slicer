@@ -20,7 +20,7 @@
 ################################################################################
 
 #-----------------------------------------------------------------------------
-# Git protocole option
+# Git protocol option
 #-----------------------------------------------------------------------------
 option(${CMAKE_PROJECT_NAME}_USE_GIT_PROTOCOL "If behind a firewall turn this off to use http instead." ON)
 set(git_protocol "git")
@@ -83,9 +83,11 @@ mark_as_superbuild(
 # Slicer dependency list
 #------------------------------------------------------------------------------
 
-set(ITK_EXTERNAL_NAME ITKv${ITK_VERSION_MAJOR})
+set(ITK_EXTERNAL_NAME ITKv4)
 
-set(Slicer_DEPENDENCIES curl teem VTK ${ITK_EXTERNAL_NAME} CTK LibArchive)
+set(VTK_EXTERNAL_NAME VTKv7)
+
+set(Slicer_DEPENDENCIES curl teem ${VTK_EXTERNAL_NAME} ${ITK_EXTERNAL_NAME} CTK LibArchive)
 
 set(CURL_ENABLE_SSL ${Slicer_USE_PYTHONQT_WITH_OPENSSL})
 
@@ -110,11 +112,21 @@ if(Slicer_BUILD_DICOM_SUPPORT)
 endif()
 
 if(Slicer_BUILD_DICOM_SUPPORT AND Slicer_USE_PYTHONQT_WITH_OPENSSL)
-  list(APPEND Slicer_DEPENDENCIES pydicom)
+  list(APPEND Slicer_DEPENDENCIES python-pydicom)
 endif()
 
-if(Slicer_USE_BatchMake)
-  list(APPEND Slicer_DEPENDENCIES BatchMake)
+if(Slicer_USE_PYTHONQT AND Slicer_BUILD_EXTENSIONMANAGER_SUPPORT)
+  list(APPEND Slicer_DEPENDENCIES python-GitPython python-chardet)
+  if(Slicer_USE_PYTHONQT_WITH_OPENSSL OR Slicer_USE_SYSTEM_python)
+    # python-PyGithub requires SSL support in Python
+    list(APPEND Slicer_DEPENDENCIES python-PyGithub)
+  else()
+    message(STATUS "--------------------------------------------------")
+    message(STATUS "Python was built without SSL support; "
+                   "github integration will not be available. "
+                   "Set Slicer_USE_PYTHONQT_WITH_OPENSSL=ON to enable this feature.")
+    message(STATUS "--------------------------------------------------")
+  endif()
 endif()
 
 if(Slicer_USE_CTKAPPLAUNCHER)
@@ -161,7 +173,7 @@ list(APPEND Slicer_REMOTE_DEPENDENCIES jqPlot)
 
 Slicer_Remote_Add(OpenIGTLinkIF
   GIT_REPOSITORY ${git_protocol}://github.com/openigtlink/OpenIGTLinkIF.git
-  GIT_TAG b73e6a31119e20ec4793a644d83fc03ab7e716d9
+  GIT_TAG 9271ec55d4cb0bbeaee4ead84e8c242e9d0ad320
   OPTION_NAME Slicer_BUILD_OpenIGTLinkIF
   OPTION_DEPENDS "Slicer_BUILD_QTLOADABLEMODULES;Slicer_USE_OpenIGTLink"
   LABELS REMOTE_MODULE
@@ -173,7 +185,7 @@ mark_as_advanced(Slicer_BUILD_MULTIVOLUME_SUPPORT)
 
 Slicer_Remote_Add(MultiVolumeExplorer
   GIT_REPOSITORY ${git_protocol}://github.com/fedorov/MultiVolumeExplorer.git
-  GIT_TAG 8e1ad5f885a32a05c34b1699f945239cdba099b5
+  GIT_TAG a0743dc5f63d8d9d93f66596b7eeb255d2ca02bf
   OPTION_NAME Slicer_BUILD_MultiVolumeExplorer
   OPTION_DEPENDS "Slicer_BUILD_QTLOADABLEMODULES;Slicer_BUILD_MULTIVOLUME_SUPPORT;Slicer_USE_PYTHONQT"
   LABELS REMOTE_MODULE
@@ -182,7 +194,7 @@ list_conditional_append(Slicer_BUILD_MultiVolumeExplorer Slicer_REMOTE_DEPENDENC
 
 Slicer_Remote_Add(MultiVolumeImporter
   GIT_REPOSITORY ${git_protocol}://github.com/fedorov/MultiVolumeImporter.git
-  GIT_TAG b40cd3e199c3bf9b43e6be40c96e8a6c496fc15b
+  GIT_TAG f1dfd21d1804bae22a308a97772f7f83eef363df
   OPTION_NAME Slicer_BUILD_MultiVolumeImporter
   OPTION_DEPENDS "Slicer_BUILD_QTLOADABLEMODULES;Slicer_BUILD_MULTIVOLUME_SUPPORT;Slicer_USE_PYTHONQT"
   LABELS REMOTE_MODULE
@@ -191,34 +203,91 @@ list_conditional_append(Slicer_BUILD_MultiVolumeImporter Slicer_REMOTE_DEPENDENC
 
 Slicer_Remote_Add(SimpleFilters
   GIT_REPOSITORY ${git_protocol}://github.com/SimpleITK/SlicerSimpleFilters.git
-  GIT_TAG fc1f06ce52aec9272f928f3d1e0fa59b1a1c8bd6
+  GIT_TAG c58cfe5d5ec868e2a58cb409a53abb14b9e047a3
   OPTION_NAME Slicer_BUILD_SimpleFilters
   OPTION_DEPENDS "Slicer_BUILD_QTSCRIPTEDMODULES;Slicer_USE_SimpleITK"
   LABELS REMOTE_MODULE
   )
 list_conditional_append(Slicer_BUILD_SimpleFilters Slicer_REMOTE_DEPENDENCIES SimpleFilters)
 
+set(BRAINSTools_options
+  BRAINSTools_SUPERBUILD:BOOL=OFF
+  BRAINSTools_CLI_LIBRARY_OUTPUT_DIRECTORY:PATH=${CMAKE_BINARY_DIR}/${Slicer_BINARY_INNER_SUBDIR}/${Slicer_CLIMODULES_LIB_DIR}
+  BRAINSTools_CLI_ARCHIVE_OUTPUT_DIRECTORY:PATH=${CMAKE_BINARY_DIR}/${Slicer_BINARY_INNER_SUBDIR}/${Slicer_CLIMODULES_LIB_DIR}
+  BRAINSTools_CLI_RUNTIME_OUTPUT_DIRECTORY:PATH=${CMAKE_BINARY_DIR}/${Slicer_BINARY_INNER_SUBDIR}/${Slicer_CLIMODULES_BIN_DIR}
+  BRAINSTools_CLI_INSTALL_LIBRARY_DESTINATION:PATH=${Slicer_INSTALL_CLIMODULES_LIB_DIR}
+  BRAINSTools_CLI_INSTALL_ARCHIVE_DESTINATION:PATH=${Slicer_INSTALL_CLIMODULES_LIB_DIR}
+  BRAINSTools_CLI_INSTALL_RUNTIME_DESTINATION:PATH=${Slicer_INSTALL_CLIMODULES_BIN_DIR}
+  BRAINSTools_DISABLE_TESTING:BOOL=ON
+  USE_BRAINSFit:BOOL=ON
+  USE_BRAINSROIAuto:BOOL=ON
+  USE_BRAINSResample:BOOL=ON
+  USE_BRAINSDemonWarp:BOOL=ON
+  # BRAINSTools comes with some extra tool that should not be compiled by default
+  USE_AutoWorkup:BOOL=OFF
+  USE_ReferenceAtlas:BOOL=OFF
+  USE_ANTS:BOOL=OFF
+  USE_GTRACT:BOOL=OFF
+  USE_BRAINSABC:BOOL=OFF
+  USE_BRAINSTalairach:BOOL=OFF
+  USE_BRAINSConstellationDetector:BOOL=OFF
+  USE_BRAINSMush:BOOL=OFF
+  USE_BRAINSInitializedControlPoints:BOOL=OFF
+  USE_BRAINSMultiModeSegment:BOOL=OFF
+  USE_BRAINSCut:BOOL=OFF
+  USE_BRAINSLandmarkInitializer:BOOL=OFF
+  USE_ImageCalculator:BOOL=OFF
+  USE_BRAINSSurfaceTools:BOOL=OFF
+  USE_BRAINSSnapShotWriter:BOOL=OFF
+  USE_ConvertBetweenFileFormats:BOOL=OFF
+  USE_BRAINSMultiSTAPLE:BOOL=OFF
+  USE_BRAINSCreateLabelMapFromProbabilityMaps:BOOL=OFF
+  USE_BRAINSContinuousClass:BOOL=OFF
+  USE_ICCDEF:BOOL=OFF
+  USE_BRAINSPosteriorToContinuousClass:BOOL=OFF
+  USE_DebugImageViewer:BOOL=OFF
+  BRAINS_DEBUG_IMAGE_WRITE:BOOL=OFF
+  USE_BRAINSTransformConvert:BOOL=ON
+  USE_DWIConvert:BOOL=${Slicer_BUILD_DICOM_SUPPORT} ## Need to figure out library linking
+  )
 Slicer_Remote_Add(BRAINSTools
-  GIT_REPOSITORY "${git_protocol}://github.com/BRAINSia/BRAINSTools.git"
-  GIT_TAG "bd755e2d82b7b8b8454fcb579d416e39b16dff80"
+  GIT_REPOSITORY "${git_protocol}://github.com/Slicer/BRAINSTools.git"
+  GIT_TAG "1a8e84b5b850a9f08338b23d80c18e459e0b01a1"  # post-v4.6.0
   OPTION_NAME Slicer_BUILD_BRAINSTOOLS
   OPTION_DEPENDS "Slicer_BUILD_CLI_SUPPORT;Slicer_BUILD_CLI"
-  #LABELS REMOTE_MODULE # Do not specify label, source directory will be explictly added.
+  LABELS REMOTE_MODULE
+  VARS ${BRAINSTools_options}
   )
 list_conditional_append(Slicer_BUILD_BRAINSTOOLS Slicer_REMOTE_DEPENDENCIES BRAINSTools)
 
+#Slicer_Remote_Add(EMSegment
+#  SVN_REPOSITORY "http://svn.slicer.org/Slicer3/branches/Slicer4-EMSegment"
+#  SVN_REVISION -r "17115"
+#  OPTION_NAME Slicer_BUILD_EMSegment
+#  OPTION_DEPENDS "Slicer_BUILD_BRAINSTOOLS;Slicer_BUILD_QTLOADABLEMODULES;Slicer_USE_PYTHONQT_WITH_TCL"
+#  LABELS REMOTE_MODULE
+#  )
 Slicer_Remote_Add(EMSegment
-  SVN_REPOSITORY "http://svn.slicer.org/Slicer3/trunk/Modules/EMSegment"
-  SVN_REVISION -r "17040"
+  GIT_REPOSITORY "${git_protocol}://github.com/tokjun/Slicer4-EMSegment.git"
+  GIT_TAG "eeb6927908057847481d92152db484735bcb8ee1"  
   OPTION_NAME Slicer_BUILD_EMSegment
   OPTION_DEPENDS "Slicer_BUILD_BRAINSTOOLS;Slicer_BUILD_QTLOADABLEMODULES;Slicer_USE_PYTHONQT_WITH_TCL"
   LABELS REMOTE_MODULE
   )
 list_conditional_append(Slicer_BUILD_EMSegment Slicer_REMOTE_DEPENDENCIES EMSegment)
 
+Slicer_Remote_Add(OtsuThresholdImageFilter
+  GIT_REPOSITORY "${git_protocol}://github.com/Slicer/Slicer-OtsuThresholdImageFilter"
+  GIT_TAG "cf39e5064472af31809ec1fa2f93fb97dc9a606e"
+  OPTION_NAME Slicer_BUILD_OtsuThresholdImageFilter
+  OPTION_DEPENDS "Slicer_BUILD_EMSegment"
+  LABELS REMOTE_MODULE
+  )
+list_conditional_append(Slicer_BUILD_OtsuThresholdImageFilter Slicer_REMOTE_DEPENDENCIES OtsuThresholdImageFilter)
+
 Slicer_Remote_Add(DataStore
   GIT_REPOSITORY "${git_protocol}://github.com/Slicer/Slicer-DataStore"
-  GIT_TAG "6ed2b737c1234c9105140bacc0619d2378c9d15e"
+  GIT_TAG "6c3fb92da5b4a9f8c13781add66a29f9b2bf8ab0"
   OPTION_NAME Slicer_BUILD_DataStore
   LABELS REMOTE_MODULE
   )
@@ -226,7 +295,7 @@ list_conditional_append(Slicer_BUILD_DataStore Slicer_REMOTE_DEPENDENCIES DataSt
 
 Slicer_Remote_Add(CompareVolumes
   GIT_REPOSITORY "${git_protocol}://github.com/pieper/CompareVolumes"
-  GIT_TAG "51d44e6c977842063207732ae430f16708724d45"
+  GIT_TAG "6d46b39048bf556ed54ea6dcae8870c6c13f311b"
   OPTION_NAME Slicer_BUILD_CompareVolumes
   OPTION_DEPENDS "Slicer_USE_PYTHONQT"
   LABELS REMOTE_MODULE
@@ -235,12 +304,91 @@ list_conditional_append(Slicer_BUILD_CompareVolumes Slicer_REMOTE_DEPENDENCIES C
 
 Slicer_Remote_Add(LandmarkRegistration
   GIT_REPOSITORY "${git_protocol}://github.com/pieper/LandmarkRegistration"
-  GIT_TAG "7373eef79f9e6741274e4a2d41c01fd8694a46e3"
+  GIT_TAG "13d7b32ffc0be030256fd3d1b010a0efc18e3bff"
   OPTION_NAME Slicer_BUILD_LandmarkRegistration
   OPTION_DEPENDS "Slicer_BUILD_CompareVolumes;Slicer_USE_PYTHONQT"
   LABELS REMOTE_MODULE
   )
 list_conditional_append(Slicer_BUILD_LandmarkRegistration Slicer_REMOTE_DEPENDENCIES LandmarkRegistration)
+
+Slicer_Remote_Add(SlicerDMRI
+  GIT_REPOSITORY "${git_protocol}://github.com/SlicerDMRI/SlicerDMRI"
+  # SlicerDMRI Maintainer: If new revision of the extension add or remove modules, consider updating
+  #                        the module lists below. Thanks.
+  GIT_TAG "86dc8ec85d9318ad05420962652443da6bf95b2a"
+  OPTION_NAME Slicer_BUILD_SlicerDMRI
+  OPTION_DEPENDS "Slicer_BUILD_DIFFUSION_SUPPORT"
+  LABELS REMOTE_EXTENSION
+  SOURCE_DIR_VAR SlicerDMRI_SOURCE_DIR
+  VARS
+    SlicerDMRI_SUPERBUILD:BOOL=OFF
+    MRML_USE_vtkTeem:BOOL=ON # XXX No way to detect this in Superbuild
+  )
+if(Slicer_BUILD_SlicerDMRI)
+  # XXX Workaround Windows "path or filename too long" error by copying CLI, Loadable and Scripted modules
+  #     in the same directory.
+  #     Then, instead of having Visual Studio 2013 using path like:
+  #       C:\D\N\Slicer-1-build\Slicer-build\E\SlicerDMRI\Modules\Loadable\TractographyDisplay\MRMLDM\vtkSlicerTractographyDisplayModuleMRMLDisplayableManagerPythonD.dir\Release\vtkSlice.BF02D1B4.tlog\vtkSlicerTractographyDisplayModuleMRMLDisplayableManagerPythonD.lastbuildstate
+  #     It will be 24 characters shorter:
+  #       C:\D\N\Slicer-1-build\Slicer-build\E\DMRI\TractographyDisplay\MRMLDM\vtkSlicerTractographyDisplayModuleMRMLDisplayableManagerPythonD.dir\Release\vtkSlice.BF02D1B4.tlog\vtkSlicerTractographyDisplayModuleMRMLDisplayableManagerPythonD.lastbuildstate
+  #
+  # XXX For sake of consistency, the workaround is applied on both Windows and Unix. The difference
+  #     is that symlinks are used on Unix.
+  set(_src_dir ${CMAKE_CURRENT_BINARY_DIR}/SlicerDMRI)
+  set(_dest_dir ${CMAKE_CURRENT_BINARY_DIR}/DMRI)
+  set(_step_comands)
+  set(_module_names)
+  foreach(_module_dir
+      Modules/Loadable/TractographyDisplay
+      Modules/Loadable/TractographyInteractiveSeeding
+      # SlicerDMRI Maintainer: Add loadable module before this comment
+
+      Modules/CLI/DWIToDTIEstimation
+      Modules/CLI/DiffusionWeightedVolumeMasking
+      Modules/CLI/DiffusionTensorScalarMeasurements
+      Modules/CLI/FiberTractMeasurements
+      Modules/CLI/TractographyLabelMapSeeding
+      Modules/CLI/FiberBundleLabelSelect
+      # SlicerDMRI Maintainer: Add CLI module before this comment
+
+      Modules/Scripted/DICOM2FullBrainTractography
+      Modules/Scripted/FiberBundleToLabelMap
+      # SlicerDMRI Maintainer: Add Scripted module before this comment
+      )
+    get_filename_component(_module_name ${_module_dir} NAME)
+    list(APPEND _module_names ${_module_name})
+    if(WIN32)
+      list(APPEND _step_comands
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${_dest_dir}/${_module_name}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${_src_dir}/${_module_dir} ${_dest_dir}/${_module_name}
+        )
+    else()
+      list(APPEND _step_comands
+        COMMAND ${CMAKE_COMMAND} -E create_symlink ${_src_dir}/${_module_dir} ${_dest_dir}/${_module_name}
+        )
+    endif()
+  endforeach()
+
+  # Generate CMakeLists for "re-organized" extension source code
+  file(MAKE_DIRECTORY ${_dest_dir})
+  file(WRITE ${_dest_dir}/CMakeLists.txt
+"# Generate by ${CMAKE_CURRENT_LIST_FILE}
+foreach(module_name ${_module_names})
+  add_subdirectory(\${module_name})
+endforeach()
+")
+
+  # Add step
+  ExternalProject_Add_Step(SlicerDMRI reorganize_module_source_directories
+    DEPENDEES update
+    COMMENT "Reorganizing 'SlicerDMRI' module source directories: workaround windows 'filename or path too long' issue"
+    ${_step_comands}
+    )
+
+  set(SlicerDMRI_SOURCE_DIR ${_dest_dir})
+  message(STATUS "Remote - SlicerDMRI_SOURCE_DIR:${SlicerDMRI_SOURCE_DIR}")
+endif()
+list_conditional_append(Slicer_BUILD_SlicerDMRI Slicer_REMOTE_DEPENDENCIES SlicerDMRI)
 
 #-----------------------------------------------------------------------------
 # Define list of additional options used to configure Slicer
@@ -290,7 +438,6 @@ ExternalProject_Add(${proj}
     -DSlicer_REQUIRED_CXX_FLAGS:STRING=${Slicer_REQUIRED_CXX_FLAGS}
     -DSlicer_SUPERBUILD:BOOL=OFF
     -DSlicer_SUPERBUILD_DIR:PATH=${Slicer_BINARY_DIR}
-    -DSlicer_BUILD_WIN32_CONSOLE:BOOL=${Slicer_BUILD_WIN32_CONSOLE}
     -D${Slicer_MAIN_PROJECT}_APPLICATION_NAME:STRING=${${Slicer_MAIN_PROJECT}_APPLICATION_NAME}
     -D${Slicer_MAIN_PROJECT_APPLICATION_NAME}_VERSION_MAJOR:STRING=${${Slicer_MAIN_PROJECT_APPLICATION_NAME}_VERSION_MAJOR}
     -D${Slicer_MAIN_PROJECT_APPLICATION_NAME}_VERSION_MINOR:STRING=${${Slicer_MAIN_PROJECT_APPLICATION_NAME}_VERSION_MINOR}
@@ -305,11 +452,21 @@ ExternalProject_Add(${proj}
 
 # This custom external project step forces the build and later
 # steps to run whenever a top level build is done...
+#
+# BUILD_ALWAYS flag is available in CMake 3.1 that allows force build
+# of external projects without this workaround. Remove this workaround
+# and use the CMake flag instead, when Slicer's required minimum CMake
+# version will be at least 3.1.
+#
+if(CMAKE_CONFIGURATION_TYPES)
+  set(BUILD_STAMP_FILE "${CMAKE_CURRENT_BINARY_DIR}/${proj}-prefix/src/${proj}-stamp/${CMAKE_CFG_INTDIR}/${proj}-build")
+else()
+  set(BUILD_STAMP_FILE "${CMAKE_CURRENT_BINARY_DIR}/${proj}-prefix/src/${proj}-stamp/${proj}-build")
+endif()
 ExternalProject_Add_Step(${proj} forcebuild
-  COMMAND ${CMAKE_COMMAND} -E echo_append ""
+  COMMAND ${CMAKE_COMMAND} -E remove ${BUILD_STAMP_FILE}
   COMMENT "Forcing build step for '${proj}'"
-  DEPENDEES configure
-  DEPENDERS build
+  DEPENDEES build
   ALWAYS 1
   )
 

@@ -41,6 +41,10 @@
 // MRML includes
 #include "vtkMRMLColorLogic.h"
 
+// SubjectHierarchy Plugins includes
+#include "qSlicerSubjectHierarchyPluginHandler.h"
+#include "qSlicerSubjectHierarchyModelsPlugin.h"
+
 //-----------------------------------------------------------------------------
 Q_EXPORT_PLUGIN2(qSlicerModelsModule, qSlicerModelsModule);
 
@@ -141,22 +145,28 @@ void qSlicerModelsModule::setup()
   // Configure models logic
   vtkSlicerModelsLogic* modelsLogic =
     vtkSlicerModelsLogic::SafeDownCast(this->logic());
-  qSlicerAbstractCoreModule* colorsModule =
-    qSlicerCoreApplication::application()->moduleManager()->module("Colors");
-  if (colorsModule)
+  if (qSlicerApplication::application())
     {
-    vtkMRMLColorLogic* colorLogic =
-      vtkMRMLColorLogic::SafeDownCast(colorsModule->logic());
-    modelsLogic->SetColorLogic(colorLogic);
+    qSlicerAbstractCoreModule* colorsModule =
+      qSlicerCoreApplication::application()->moduleManager()->module("Colors");
+    if (colorsModule)
+      {
+      vtkMRMLColorLogic* colorLogic =
+        vtkMRMLColorLogic::SafeDownCast(colorsModule->logic());
+      modelsLogic->SetColorLogic(colorLogic);
+      }
+    // Register IOs
+    qSlicerIOManager* ioManager = qSlicerApplication::application()->ioManager();
+    ioManager->registerIO(new qSlicerModelsReader(modelsLogic, this));
+    ioManager->registerIO(new qSlicerScalarOverlayReader(modelsLogic, this));
+    ioManager->registerDialog(new qSlicerModelsDialog(this));
+    ioManager->registerIO(new qSlicerNodeWriter(
+      "Models", QString("ModelFile"),
+      QStringList() << "vtkMRMLModelNode", true, this));
     }
-  // Register IOs
-  qSlicerIOManager* ioManager = qSlicerApplication::application()->ioManager();
-  ioManager->registerIO(new qSlicerModelsReader(modelsLogic, this));
-  ioManager->registerIO(new qSlicerScalarOverlayReader(modelsLogic, this));
-  ioManager->registerDialog(new qSlicerModelsDialog(this));
-  ioManager->registerIO(new qSlicerNodeWriter(
-    "Models", QString("ModelFile"),
-    QStringList() << "vtkMRMLModelNode", this));
+
+  // Register Subject Hierarchy core plugins
+  qSlicerSubjectHierarchyPluginHandler::instance()->registerPlugin(new qSlicerSubjectHierarchyModelsPlugin());
 }
 
 //-----------------------------------------------------------------------------

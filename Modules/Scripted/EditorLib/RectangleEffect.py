@@ -1,23 +1,28 @@
 import os
-from __main__ import vtk
-from __main__ import ctk
-from __main__ import qt
-from __main__ import slicer
-from EditOptions import EditOptions
-from EditorLib import EditorLib
+import vtk
+import ctk
+import qt
+import slicer
+from EditOptions import HelpButton
 import LabelEffect
 
+__all__ = [
+  'RectangleEffectOptions',
+  'RectangleEffectTool',
+  'RectangleEffectLogic',
+  'RectangleEffect'
+  ]
 
 #########################################################
 #
-# 
+#
 comment = """
 
   RectangleEffect is a subclass of LabelEffect
   that implements the interactive paintbrush tool
   in the slicer editor
 
-# TODO : 
+# TODO :
 """
 #
 #########################################################
@@ -39,7 +44,7 @@ class RectangleEffectOptions(LabelEffect.LabelEffectOptions):
   def create(self):
     super(RectangleEffectOptions,self).create()
 
-    EditorLib.HelpButton(self.frame, "Use this tool to draw a rectangle.\n\nLeft Click and Drag: sweep out an outline that will draw when the button is released.")
+    HelpButton(self.frame, "Use this tool to draw a rectangle.\n\nLeft Click and Drag: sweep out an outline that will draw when the button is released.")
 
     # Add vertical spacer
     self.frame.layout().addStretch(1)
@@ -49,7 +54,7 @@ class RectangleEffectOptions(LabelEffect.LabelEffectOptions):
 
   # note: this method needs to be implemented exactly as-is
   # in each leaf subclass so that "self" in the observer
-  # is of the correct type 
+  # is of the correct type
   def updateParameterNode(self, caller, event):
     node = self.editUtil.getParameterNode()
     if node != self.parameterNode:
@@ -75,7 +80,7 @@ class RectangleEffectOptions(LabelEffect.LabelEffectOptions):
 #
 # RectangleEffectTool
 #
- 
+
 class RectangleEffectTool(LabelEffect.LabelEffectTool):
   """
   One instance of this will be created per-view when the effect
@@ -88,7 +93,7 @@ class RectangleEffectTool(LabelEffect.LabelEffectTool):
 
   def __init__(self, sliceWidget):
     super(RectangleEffectTool,self).__init__(sliceWidget)
-    
+
     # create a logic instance to do the non-gui work
     self.logic = RectangleEffectLogic(self.sliceWidget.sliceLogic())
 
@@ -102,7 +107,7 @@ class RectangleEffectTool(LabelEffect.LabelEffectTool):
 
     self.mapper = vtk.vtkPolyDataMapper2D()
     self.actor = vtk.vtkActor2D()
-    self.mapper.SetInput(self.polyData)
+    self.mapper.SetInputData(self.polyData)
     self.actor.SetMapper(self.mapper)
     property_ = self.actor.GetProperty()
     property_.SetColor(1,1,0)
@@ -128,13 +133,13 @@ class RectangleEffectTool(LabelEffect.LabelEffectTool):
 
     for x,y in ((0,0),)*4:
       p = points.InsertNextPoint( x, y, 0 )
-      if prevPoint != None:
+      if prevPoint is not None:
         idList = vtk.vtkIdList()
         idList.InsertNextId( prevPoint )
         idList.InsertNextId( p )
         self.polyData.InsertNextCell( vtk.VTK_LINE, idList )
       prevPoint = p
-      if firstPoint == None:
+      if firstPoint is None:
         firstPoint = p
 
     # make the last line in the polydata
@@ -196,13 +201,13 @@ class RectangleEffectTool(LabelEffect.LabelEffectTool):
 #
 # RectangleEffectLogic
 #
- 
+
 class RectangleEffectLogic(LabelEffect.LabelEffectLogic):
   """
   This class contains helper methods for a given effect
   type.  It can be instanced as needed by an RectangleEffectTool
   or RectangleEffectOptions instance in order to compute intermediate
-  results (say, for user feedback) or to implement the final 
+  results (say, for user feedback) or to implement the final
   segmentation editing operation.  This class is split
   from the RectangleEffectTool so that the operations can be used
   by other code without the need for a view context.
@@ -213,7 +218,7 @@ class RectangleEffectLogic(LabelEffect.LabelEffectLogic):
 
 
 #
-# The RectangleEffect class definition 
+# The RectangleEffect class definition
 #
 
 class RectangleEffect(LabelEffect.LabelEffect):

@@ -11,6 +11,11 @@
 
 #define SLICER_REVISION_SPECIFIC_USER_SETTINGS_FILEBASENAME "@SLICER_REVISION_SPECIFIC_USER_SETTINGS_FILEBASENAME@"
 
+#define Slicer_DEFAULT_HOME_MODULE "@Slicer_DEFAULT_HOME_MODULE@"
+#define Slicer_DEFAULT_FAVORITE_MODULES "@Slicer_DEFAULT_FAVORITE_MODULES@"
+
+#define Slicer_DISCLAIMER_AT_STARTUP "@Slicer_DISCLAIMER_AT_STARTUP@"
+
 #if defined(WIN32) && !defined(VTKSLICER_STATIC)
 #pragma warning ( disable : 4275 )
 #endif
@@ -27,9 +32,7 @@
 #define VTKSLICER_STATIC
 #endif
 
-#cmakedefine Slicer_USE_BatchMake
 #cmakedefine Slicer_USE_IGSTK
-#cmakedefine Slicer_USE_MIDAS
 #cmakedefine Slicer_USE_NAVITRACK
 #cmakedefine Slicer_USE_NUMPY
 #cmakedefine Slicer_USE_PYTHONQT
@@ -101,6 +104,9 @@
 #  define Slicer_INCR_TCL_VERSION_DOT "@INCR_TCL_VERSION_DOT@"
 #  define Slicer_INCR_TCL_VERSION "@INCR_TCL_VERSION@"
 #endif //Slicer_USE_PYTHONQT_WITH_TCL
+
+#cmakedefine Slicer_VTK_RENDERING_USE_OpenGL_BACKEND
+#cmakedefine Slicer_VTK_RENDERING_USE_OpenGL2_BACKEND
 
 // Library sub-directory - The following macros define directories only valid for a given build tree.
 #define VTK_DIR "@VTK_DIR@"

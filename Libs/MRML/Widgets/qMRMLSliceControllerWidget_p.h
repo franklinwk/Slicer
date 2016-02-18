@@ -45,6 +45,7 @@
 #include <vtkMRMLSliceLogic.h>
 
 /// VTK includes
+#include <vtkAlgorithmOutput.h>
 #include <vtkCollection.h>
 #include <vtkImageData.h>
 #include <vtkSmartPointer.h>
@@ -59,14 +60,14 @@ class vtkMRMLSliceNode;
 class vtkObject;
 
 //-----------------------------------------------------------------------------
-struct qMRMLOrientation
+struct QMRML_WIDGETS_EXPORT qMRMLOrientation
 {
   QString Prefix;
   QString ToolTip;
 };
 
 //-----------------------------------------------------------------------------
-class qMRMLSliceControllerWidgetPrivate
+class QMRML_WIDGETS_EXPORT qMRMLSliceControllerWidgetPrivate
   : public qMRMLViewControllerBarPrivate
   , public Ui_qMRMLSliceControllerWidget
 {
@@ -90,9 +91,11 @@ public:
   void setupSliceModelMenu();
   void setupLabelMapMenu();
   void setupMoreOptionsMenu();
+  void setupOrientationMarkerMenu();
+  void setupRulerMenu();
 
   vtkSmartPointer<vtkCollection> saveNodesForUndo(const QString& nodeTypes);
-  
+
   void enableLayerWidgets();
 
   vtkMRMLSliceLogic* compositeNodeLogic(vtkMRMLSliceCompositeNode* node);
@@ -144,7 +147,7 @@ public:
   vtkMRMLSliceCompositeNode*          MRMLSliceCompositeNode;
   vtkSmartPointer<vtkMRMLSliceLogic>  SliceLogic;
   vtkCollection*                      SliceLogics;
-  vtkWeakPointer<vtkImageData>        ImageData;
+  vtkWeakPointer<vtkAlgorithmOutput>  ImageDataConnection;
   QHash<QString, qMRMLOrientation>    SliceOrientationToDescription;
   QString                             SliceViewName;
   QButtonGroup*                       ControllerButtonGroup;
@@ -160,22 +163,29 @@ public:
   QMenu*                              SliceSpacingMenu;
   QMenu*                              SliceModelMenu;
   QMenu*                              LabelMapMenu;
+  QMenu*                              OrientationMarkerMenu;
+  QMenu*                              RulerMenu;
 
-  ctkDoubleSpinBox*                         SliceSpacingSpinBox;
-  ctkDoubleSpinBox*                         SliceFOVSpinBox;
+  ctkDoubleSpinBox*                   SliceSpacingSpinBox;
+  ctkDoubleSpinBox*                   SliceFOVSpinBox;
   QSpinBox*                           LightBoxRowsSpinBox;
   QSpinBox*                           LightBoxColumnsSpinBox;
 
-  ctkDoubleSpinBox*                         SliceModelFOVXSpinBox;
-  ctkDoubleSpinBox*                         SliceModelFOVYSpinBox;
+  ctkDoubleSpinBox*                   SliceModelFOVXSpinBox;
+  ctkDoubleSpinBox*                   SliceModelFOVYSpinBox;
 
-  ctkDoubleSpinBox*                         SliceModelOriginXSpinBox;
-  ctkDoubleSpinBox*                         SliceModelOriginYSpinBox;
+  ctkDoubleSpinBox*                   SliceModelOriginXSpinBox;
+  ctkDoubleSpinBox*                   SliceModelOriginYSpinBox;
 
   QSpinBox*                           SliceModelDimensionXSpinBox;
   QSpinBox*                           SliceModelDimensionYSpinBox;
 
   QSize                               ViewSize;
+
+  ctkSignalMapper*                    OrientationMarkerTypesMapper;
+  ctkSignalMapper*                    OrientationMarkerSizesMapper;
+
+  ctkSignalMapper*                    RulerTypesMapper;
 };
 
 #endif

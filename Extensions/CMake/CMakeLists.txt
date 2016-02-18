@@ -11,6 +11,9 @@ if(NOT Slicer_SOURCE_DIR)
   endif()
 endif()
 
+if(POLICY CMP0048)
+  cmake_policy(SET CMP0048 NEW) # CMake 3.0.0
+endif()
 project(SlicerExtensions)
 
 #-----------------------------------------------------------------------------
@@ -50,7 +53,7 @@ get_filename_component(CMAKE_CURRENT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} REAL
 set(default_extension_description_dir ${CMAKE_CURRENT_SOURCE_DIR}/../)
 set(default_local_extension_dir ${default_extension_description_dir})
 
-set(Slicer_EXTENSIONS_TRACK_QUALIFIER "master" CACHE STRING "CDash extensions track qualifier (master, 4.3, ...)")
+set(Slicer_EXTENSIONS_TRACK_QUALIFIER "master" CACHE STRING "CDash extensions track qualifier (master, 4.4, ...)")
 
 if(NOT Slicer_SOURCE_DIR)
   #-----------------------------------------------------------------------------

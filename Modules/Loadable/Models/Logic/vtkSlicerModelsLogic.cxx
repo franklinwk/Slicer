@@ -19,10 +19,12 @@
 #include <vtkMRMLFreeSurferModelStorageNode.h>
 #include <vtkMRMLModelDisplayNode.h>
 #include <vtkMRMLModelNode.h>
+#include <vtkMRMLSelectionNode.h>
 #include <vtkMRMLScene.h>
 #include <vtkMRMLTransformNode.h>
 
 /// VTK includes
+#include <vtkAlgorithmOutput.h>
 #include <vtkGeneralTransform.h>
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
@@ -37,7 +39,6 @@
 /// STD includes
 #include <cassert>
 
-vtkCxxRevisionMacro(vtkSlicerModelsLogic, "$Revision$");
 vtkStandardNewMacro(vtkSlicerModelsLogic);
 vtkCxxSetObjectMacro(vtkSlicerModelsLogic, ColorLogic, vtkMRMLColorLogic);
 
@@ -110,6 +111,25 @@ vtkMRMLModelNode* vtkSlicerModelsLogic::AddModel(vtkPolyData* polyData)
 }
 
 //----------------------------------------------------------------------------
+vtkMRMLModelNode* vtkSlicerModelsLogic::AddModel(vtkAlgorithmOutput* polyData)
+{
+  if (this->GetMRMLScene() == 0)
+    {
+    return 0;
+    }
+
+  vtkNew<vtkMRMLModelDisplayNode> display;
+  this->GetMRMLScene()->AddNode(display.GetPointer());
+
+  vtkNew<vtkMRMLModelNode> model;
+  model->SetPolyDataConnection(polyData);
+  model->SetAndObserveDisplayNodeID(display->GetID());
+  this->GetMRMLScene()->AddNode(model.GetPointer());
+
+  return model.GetPointer();
+}
+
+//----------------------------------------------------------------------------
 int vtkSlicerModelsLogic::AddModels (const char* dirname, const char* suffix )
 {
   std::string ssuf = suffix;
@@ -173,10 +193,10 @@ vtkMRMLModelNode* vtkSlicerModelsLogic::AddModel (const char* filename)
     fsmStorageNode->SetFileName(filename);
     localFile = filename;
     }
-  const itksys_stl::string fname(localFile?localFile:"");
+  const std::string fname(localFile?localFile:"");
   // the model name is based on the file name (itksys call should work even if
   // file is not on disk yet)
-  itksys_stl::string name = itksys::SystemTools::GetFilenameName(fname);
+  std::string name = itksys::SystemTools::GetFilenameName(fname);
   vtkDebugMacro("AddModel: got model name = " << name.c_str());
 
   // check to see which node can read this type of file
@@ -202,7 +222,7 @@ vtkMRMLModelNode* vtkSlicerModelsLogic::AddModel (const char* filename)
   */
   if (storageNode != NULL)
     {
-    itksys_stl::string baseName = itksys::SystemTools::GetFilenameWithoutExtension(fname);
+    std::string baseName = itksys::SystemTools::GetFilenameWithoutExtension(fname);
     std::string uname( this->GetMRMLScene()->GetUniqueNameByString(baseName.c_str()));
     modelNode->SetName(uname.c_str());
 
@@ -226,11 +246,13 @@ vtkMRMLModelNode* vtkSlicerModelsLogic::AddModel (const char* filename)
       {
       vtkErrorMacro("AddModel: error reading " << filename);
       this->GetMRMLScene()->RemoveNode(modelNode.GetPointer());
+      return 0;
       }
     }
   else
     {
     vtkErrorMacro("Couldn't read file: " << filename);
+    return 0;
     }
 
   return modelNode.GetPointer();
@@ -278,7 +300,6 @@ int vtkSlicerModelsLogic::SaveModel (const char* filename, vtkMRMLModelNode *mod
 
   return res;
 }
-
 
 //----------------------------------------------------------------------------
 void vtkSlicerModelsLogic::PrintSelf(ostream& os, vtkIndent indent)
@@ -391,7 +412,6 @@ vtkMRMLStorageNode* vtkSlicerModelsLogic::AddScalar(const char* filename, vtkMRM
         }
       }
     //--- end informatics
-
     }
   fsmoStorageNode->Delete();
 
@@ -416,7 +436,7 @@ void vtkSlicerModelsLogic::TransformModel(vtkMRMLTransformNode *tnode,
 
   vtkMRMLTransformNode *mtnode = modelNode->GetParentTransformNode();
 
-  vtkGeneralTransform *transform = tnode->GetTransformToParent();
+  vtkAbstractTransform *transform = tnode->GetTransformToParent();
   modelOut->ApplyTransform(transform);
 
   if (transformNormals)
@@ -427,7 +447,7 @@ void vtkSlicerModelsLogic::TransformModel(vtkMRMLTransformNode *tnode,
     //--- Triangle strips are broken up into triangle polygons.
     //--- Polygons are not automatically re-stripped.
     vtkNew<vtkPolyDataNormals> normals;
-    normals->SetInput(poly.GetPointer());
+    normals->SetInputData(poly.GetPointer());
     //--- NOTE: This assumes a completely closed surface
     //---(i.e. no boundary edges) and no non-manifold edges.
     //--- If these constraints do not hold, the AutoOrientNormals
@@ -441,7 +461,7 @@ void vtkSlicerModelsLogic::TransformModel(vtkMRMLTransformNode *tnode,
     normals->ConsistencyOn();
 
     normals->Update();
-    modelOut->SetAndObservePolyData(normals->GetOutput());
+    modelOut->SetPolyDataConnection(normals->GetOutputPort());
    }
 
   modelOut->SetAndObserveTransformNodeID(mtnode == NULL ? NULL : mtnode->GetID());
@@ -456,9 +476,25 @@ void vtkSlicerModelsLogic::SetAllModelsVisibility(int flag)
     {
     return;
     }
-  
+
+  std::vector<vtkMRMLNode *> selectionNodes;
+  vtkMRMLSelectionNode *selectionNode = 0;
+  if (this->GetMRMLScene())
+    {
+    this->GetMRMLScene()->GetNodesByClass("vtkMRMLSelectionNode", selectionNodes);
+    }
+
+  if (selectionNodes.size() > 0)
+    {
+    selectionNode = vtkMRMLSelectionNode::SafeDownCast(selectionNodes[0]);
+    }
+
+  std::map<std::string, std::string> displayNodeClasses =
+    selectionNode->GetModelHierarchyDisplayNodeClassNames();
+  std::map<std::string, std::string>::iterator it;
+
   int numModels = this->GetMRMLScene()->GetNumberOfNodesByClass("vtkMRMLModelNode");
-  
+
   // go into batch processing mode
   this->GetMRMLScene()->StartState(vtkMRMLScene::BatchProcessState);
   for (int i = 0; i < numModels; i++)
@@ -478,6 +514,27 @@ void vtkSlicerModelsLogic::SetAllModelsVisibility(int flag)
         {
         // have a "real" model node, set the display visibility
         modelNode->SetDisplayVisibility(flag);
+        }
+      }
+
+    if (flag != 2 && mrmlNode != NULL
+        && !vtkMRMLSliceLogic::IsSliceModelNode(mrmlNode) )
+      {
+      vtkMRMLModelNode *modelNode = vtkMRMLModelNode::SafeDownCast(mrmlNode);
+      int ndnodes = modelNode->GetNumberOfDisplayNodes();
+      for (int i=0; i<ndnodes; i++)
+        {
+        vtkMRMLDisplayNode *displayNode = modelNode->GetNthDisplayNode(i);
+        if (displayNode)
+          {
+          for (it = displayNodeClasses.begin(); it != displayNodeClasses.end(); it++)
+            {
+            if (!strcmp(displayNode->GetClassName(), it->second.c_str()))
+              {
+              displayNode->SetVisibility(flag);
+              }
+            }
+          }
         }
       }
     }

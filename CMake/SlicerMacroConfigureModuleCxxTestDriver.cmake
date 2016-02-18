@@ -21,10 +21,12 @@
 macro(SlicerMacroConfigureModuleCxxTestDriver)
   set(options
     WITH_VTK_DEBUG_LEAKS_CHECK
+    WITH_VTK_ERROR_OUTPUT_CHECK
     )
   set(oneValueArgs
     NAME
     TESTS_TO_RUN_VAR
+    FOLDER
     )
   set(multiValueArgs
     SOURCES
@@ -50,17 +52,29 @@ macro(SlicerMacroConfigureModuleCxxTestDriver)
 
   if(SLICER_TEST_DRIVER_SOURCES)
 
-    set(CMAKE_TESTDRIVER_BEFORE_TESTMAIN
-"// Direct VTK messages on standard output
-#ifdef WIN32
-  vtkWin32OutputWindow* outputWindow =
-    vtkWin32OutputWindow::SafeDownCast(vtkOutputWindow::GetInstance());
-  if (outputWindow)
-    {
-    outputWindow->SendToStdErrOn();
-    }
-#endif")
+    set(CMAKE_TESTDRIVER_BEFORE_TESTMAIN "")
+    set(CMAKE_TESTDRIVER_AFTER_TESTMAIN "")
+
     set(EXTRA_INCLUDE "vtkWin32OutputWindow.h")
+
+    if(SLICER_TEST_DRIVER_WITH_VTK_ERROR_OUTPUT_CHECK)
+      set(CMAKE_TESTDRIVER_BEFORE_TESTMAIN
+        "${CMAKE_TESTDRIVER_BEFORE_TESTMAIN}\nTESTING_OUTPUT_ASSERT_WARNINGS_ERRORS(0);")
+      set(CMAKE_TESTDRIVER_AFTER_TESTMAIN
+        "${CMAKE_TESTDRIVER_AFTER_TESTMAIN}\nTESTING_OUTPUT_ASSERT_WARNINGS_ERRORS(0);")
+      set(EXTRA_INCLUDE "${EXTRA_INCLUDE}\"\n\#include \"vtkTestingOutputWindow.h")
+    else()
+    set(CMAKE_TESTDRIVER_BEFORE_TESTMAIN
+      "${CMAKE_TESTDRIVER_BEFORE_TESTMAIN}\n// Direct VTK messages to standard output
+      #ifdef WIN32
+        vtkWin32OutputWindow* outputWindow =
+          vtkWin32OutputWindow::SafeDownCast(vtkOutputWindow::GetInstance());
+        if (outputWindow)
+          {
+          outputWindow->SendToStdErrOn();
+          }
+      #endif")
+    endif()
 
     if(SLICER_TEST_DRIVER_WITH_VTK_DEBUG_LEAKS_CHECK)
       set(CMAKE_TESTDRIVER_BEFORE_TESTMAIN
@@ -93,6 +107,13 @@ macro(SlicerMacroConfigureModuleCxxTestDriver)
       ${SLICER_TEST_DRIVER_NAME}
       ${SLICER_TEST_DRIVER_TARGET_LIBRARIES}
       )
+    if(NOT DEFINED SLICER_TEST_DRIVER_FOLDER AND DEFINED MODULE_NAME)
+      set(SLICER_TEST_DRIVER_FOLDER "Module-${MODULE_NAME}")
+    endif()
+    if(NOT "${SLICER_TEST_DRIVER_FOLDER}" STREQUAL "")
+      set_target_properties(${SLICER_TEST_DRIVER_NAME}CxxTests
+        PROPERTIES FOLDER ${SLICER_TEST_DRIVER_FOLDER})
+    endif()
   endif()
 
 endmacro()

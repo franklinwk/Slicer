@@ -70,7 +70,7 @@ public slots:
   void spinView(bool enabled);
   void rockView(bool enabled);
   void setAnimationMode(int newAnimationMode);
-  
+
   void resetFocalPoint();
   void set3DAxisVisible(bool visible);
   void set3DAxisLabelVisible(bool visible);
@@ -96,6 +96,9 @@ public slots:
                           QColor color2 = QColor());
 
   void setStereoType(int newStereoType);
+  void setOrientationMarkerType(int type);
+  void setOrientationMarkerSize(int size);
+  void setRulerType(int type);
 
 protected slots:
   void updateWidgetFromMRML();

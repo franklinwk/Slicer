@@ -64,8 +64,8 @@ void qMRMLSliceWidgetPrivate::init()
   connect(this->SliceView, SIGNAL(resized(QSize)),
           this->SliceController, SLOT(setSliceViewSize(QSize)));
 
-  connect(this->SliceController, SIGNAL(imageDataChanged(vtkImageData*)),
-          this, SLOT(setImageData(vtkImageData*)));
+  connect(this->SliceController, SIGNAL(imageDataConnectionChanged(vtkAlgorithmOutput*)),
+          this, SLOT(setImageDataConnection(vtkAlgorithmOutput*)));
   connect(this->SliceController, SIGNAL(renderRequested()),
           this->SliceView, SLOT(scheduleRender()), Qt::QueuedConnection);
 }
@@ -80,10 +80,10 @@ void qMRMLSliceWidgetPrivate::endProcessing()
 }
 
 // --------------------------------------------------------------------------
-void qMRMLSliceWidgetPrivate::setImageData(vtkImageData * imageData)
+void qMRMLSliceWidgetPrivate::setImageDataConnection(vtkAlgorithmOutput * imageDataConnection)
 {
-  //qDebug() << "qMRMLSliceWidgetPrivate::setImageData";
-  this->SliceView->setImageData(imageData);
+  //qDebug() << "qMRMLSliceWidgetPrivate::setImageDataConnection";
+  this->SliceView->setImageDataConnection(imageDataConnection);
 }
 
 // --------------------------------------------------------------------------
@@ -95,6 +95,16 @@ qMRMLSliceWidget::qMRMLSliceWidget(QWidget* _parent) : Superclass(_parent)
 {
   Q_D(qMRMLSliceWidget);
   d->init();
+}
+
+// --------------------------------------------------------------------------
+qMRMLSliceWidget::qMRMLSliceWidget(qMRMLSliceWidgetPrivate* pimpl,
+                                   QWidget* _parent)
+  : Superclass(_parent)
+  , d_ptr(pimpl)
+{
+  Q_D(qMRMLSliceWidget);
+  // Note: You are responsible to call init() in the constructor of derived class.
 }
 
 // --------------------------------------------------------------------------
@@ -198,17 +208,17 @@ QString qMRMLSliceWidget::sliceOrientation()const
 }
 
 //---------------------------------------------------------------------------
-void qMRMLSliceWidget::setImageData(vtkImageData* newImageData)
+void qMRMLSliceWidget::setImageDataConnection(vtkAlgorithmOutput* newImageDataConnection)
 {
   Q_D(qMRMLSliceWidget);
-  d->SliceController->setImageData(newImageData);
+  d->SliceController->setImageDataConnection(newImageDataConnection);
 }
 
 //---------------------------------------------------------------------------
-vtkImageData* qMRMLSliceWidget::imageData() const
+vtkAlgorithmOutput* qMRMLSliceWidget::imageDataConnection() const
 {
   Q_D(const qMRMLSliceWidget);
-  return d->SliceController->imageData();
+  return d->SliceController->imageDataConnection();
 }
 
 //---------------------------------------------------------------------------
@@ -245,7 +255,7 @@ void qMRMLSliceWidget::fitSliceToBackground()
 }
 
 // --------------------------------------------------------------------------
-const qMRMLSliceView* qMRMLSliceWidget::sliceView()const
+qMRMLSliceView* qMRMLSliceWidget::sliceView()const
 {
   Q_D(const qMRMLSliceWidget);
   return d->SliceView;

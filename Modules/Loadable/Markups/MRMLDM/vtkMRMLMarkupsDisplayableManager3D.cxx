@@ -29,7 +29,6 @@
 // MRML includes
 #include <vtkMRMLApplicationLogic.h>
 #include <vtkMRMLInteractionNode.h>
-#include <vtkMRMLLinearTransformNode.h>
 #include <vtkMRMLScene.h>
 #include <vtkMRMLSelectionNode.h>
 #include <vtkMRMLSliceCompositeNode.h>
@@ -58,6 +57,7 @@
 #include <vtkSeedRepresentation.h>
 #include <vtkSeedWidget.h>
 #include <vtkWidgetRepresentation.h>
+#include <vtkGeneralTransform.h>
 
 // STD includes
 #include <algorithm>
@@ -70,7 +70,6 @@ typedef void (*fp)(void);
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro (vtkMRMLMarkupsDisplayableManager3D);
-vtkCxxRevisionMacro (vtkMRMLMarkupsDisplayableManager3D, "$Revision: 1.2 $");
 
 //---------------------------------------------------------------------------
 vtkMRMLMarkupsDisplayableManager3D::vtkMRMLMarkupsDisplayableManager3D()
@@ -696,7 +695,16 @@ void vtkMRMLMarkupsDisplayableManager3D::UpdateWidgetVisibility(vtkMRMLMarkupsNo
    bool visibleOnNode = true;
    if (displayNode)
      {
-     visibleOnNode = (displayNode->GetVisibility()== 1 ? true : false);
+     vtkMRMLViewNode *viewNode = this->GetMRMLViewNode();
+     if (viewNode)
+       {
+       // use the view information to get the visibility
+       visibleOnNode = (displayNode->GetVisibility(viewNode->GetID()) == 1 ? true : false);
+       }
+     else
+       {
+       visibleOnNode = (displayNode->GetVisibility() == 1 ? true : false);
+       }
      }
    // check if the widget is visible according to the widget state
    bool visibleOnWidget = (widget->GetEnabled() == 1 ? true : false);
@@ -1125,35 +1133,40 @@ void vtkMRMLMarkupsDisplayableManager3D::GetWorldToLocalCoordinates(vtkMRMLMarku
     return;
     }
 
-  vtkMRMLTransformNode* tnode = node->GetParentTransformNode();
-  if (tnode != NULL && tnode->IsLinear())
+  for (int i=0; i<3; i++)
     {
-    vtkNew<vtkMatrix4x4> transformToWorld;
-    transformToWorld->Identity();
-    vtkMRMLLinearTransformNode *lnode = vtkMRMLLinearTransformNode::SafeDownCast(tnode);
-    lnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
-    transformToWorld->Invert();
+    localCoordinates[i] = worldCoordinates[i];
+    }
 
-    double p[4];
-    p[3] = 1;
-    int i;
-    for (i=0; i<3; i++)
-      {
-      p[i] = worldCoordinates[i];
-      }
-    double *xyz = transformToWorld->MultiplyDoublePoint(p);
-    for (i=0; i<3; i++)
-      {
-      localCoordinates[i] = xyz[i];
-      }
-    }
-  else
+  vtkMRMLTransformNode* tnode = node->GetParentTransformNode();
+  vtkGeneralTransform *transformToWorld = vtkGeneralTransform::New();
+  transformToWorld->Identity();
+  if (tnode != 0 && !tnode->IsTransformToWorldLinear())
     {
-    for (int i=0; i<3; i++)
-      {
-      localCoordinates[i] = worldCoordinates[i];
-      }
+    tnode->GetTransformFromWorld(transformToWorld);
     }
+  else if (tnode != NULL && tnode->IsTransformToWorldLinear())
+    {
+    vtkNew<vtkMatrix4x4> matrixTransformToWorld;
+    matrixTransformToWorld->Identity();
+    tnode->GetMatrixTransformToWorld(matrixTransformToWorld.GetPointer());
+    matrixTransformToWorld->Invert();
+    transformToWorld->Concatenate(matrixTransformToWorld.GetPointer());
+  }
+
+  double p[4];
+  p[3] = 1;
+  int i;
+  for (i=0; i<3; i++)
+    {
+    p[i] = worldCoordinates[i];
+    }
+  double *xyz = transformToWorld->TransformDoublePoint(p);
+  for (i=0; i<3; i++)
+    {
+    localCoordinates[i] = xyz[i];
+    }
+  transformToWorld->Delete();
 }
 
 //---------------------------------------------------------------------------

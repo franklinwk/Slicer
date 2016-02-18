@@ -28,6 +28,7 @@
 #include "vtkMRMLSliceNode.h"
 #include "vtkMRMLViewNode.h"
 #include "vtkMRMLChartViewNode.h"
+#include "vtkMRMLTableViewNode.h"
 
 // VTK includes
 #include <vtkCallbackCommand.h>
@@ -572,6 +573,53 @@ const char* threeOverThreeQuantitativeView =
   " </item>"
   "</layout>";
 
+const char* fourUpTableView =
+  "<layout type=\"vertical\" split=\"true\" >"
+  " <item>"
+  "  <layout type=\"vertical\">"
+  "   <item>"
+  "    <layout type=\"horizontal\">"
+  "     <item>"
+  "      <view class=\"vtkMRMLSliceNode\" singletontag=\"Red\">"
+  "       <property name=\"orientation\" action=\"default\">Axial</property>"
+  "       <property name=\"viewlabel\" action=\"default\">R</property>"
+  "       <property name=\"viewcolor\" action=\"default\">#F34A33</property>"
+  "      </view>"
+  "     </item>"
+  "     <item>"
+  "      <view class=\"vtkMRMLViewNode\" singletontag=\"1\">"
+  "       <property name=\"viewlabel\" action=\"default\">1</property>"
+  "      </view>"
+  "     </item>"
+  "    </layout>"
+  "   </item>"
+  "   <item>"
+  "    <layout type=\"horizontal\">"
+  "     <item>"
+  "      <view class=\"vtkMRMLSliceNode\" singletontag=\"Yellow\">"
+  "       <property name=\"orientation\" action=\"default\">Sagittal</property>"
+  "       <property name=\"viewlabel\" action=\"default\">Y</property>"
+  "       <property name=\"viewcolor\" action=\"default\">#EDD54C</property>"
+  "      </view>"
+  "     </item>"
+  "     <item>"
+  "      <view class=\"vtkMRMLSliceNode\" singletontag=\"Green\">"
+  "       <property name=\"orientation\" action=\"default\">Coronal</property>"
+  "       <property name=\"viewlabel\" action=\"default\">G</property>"
+  "       <property name=\"viewcolor\" action=\"default\">#6EB04B</property>"
+  "      </view>"
+  "     </item>"
+  "    </layout>"
+  "   </item>"
+  "  </layout>"
+  " </item>"
+  " <item>"
+  "  <view class=\"vtkMRMLTableViewNode\" singletontag=\"TableView1\">"
+  "    <property name=\"viewlabel\" action=\"default\">1</property>"
+  "  </view>"
+  " </item>"
+  "</layout>";
+
 const char* sideBySideView =
   "<layout type=\"horizontal\">"
   "  <item>"
@@ -921,7 +969,6 @@ const char* threeByThreeSliceView =
 
 
 //----------------------------------------------------------------------------
-vtkCxxRevisionMacro(vtkMRMLLayoutLogic, "$Revision$");
 vtkStandardNewMacro(vtkMRMLLayoutLogic);
 
 //----------------------------------------------------------------------------
@@ -1350,6 +1397,8 @@ void vtkMRMLLayoutLogic::AddDefaultLayouts()
                                          twoOverTwoView);
   this->LayoutNode->AddLayoutDescription(vtkMRMLLayoutNode::SlicerLayoutThreeOverThreeQuantitativeView,
                                          threeOverThreeQuantitativeView);
+  this->LayoutNode->AddLayoutDescription(vtkMRMLLayoutNode::SlicerLayoutFourUpTableView,
+                                         fourUpTableView);
   this->LayoutNode->AddLayoutDescription(vtkMRMLLayoutNode::SlicerLayoutSideBySideView,
                                          sideBySideView);
   this->LayoutNode->AddLayoutDescription(vtkMRMLLayoutNode::SlicerLayoutFourByThreeSliceView,
@@ -1389,51 +1438,22 @@ vtkMRMLNode* vtkMRMLLayoutLogic::CreateViewFromAttributes(const ViewAttributes& 
     const std::string& type = it->second;
     node->SetAttribute("ViewType", type.c_str());
     }
-  if (className == "vtkMRMLViewNode")
+  vtkMRMLAbstractViewNode* viewNode = vtkMRMLAbstractViewNode::SafeDownCast(node);
+  if (viewNode)
     {
-    vtkMRMLViewNode* viewNode = vtkMRMLViewNode::SafeDownCast(node);
     it = attributes.find(std::string("singletontag"));
     if (it != end)
       {
       const std::string& singletonTag = it->second;
       viewNode->SetLayoutName(singletonTag.c_str());
       }
-    std::string name = std::string("View");
-    name += std::string(viewNode->GetLayoutName());
-    node->SetName(name.c_str());
-    //node->SetName(this->GetMRMLScene()->GetUniqueNameByString("View"));
-    }
-  else if (className == "vtkMRMLChartViewNode")
-    {
-    vtkMRMLChartViewNode* chartViewNode = vtkMRMLChartViewNode::SafeDownCast(node);
-    it = attributes.find(std::string("singletontag"));
-    if (it != end)
+    std::string name = std::string(viewNode->GetLayoutName());
+    // Maintain backward compatibility
+    if (!viewNode->IsA("vtkMRMLSliceNode") && !viewNode->IsA("vtkMRMLChartViewNode") && !viewNode->IsA("vtkMRMLTableViewNode"))
       {
-      const std::string& singletonTag = it->second;
-      chartViewNode->SetLayoutName(singletonTag.c_str());
+      name = std::string("View") + name;
       }
-    std::string name = std::string(chartViewNode->GetLayoutName());
-    node->SetName(name.c_str());
-    }
-  else if (className == "vtkMRMLSliceNode")
-    {
-    vtkMRMLSliceNode* sliceNode = vtkMRMLSliceNode::SafeDownCast(node);
-    it = attributes.find(std::string("singletontag"));
-    if (it != end)
-      {
-      const std::string& singletonTag = it->second;
-      sliceNode->SetLayoutName(singletonTag.c_str());
-      }
-/*
-    it = attributes.find(std::string("type"));
-    if (it != end)
-      {
-      const std::string& orientation = it->second;
-      sliceNode->SetOrientation(orientation.c_str());
-      }
-*/
-    std::string name = std::string(sliceNode->GetLayoutName());// + std::string(sliceNode->GetOrientationString());
-    node->SetName(name.c_str());
+    viewNode->SetName(name.c_str());
     }
   return node;
 }
@@ -1538,6 +1558,47 @@ void vtkMRMLLayoutLogic::ApplyProperty(const ViewProperty& property, vtkMRMLNode
 }
 
 //----------------------------------------------------------------------------
+void vtkMRMLLayoutLogic::MaximizeView(vtkMRMLAbstractViewNode* viewToMaximize)
+{
+  int layout = vtkMRMLLayoutNode::SlicerLayoutMaximizedView;
+  this->CreateMaximizedViewLayoutDescription( layout, viewToMaximize);
+  vtkMRMLLayoutNode* layoutNode = this->GetLayoutNode();
+  if (layoutNode)
+    {
+    layoutNode->SetViewArrangement(layout);
+    }
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLLayoutLogic
+::CreateMaximizedViewLayoutDescription(int layout,
+                                       vtkMRMLAbstractViewNode* viewToMaximize)
+{
+  vtkMRMLLayoutNode* layoutNode = this->GetLayoutNode();
+  if (!layoutNode)
+    {
+    vtkErrorMacro( << "No layout node");
+    }
+  std::stringstream layoutDescription;
+  layoutDescription <<
+    "<layout type=\"horizontal\">"
+    " <item>"
+    "  <view class=\"" << viewToMaximize->GetClassName() << "\" "
+    "singletontag=\""<< viewToMaximize->GetSingletonTag() << "\">"
+    "  </view>"
+    " </item>"
+    "</layout>";
+  if (layoutNode->IsLayoutDescription(layout))
+    {
+    layoutNode->SetLayoutDescription(layout, layoutDescription.str().c_str());
+    }
+  else
+    {
+    layoutNode->AddLayoutDescription(layout, layoutDescription.str().c_str());
+    }
+}
+
+//----------------------------------------------------------------------------
 vtkMRMLNode* vtkMRMLLayoutLogic::GetViewFromAttributes(const ViewAttributes& attributes)
 {
   vtkSmartPointer<vtkCollection> nodes;
@@ -1556,7 +1617,7 @@ vtkCollection* vtkMRMLLayoutLogic::GetViewsFromAttributes(const ViewAttributes& 
     {
     return NULL;
     }
-  // filter on the class name, that remove a lot of options
+  // filter on the class name to remove a lot of options.
   ViewAttributes::const_iterator it = attributes.find(std::string("class"));
   ViewAttributes::const_iterator end = attributes.end();
   if (it == end)
@@ -1612,11 +1673,7 @@ vtkCollection* vtkMRMLLayoutLogic::GetViewsFromAttributes(const ViewAttributes& 
       }
     else if (attributeName == "type")
       {
-      if (className == "vtkMRMLSliceNode")
-        {
-        continue;
-        }
-      if (className == "vtkMRMLChartViewNode")
+      if (className != "vtkMRMLViewNode")
         {
         continue;
         }

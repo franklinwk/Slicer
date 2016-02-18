@@ -17,7 +17,6 @@
 
 // MRML includes
 #include <vtkMRMLInteractionNode.h>
-#include <vtkMRMLLinearTransformNode.h>
 #include <vtkMRMLScene.h>
 #include <vtkMRMLSliceNode.h>
 #include <vtkMRMLTransformNode.h>
@@ -32,11 +31,14 @@
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
 #include <vtkObject.h>
+#include <vtkPickingManager.h>
 #include <vtkPlane.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper2D.h>
 #include <vtkProperty.h>
 #include <vtkRenderer.h>
+// for picking
+#include <vtkRenderWindowInteractor.h>
 #include <vtkTransform.h>
 #include <vtkTransformPolyDataFilter.h>
 
@@ -46,7 +48,6 @@
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro (vtkMRMLAnnotationROIDisplayableManager);
-vtkCxxRevisionMacro (vtkMRMLAnnotationROIDisplayableManager, "$Revision: 1.0 $");
 
 //---------------------------------------------------------------------------
 // vtkMRMLAnnotationROIDisplayableManager Callback
@@ -147,6 +148,16 @@ vtkAbstractWidget * vtkMRMLAnnotationROIDisplayableManager::CreateWidget(vtkMRML
   else
     {
     roiWidget = vtkAnnotationROIWidget::New();
+    }
+
+  if (this->GetInteractor()->GetPickingManager())
+    {
+    if (!(this->GetInteractor()->GetPickingManager()->GetEnabled()))
+      {
+      // if the picking manager is not already turned on for this
+      // interactor, enable it
+      this->GetInteractor()->GetPickingManager()->EnabledOn();
+      }
     }
 
   roiWidget->SetInteractor(this->GetInteractor());
@@ -344,10 +355,9 @@ void vtkMRMLAnnotationROIDisplayableManager::PropagateMRMLToWidget(vtkMRMLAnnota
   transformToWorld->Identity();
 
   vtkMRMLTransformNode* tnode = roiNode->GetParentTransformNode();
-  if (tnode != NULL && tnode->IsLinear())
+  if (tnode != NULL && tnode->IsTransformToWorldLinear())
     {
-    vtkMRMLLinearTransformNode *lnode = vtkMRMLLinearTransformNode::SafeDownCast(tnode);
-    lnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
+    tnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
     }
   transformToWorld->Invert();
 
@@ -479,10 +489,9 @@ void vtkMRMLAnnotationROIDisplayableManager::PropagateMRMLToWidget2D(vtkMRMLAnno
   transformToWorld->Identity();
 
   vtkMRMLTransformNode* tnode = roiNode->GetParentTransformNode();
-  if (tnode != NULL && tnode->IsLinear())
+  if (tnode != NULL && tnode->IsTransformToWorldLinear())
     {
-    vtkMRMLLinearTransformNode *lnode = vtkMRMLLinearTransformNode::SafeDownCast(tnode);
-    lnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
+    tnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
     }
 
   // update the transform from world to screen space
@@ -537,18 +546,10 @@ void vtkMRMLAnnotationROIDisplayableManager::PropagateMRMLToWidget2D(vtkMRMLAnno
   plane->SetNormal(normal);
   plane->SetOrigin(origin);
 
+  rep->SetSliceIntersectionVisibility(roiNode->GetDisplayVisibility() ? 1:0);
   rep->SetHandlesVisibility(roiNode->GetLocked()==0 && roiNode->GetDisplayVisibility() ? 1:0);
 
   rep->PlaceWidget(b);
-
-  // update actor's visbility from mrml
-
-  vtkNew<vtkPropCollection> actors;
-  rep->GetActors2D(actors.GetPointer());
-  for (int i=0; i<actors->GetNumberOfItems(); i++)
-    {
-    vtkProp::SafeDownCast(actors->GetItemAsObject(i))->SetVisibility(roiNode->GetDisplayVisibility());
-    }
 
   // re-render the widget
   rep->NeedToRenderOn();
@@ -737,10 +738,9 @@ void vtkMRMLAnnotationROIDisplayableManager::SetParentTransformToWidget(vtkMRMLA
 
   // get the nodes's transform node
   vtkMRMLTransformNode* tnode = node->GetParentTransformNode();
-  if (rep != NULL && tnode != NULL && tnode->IsLinear())
+  if (rep != NULL && tnode != NULL && tnode->IsTransformToWorldLinear())
     {
-    vtkMRMLLinearTransformNode *lnode = vtkMRMLLinearTransformNode::SafeDownCast(tnode);
-    lnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
+    tnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
     }
 
   vtkNew<vtkPropCollection> actors;

@@ -11,33 +11,32 @@
 #include "vtkSlicerFiducialsLogic.h"
 
 // MRML includes
-#include "vtkMRMLLinearTransformNode.h"
 #include "vtkMRMLFiducialListNode.h"
 #include "vtkMRMLScene.h"
 #include "vtkMRMLSelectionNode.h"
 #include "vtkMRMLStorageNode.h"
+#include "vtkMRMLTransformNode.h"
 
 // VTK includes
 #include <vtkMatrix4x4.h>
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
 
-#include <vtksys/SystemTools.hxx> 
+#include <vtksys/SystemTools.hxx>
 
 
-vtkCxxRevisionMacro(vtkSlicerFiducialsLogic, "$Revision$");
 vtkStandardNewMacro(vtkSlicerFiducialsLogic);
 
 //----------------------------------------------------------------------------
 vtkSlicerFiducialsLogic::vtkSlicerFiducialsLogic()
 {
- 
+
 }
 
 //----------------------------------------------------------------------------
 vtkSlicerFiducialsLogic::~vtkSlicerFiducialsLogic()
 {
-    
+
 }
 
 //----------------------------------------------------------------------------
@@ -101,8 +100,8 @@ void vtkSlicerFiducialsLogic::AddFiducialListSelected()
 vtkMRMLFiducialListNode *vtkSlicerFiducialsLogic::AddFiducialList()
 {
   this->GetMRMLScene()->SaveStateForUndo();
-  
-  vtkMRMLNode *node = 
+
+  vtkMRMLNode *node =
     this->GetMRMLScene()->CreateNodeByClass("vtkMRMLFiducialListNode");
   if (node == NULL)
     {
@@ -113,7 +112,7 @@ vtkMRMLFiducialListNode *vtkSlicerFiducialsLogic::AddFiducialList()
   if (storableNode)
     {
     vtkMRMLStorageNode *snode = vtkMRMLFiducialListNode::SafeDownCast(node)->CreateDefaultStorageNode();
-    //    vtkMRMLStorageNode *snode = storableNode->CreateDefaultStorageNode(); 
+    //    vtkMRMLStorageNode *snode = storableNode->CreateDefaultStorageNode();
     if (snode)
       {
       snode->SetScene(this->GetMRMLScene());
@@ -123,7 +122,7 @@ vtkMRMLFiducialListNode *vtkSlicerFiducialsLogic::AddFiducialList()
       }
     }
   node->SetName(this->GetMRMLScene()->GetUniqueNameByString("L"));
-  this->GetMRMLScene()->AddNode(node); 
+  this->GetMRMLScene()->AddNode(node);
   node->Delete();
   return vtkMRMLFiducialListNode::SafeDownCast(node);
 }
@@ -156,7 +155,7 @@ int vtkSlicerFiducialsLogic::AddFiducialSelected (float x, float y, float z, int
      vtkErrorMacro("AddFiducialSelected: no selected list to which to add a fiducial, even tried adding one");
      return index;
     }
-  
+
   // add a fiducial to the selected list
   this->GetMRMLScene()->SaveStateForUndo(flist);
   vtkDebugMacro("AddFiducialSelected: calling add fiducial on list " << flist->GetName());
@@ -165,7 +164,7 @@ int vtkSlicerFiducialsLogic::AddFiducialSelected (float x, float y, float z, int
     {
     vtkErrorMacro("AddFiducialSelected: error adding a fiducial at " << x << ", " << y << ", " << z  << " to list " << flist->GetName());
     }
-  
+
   return index;
 }
 
@@ -188,10 +187,9 @@ int vtkSlicerFiducialsLogic::AddFiducialPicked (float x, float y, float z, int s
   vtkMRMLTransformNode* tnode = flist->GetParentTransformNode();
   vtkNew<vtkMatrix4x4> transformToWorld;
   transformToWorld->Identity();
-  if (tnode != NULL && tnode->IsLinear())
+  if (tnode != NULL && tnode->IsTransformToWorldLinear())
     {
-    vtkMRMLLinearTransformNode *lnode = vtkMRMLLinearTransformNode::SafeDownCast(tnode);
-    lnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
+    tnode->GetMatrixTransformToWorld(transformToWorld.GetPointer());
     }
   // will convert by the inverted parent transform
   transformToWorld->Invert();
@@ -201,7 +199,7 @@ int vtkSlicerFiducialsLogic::AddFiducialPicked (float x, float y, float z, int s
   xyzw[2] = z;
   xyzw[3] = 1.0;
   double worldxyz[4], *worldp = &worldxyz[0];
-              
+
   transformToWorld->MultiplyPoint(xyzw, worldp);
 
   tnode = NULL;
@@ -214,8 +212,8 @@ int vtkSlicerFiducialsLogic::AddFiducialPicked (float x, float y, float z, int s
 vtkMRMLFiducialListNode *vtkSlicerFiducialsLogic::LoadFiducialList(const char* path)
 {
   this->GetMRMLScene()->SaveStateForUndo();
-  
-  vtkMRMLNode *node = 
+
+  vtkMRMLNode *node =
     this->GetMRMLScene()->CreateNodeByClass("vtkMRMLFiducialListNode");
   if (node == NULL)
     {
@@ -235,7 +233,7 @@ vtkMRMLFiducialListNode *vtkSlicerFiducialsLogic::LoadFiducialList(const char* p
   vtkMRMLStorageNode *snode = listNode->CreateDefaultStorageNode();
   snode->SetFileName(path);
   this->GetMRMLScene()->AddNode(snode);
-  
+
   listNode->SetAndObserveStorageNodeID(snode->GetID());
   int retval = snode->ReadData(listNode);
 
@@ -250,6 +248,6 @@ vtkMRMLFiducialListNode *vtkSlicerFiducialsLogic::LoadFiducialList(const char* p
     }
 
   snode->Delete();
-  
+
   return listNode;
 }

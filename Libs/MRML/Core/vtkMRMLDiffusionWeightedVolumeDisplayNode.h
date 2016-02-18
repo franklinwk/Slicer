@@ -19,6 +19,7 @@
 #include "vtkMRMLScalarVolumeDisplayNode.h"
 
 // VTK includes
+class vtkAlgorithmOutput;
 class vtkImageData;
 class vtkImageExtractComponents;
 
@@ -40,29 +41,26 @@ class VTK_MRML_EXPORT vtkMRMLDiffusionWeightedVolumeDisplayNode : public vtkMRML
 
   virtual vtkMRMLNode* CreateNodeInstance();
 
-  /// 
+  ///
   /// Set node attributes
   virtual void ReadXMLAttributes( const char** atts);
 
-  /// 
+  ///
   /// Write this node's information to a MRML file in XML format.
   virtual void WriteXML(ostream& of, int indent);
 
-  /// 
+  ///
   /// Copy the node's attributes to this object
   virtual void Copy(vtkMRMLNode *node);
 
-  /// 
+  ///
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName() {return "DiffusionWeightedVolumeDisplay";};
 
-  /// 
+  ///
   /// Get the pipeline input
-  virtual vtkImageData* GetInputImageData();
+  virtual vtkAlgorithmOutput* GetInputImageDataConnection();
 
-  /// 
-  /// Get the pipeline output
-  virtual vtkImageData* GetOutputImageData();
 
   virtual void UpdateImageDataPipeline();
 
@@ -70,28 +68,26 @@ class VTK_MRML_EXPORT vtkMRMLDiffusionWeightedVolumeDisplayNode : public vtkMRML
   /// Display Information
   //--------------------------------------------------------------------------
 
-  /// 
+  ///
   /// Set/Get interpolate reformated slices
   vtkGetMacro(DiffusionComponent, int);
   vtkSetMacro(DiffusionComponent, int);
- 
+
 protected:
   vtkMRMLDiffusionWeightedVolumeDisplayNode();
   ~vtkMRMLDiffusionWeightedVolumeDisplayNode();
   vtkMRMLDiffusionWeightedVolumeDisplayNode(const vtkMRMLDiffusionWeightedVolumeDisplayNode&);
   void operator=(const vtkMRMLDiffusionWeightedVolumeDisplayNode&);
 
-  /// 
+  ///
   /// Set the input of the pipeline
-  virtual void SetInputToImageDataPipeline(vtkImageData *imageData);
+  virtual void SetInputToImageDataPipeline(vtkAlgorithmOutput *imageDataConnection);
 
-  virtual vtkImageData* GetScalarImageData();
+  virtual vtkAlgorithmOutput* GetScalarImageDataConnection();
 
+  /// This property holds the current diffusion component used for display.
   int DiffusionComponent;
-
   vtkImageExtractComponents *ExtractComponent;
-
-
 };
 
 #endif

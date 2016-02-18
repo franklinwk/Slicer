@@ -7,8 +7,8 @@
 
 =========================================================================auto=*/
 ///  vtkImageLabelChange -  Change one label value to another
-/// 
-/// 
+///
+///
 //
 /// vtkImageLabelChange is will replace one voxel value with another.
 /// This is used for editing of labelmaps.
@@ -20,14 +20,14 @@
 #include "vtkSlicerEditorLibModuleLogicExport.h"
 
 // VTK includes
-#include <vtkImageToImageFilter.h>
+#include <vtkThreadedImageAlgorithm.h>
 
 class vtkImageData;
-class VTK_SLICER_EDITORLIB_MODULE_LOGIC_EXPORT vtkImageLabelChange : public vtkImageToImageFilter
+class VTK_SLICER_EDITORLIB_MODULE_LOGIC_EXPORT vtkImageLabelChange : public vtkThreadedImageAlgorithm
 {
 public:
     static vtkImageLabelChange *New();
-    vtkTypeRevisionMacro(vtkImageLabelChange,vtkImageToImageFilter);
+    vtkTypeMacro(vtkImageLabelChange,vtkThreadedImageAlgorithm);
     void PrintSelf(ostream& os, vtkIndent indent);
 
     vtkSetMacro(InputLabel, float);
@@ -45,7 +45,7 @@ protected:
     float InputLabel;
     float OutputLabel;
 
-    void ThreadedExecute(vtkImageData *inData, vtkImageData *outData, 
+    void ThreadedExecute(vtkImageData *inData, vtkImageData *outData,
         int extent[6], int id);
 };
 

@@ -45,6 +45,7 @@
 #include <vtkImageData.h>
 #include <vtkNew.h>
 #include <vtkSmartPointer.h>
+#include <vtksys/SystemTools.hxx>
 
 //----------------------------------------------------------------------------
 qSlicerSceneWriter::qSlicerSceneWriter(QObject* parentObject)
@@ -108,10 +109,17 @@ bool qSlicerSceneWriter::write(const qSlicerIO::IOProperties& properties)
   return res;
 }
 
-
 //----------------------------------------------------------------------------
 bool qSlicerSceneWriter::writeToMRML(const qSlicerIO::IOProperties& properties)
 {
+  // set the mrml scene url first
+  Q_ASSERT(!properties["fileName"].toString().isEmpty());
+  QString fileName = properties["fileName"].toString();
+
+  this->mrmlScene()->SetURL(fileName.toLatin1());
+  std::string parentDir = vtksys::SystemTools::GetParentDirectory(this->mrmlScene()->GetURL());
+  this->mrmlScene()->SetRootDirectory(parentDir.c_str());
+
   // save an explicit default scene view recording the state of the scene when
   // saved to file
   const char *defaultSceneName = "Master Scene View";
@@ -151,7 +159,7 @@ bool qSlicerSceneWriter::writeToMRML(const qSlicerIO::IOProperties& properties)
     {
     // take a screen shot of the full layout
     sceneViewNode->SetScreenShotType(4);
-    QImage screenShot = properties["screenShot"].value<QImage>();  
+    QImage screenShot = properties["screenShot"].value<QImage>();
     // convert to vtkImageData
     vtkNew<vtkImageData> imageData;
     qMRMLUtils::qImageToVtkImageData(screenShot, imageData.GetPointer());
@@ -162,12 +170,9 @@ bool qSlicerSceneWriter::writeToMRML(const qSlicerIO::IOProperties& properties)
   // force a write
   sceneViewNode->GetStorageNode()->WriteData(sceneViewNode);
 
-  Q_ASSERT(!properties["fileName"].toString().isEmpty());
-  QString fileName = properties["fileName"].toString();
-
-  this->mrmlScene()->SetURL(fileName.toLatin1());
-  this->mrmlScene()->SetVersion("Slicer4");
+  // write out the mrml file
   bool res = this->mrmlScene()->Commit();
+
   return res;
 }
 
@@ -193,7 +198,7 @@ bool qSlicerSceneWriter::writeToMRB(const qSlicerIO::IOProperties& properties)
   // For now, create a named directory and use Qt calls to remove it
   QString tempDir = qSlicerCoreApplication::application()->temporaryPath();
   QFileInfo pack(QDir(tempDir), //QDir::tempPath(),
-                 QString("__BundleSaveTemp-") + 
+                 QString("__BundleSaveTemp-") +
                   QDateTime::currentDateTime().toString("yyyy-MM-dd_hh+mm+ss.zzz"));
   qDebug() << "packing to " << pack.absoluteFilePath();
 
@@ -258,10 +263,16 @@ bool qSlicerSceneWriter::writeToMRB(const qSlicerIO::IOProperties& properties)
     return false;
     }
 
+  // Mark the storable nodes as modified since read, since that flag was reset
+  // when the files were written out. If there was newly generated data in the
+  // scene that only got saved to the MRB bundle directory, it would be marked
+  // as unmodified since read when saving as a MRML file + data. This will not
+  // disrupt multiple MRB saves.
+  this->mrmlScene()->SetStorableNodesModifiedSinceRead();
+
   qDebug() << "saved " << fileInfo.absoluteFilePath();
   return true;
 }
-
 
 //---------------------------------------------------------------------------
 bool qSlicerSceneWriter::writeToDirectory(const qSlicerIO::IOProperties& properties)

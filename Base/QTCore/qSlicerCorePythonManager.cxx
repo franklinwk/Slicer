@@ -32,14 +32,18 @@
 #include "qSlicerCoreApplication.h"
 #include "qSlicerUtils.h"
 #include "qSlicerCorePythonManager.h"
+#include "qSlicerScriptedUtils_p.h"
 #include "vtkSlicerConfigure.h"
 
 // VTK includes
 #include <vtkPythonUtil.h>
+#include <vtkVersion.h>
 
 //-----------------------------------------------------------------------------
-qSlicerCorePythonManager::qSlicerCorePythonManager(QObject* _parent) : Superclass(_parent)
+qSlicerCorePythonManager::qSlicerCorePythonManager(QObject* _parent)
+  : Superclass(_parent)
 {
+  this->Factory = 0;
   int flags = this->initializationFlags();
   flags &= ~(PythonQt::IgnoreSiteModule); // Clear bit
   this->setInitializationFlags(flags);
@@ -48,6 +52,11 @@ qSlicerCorePythonManager::qSlicerCorePythonManager(QObject* _parent) : Superclas
 //-----------------------------------------------------------------------------
 qSlicerCorePythonManager::~qSlicerCorePythonManager()
 {
+  if (this->Factory)
+    {
+    delete this->Factory;
+    this->Factory = 0;
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -92,10 +101,15 @@ QStringList qSlicerCorePythonManager::pythonPaths()
   if (!app->isInstalled())
     {
     // Add here python path specific to the BUILD tree
-#ifdef CMAKE_INTDIR
-    paths << VTK_DIR "/bin/" CMAKE_INTDIR "/";
+#if defined(Q_WS_WIN)
+      QString vtkLibSubDir("bin");
 #else
-    paths << VTK_DIR "/bin/";
+      QString vtkLibSubDir("lib");
+#endif
+#ifdef CMAKE_INTDIR
+    paths << VTK_DIR "/" + vtkLibSubDir + "/" CMAKE_INTDIR "/";
+#else
+    paths << VTK_DIR "/" + vtkLibSubDir + "/";
 #endif
     paths << QString("%1/Wrapping/Python").arg(VTK_DIR);
 #ifdef CMAKE_INTDIR
@@ -130,7 +144,8 @@ QStringList qSlicerCorePythonManager::pythonPaths()
 void qSlicerCorePythonManager::preInitialization()
 {
   Superclass::preInitialization();
-  this->addWrapperFactory(new ctkVTKPythonQtWrapperFactory);
+  this->Factory = new ctkVTKPythonQtWrapperFactory;
+  this->addWrapperFactory(this->Factory);
   qSlicerCoreApplication* app = qSlicerCoreApplication::application();
   if (app)
     {
@@ -142,30 +157,17 @@ void qSlicerCorePythonManager::preInitialization()
 //-----------------------------------------------------------------------------
 void qSlicerCorePythonManager::addVTKObjectToPythonMain(const QString& name, vtkObject * object)
 {
-  if (name.isNull() || !object)
-    {
-    return;
-    }
   // Split name using '.'
   QStringList moduleNameList = name.split('.', QString::SkipEmptyParts);
 
   // Remove the last part
-  QString varName = moduleNameList.takeLast();
+  QString attributeName = moduleNameList.takeLast();
 
-  PyObject * module = PythonQt::self()->getMainModule();
-
-  // Loop over module name and try to import them one by one
-  foreach(const QString& moduleName, moduleNameList)
-    {
-    module = PyImport_ImportModule(moduleName.toLatin1());
-    Q_ASSERT(module);
-    }
-
-  // Add the object to the imported module
-  int ret = PyModule_AddObject(module, varName.toLatin1(),
-                               vtkPythonUtil::GetObjectFromPointer(object));
-  Q_ASSERT(ret == 0);
-  if (ret != 0)
+  bool success = qSlicerScriptedUtils::setModuleAttribute(
+        moduleNameList.join("."),
+        attributeName,
+        vtkPythonUtil::GetObjectFromPointer(object));
+  if (!success)
     {
     qCritical() << "qSlicerCorePythonManager::addVTKObjectToPythonMain - "
                    "Failed to add VTK object:" << name;

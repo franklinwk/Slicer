@@ -30,6 +30,7 @@ Version:   $Revision$
 #include "ModuleDescriptionParser.h"
 #include "ModuleDescription.h"
 #include "vtkDebugLeaks.h"
+#include <vtkVersion.h>
 
 int main(int argc, char * argv[])
 {
@@ -102,13 +103,13 @@ int main(int argc, char * argv[])
   std::cout << "Done reading the file " << InputVolume << endl;
 
   vtkImageChangeInformation *ici = vtkImageChangeInformation::New();
-  ici->SetInput(reader->GetOutput() );
+  ici->SetInputConnection(reader->GetOutputPort() );
   ici->SetOutputSpacing( 1, 1, 1 );
   ici->SetOutputOrigin( 0, 0, 0 );
   ici->Update();
 
+  ici->Update();
   image = ici->GetOutput();
-  image->Update();
 
   // Get the dimensions, marching cubes only works on 3d
   int extents[6];
@@ -144,12 +145,12 @@ int main(int argc, char * argv[])
                                      CLPProcessInformation,
                                      1.0 / 7.0, 0.0);
 
-  mcubes->SetInput(ici->GetOutput() );
+  mcubes->SetInputConnection(ici->GetOutputPort() );
   mcubes->SetValue(0, Threshold);
   mcubes->ComputeScalarsOff();
   mcubes->ComputeGradientsOff();
   mcubes->ComputeNormalsOff();
-  (mcubes->GetOutput() )->ReleaseDataFlagOn();
+  mcubes->ReleaseDataFlagOn();
   mcubes->Update();
 
   if( debug )
@@ -163,14 +164,15 @@ int main(int argc, char * argv[])
                                         "Decimator",
                                         CLPProcessInformation,
                                         1.0 / 7.0, 1.0 / 7.0);
-  decimator->SetInput(mcubes->GetOutput() );
+  decimator->SetInputConnection(mcubes->GetOutputPort() );
   decimator->SetFeatureAngle(60);
   decimator->SplittingOff();
   decimator->PreserveTopologyOn();
 
   decimator->SetMaximumError(1);
   decimator->SetTargetReduction(Decimate);
-  (decimator->GetOutput() )->ReleaseDataFlagOff();
+  decimator->ReleaseDataFlagOff();
+
 
   std::cout << "Decimating ... \n";
   // TODO add progress to decimator
@@ -192,9 +194,9 @@ int main(int argc, char * argv[])
                                          "Reversor",
                                          CLPProcessInformation,
                                          1.0 / 7.0, 2.0 / 7.0);
-    reverser->SetInput(decimator->GetOutput() );
+    reverser->SetInputConnection(decimator->GetOutputPort() );
     reverser->ReverseNormalsOn();
-    (reverser->GetOutput() )->ReleaseDataFlagOn();
+    reverser->ReleaseDataFlagOn();
     // TODO: add progress
     }
 
@@ -211,16 +213,16 @@ int main(int argc, char * argv[])
     }
   if( (transformIJKtoRAS->GetMatrix() )->Determinant() < 0 )
     {
-    smootherSinc->SetInput(reverser->GetOutput() );
+    smootherSinc->SetInputConnection(reverser->GetOutputPort() );
     }
   else
     {
-    smootherSinc->SetInput(decimator->GetOutput() );
+    smootherSinc->SetInputConnection(decimator->GetOutputPort() );
     }
   smootherSinc->SetNumberOfIterations(Smooth);
   smootherSinc->FeatureEdgeSmoothingOff();
   smootherSinc->BoundarySmoothingOff();
-  (smootherSinc->GetOutput() )->ReleaseDataFlagOn();
+  smootherSinc->ReleaseDataFlagOn();
 
   // TODO: insert progress
   std::cout << "Smoothing...\n";
@@ -230,14 +232,14 @@ int main(int argc, char * argv[])
                                          "Transformer",
                                          CLPProcessInformation,
                                          1.0 / 7.0, 4.0 / 7.0);
-  transformer->SetInput(smootherSinc->GetOutput() );
+  transformer->SetInputConnection(smootherSinc->GetOutputPort() );
   if( (transformIJKtoRAS->GetMatrix() )->Determinant() < 0 )
     {
-    transformer->SetInput(reverser->GetOutput() );
+    transformer->SetInputConnection(reverser->GetOutputPort() );
     }
   else
     {
-    transformer->SetInput(decimator->GetOutput() );
+    transformer->SetInputConnection(decimator->GetOutputPort() );
     }
 
   transformer->SetTransform(transformIJKtoRAS);
@@ -248,7 +250,7 @@ int main(int argc, char * argv[])
     }
 
   // TODO: add progress
-  (transformer->GetOutput() )->ReleaseDataFlagOn();
+  transformer->ReleaseDataFlagOn();
 
   normals = vtkPolyDataNormals::New();
   vtkPluginFilterWatcher watchNormals(normals,
@@ -263,30 +265,30 @@ int main(int argc, char * argv[])
     {
     normals->ComputePointNormalsOff();
     }
-  normals->SetInput(transformer->GetOutput() );
+  normals->SetInputConnection(transformer->GetOutputPort() );
   normals->SetFeatureAngle(60);
   normals->SetSplitting(SplitNormals);
   std::cout << "Splitting normals...\n";
   // TODO: add progress
-  (normals->GetOutput() )->ReleaseDataFlagOn();
+  normals->ReleaseDataFlagOn();
 
   stripper = vtkStripper::New();
   vtkPluginFilterWatcher watchStripper(stripper,
                                        "Stripper",
                                        CLPProcessInformation,
                                        1.0 / 7.0, 6.0 / 7.0);
-  stripper->SetInput(normals->GetOutput() );
+  stripper->SetInputConnection(normals->GetOutputPort() );
   std::cout << "Stripping...\n";
   // TODO: add progress
-  (stripper->GetOutput() )->ReleaseDataFlagOff();
+  stripper->ReleaseDataFlagOff();
+
 
   // the poly data output from the stripper can be set as an input to a model's polydata
-  (stripper->GetOutput() )->Update();
-
+  stripper->Update();
   // but for now we're just going to write it out
 
   writer = vtkXMLPolyDataWriter::New();
-  writer->SetInput(stripper->GetOutput() );
+  writer->SetInputConnection(stripper->GetOutputPort() );
   writer->SetFileName(OutputGeometry.c_str() );
   // TODO: add progress
   writer->Write();

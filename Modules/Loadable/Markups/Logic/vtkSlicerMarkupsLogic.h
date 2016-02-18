@@ -92,6 +92,13 @@ public:
   void JumpSlicesToLocation(double x, double y, double z, bool centered);
   /// jump the slice windows to the nth markup with the mrml id id
   void JumpSlicesToNthPointInMarkup(const char *id, int n, bool centered = false);
+  /// refocus all of the 3D cameras to the nth markup with the mrml id id
+  /// \sa FocusCameraOnNthPointInMarkup
+  void FocusCamerasOnNthPointInMarkup(const char *id, int n);
+  /// refocus the camera with the given cameraNodeID on the nth markup in
+  /// the markups node with id markupNodeID
+  /// \sa FocusCamerasOnNthPointInMarkup
+  void FocusCameraOnNthPointInMarkup(const char *cameraNodeID, const char *markupNodeID, int n);
 
   /// Load a markups fiducial list from fileName, return NULL on error, node ID string
   /// otherwise. Adds the appropriate storage and display nodes to the scene
@@ -177,6 +184,14 @@ public:
   /// Return true on sucessfully going into place mode, false otherwise.
   /// \sa SetActiveIDList
   bool StartPlaceMode(bool persistent);
+
+  /// Inspect all the slice composite nodes in the scene. Return 1 if all have
+  /// SliceIntersectionVisibility set to true, 0 if all have it set to false,
+  /// 2 if it's a combination of true and false, -1 on error
+  int GetSliceIntersectionsVisibility();
+  /// Set the slice intersections visbility on all the slice composite nodes
+  /// in the scene
+  void SetSliceIntersectionsVisibility(bool flag);
 
 protected:
   vtkSlicerMarkupsLogic();

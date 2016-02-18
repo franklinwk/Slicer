@@ -1,5 +1,5 @@
 import os
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 from DICOMLib import DICOMPlugin
 from DICOMLib import DICOMLoadable
 
@@ -53,7 +53,7 @@ class DICOMDiffusionVolumePluginClass(DICOMPlugin):
         tagIndex += 1
     self.tags['seriesDescription'] = "0008,103e"
 
-  def examine(self,fileLists):
+  def examineForImport(self,fileLists):
     """ Returns a list of DICOMLoadable instances
     corresponding to ways of interpreting the
     fileLists parameter.
@@ -75,7 +75,7 @@ class DICOMDiffusionVolumePluginClass(DICOMPlugin):
 
     For testing:
     dv = slicer.modules.dicomPlugins['DICOMDiffusionVolumePlugin']()
-    dv.examine([['/media/extra650/data/DWI-examples/SiemensTrioTimB17-DWI/63000-000025-000001.dcm']])
+    dv.examineForImport([['/media/extra650/data/DWI-examples/SiemensTrioTimB17-DWI/63000-000025-000001.dcm']])
     """
 
     # get the series description to use as base for volume name
@@ -98,11 +98,12 @@ class DICOMDiffusionVolumePluginClass(DICOMPlugin):
     loadables = []
     if validDWI:
       # default loadable includes all files for series
-      loadable = DICOMLib.DICOMLoadable()
+      loadable = DICOMLoadable()
       loadable.files = files
       loadable.name = name + ' - as DWI Volume'
       loadable.selected = False
       loadable.tooltip = "Appears to be DWI from vendor %s" % vendorName
+      loadable.confidence = 0.75
       loadables = [loadable]
     return loadables
 
@@ -120,7 +121,12 @@ class DICOMDiffusionVolumePluginClass(DICOMPlugin):
     diffusionNode.SetName(loadable.name)
     # set up the parameters
     parameters = {}
-    parameters['inputDicomDirectory'] = os.path.dirname(loadable.files[0])
+    tempDir = slicer.util.tempDirectory()
+    import shutil
+    for filePath in loadable.files:
+      base = os.path.basename(filePath)
+      shutil.copy(filePath, os.path.join(tempDir, base))
+    parameters['inputDicomDirectory'] = tempDir
     parameters['outputDirectory'] = slicer.app.temporaryPath
     parameters['outputVolume'] = diffusionNode.GetID()
     # run the module
@@ -130,6 +136,13 @@ class DICOMDiffusionVolumePluginClass(DICOMPlugin):
     if cliNode.GetStatusString() == "Completing" or cliNode.GetStatusString() == "Completed":
       if diffusionNode.GetImageData():
         success = True
+
+    # create Subject Hierarchy nodes for the loaded series
+    self.addSeriesInSubjectHierarchy(loadable,diffusionNode)
+
+    # remove temp directory of dwi series
+    shutil.rmtree(tempDir)
+
     return success
 
 
@@ -157,9 +170,6 @@ class DICOMDiffusionVolumePlugin:
     and was partially funded by NIH grant 3P41RR013218.
     """
 
-    # don't show this module - it only appears in the DICOM module
-    parent.hidden = True
-
     # Add this extension to the DICOM module's list for discovery when the module
     # is created.  Since this module may be discovered before DICOM itself,
     # create the list if it doesn't already exist.
@@ -168,23 +178,3 @@ class DICOMDiffusionVolumePlugin:
     except AttributeError:
       slicer.modules.dicomPlugins = {}
     slicer.modules.dicomPlugins['DICOMDiffusionVolumePlugin'] = DICOMDiffusionVolumePluginClass
-
-#
-# DICOMDiffusionVolumeWidget
-#
-
-class DICOMDiffusionVolumeWidget:
-  def __init__(self, parent = None):
-    self.parent = parent
-
-  def setup(self):
-    # don't display anything for this widget - it will be hidden anyway
-    pass
-
-  def enter(self):
-    pass
-
-  def exit(self):
-    pass
-
-

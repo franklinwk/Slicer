@@ -13,7 +13,7 @@
 
 =========================================================================*/
 ///  vtkAnnotationROIRepresentation2D - a class defining the representation for the vtkSlicerBoxWidget2
-/// 
+///
 /// This class is a concrete representation for the vtkSlicerBoxWidget2. It
 /// represents a box with seven handles: one on each of the six faces, plus a
 /// center handle. Through interaction with the widget, the box
@@ -54,7 +54,6 @@ class vtkMatrix4x4;
 class vtkActor2D;
 class vtkPolyDataMapper2D;
 class vtkPlane;
-class vtkCutter;
 class vtkTransform;
 class vtkTransformPolyDataFilter;
 
@@ -64,16 +63,16 @@ vtkAnnotationROIRepresentation2D
   : public vtkAnnotationROIRepresentation
 {
 public:
-  /// 
+  ///
   /// Instantiate the class.
   static vtkAnnotationROIRepresentation2D *New();
 
-  /// 
+  ///
   /// Standard methods for the class.
-  vtkTypeRevisionMacro(vtkAnnotationROIRepresentation2D,vtkAnnotationROIRepresentation);
+  vtkTypeMacro(vtkAnnotationROIRepresentation2D,vtkAnnotationROIRepresentation);
   void PrintSelf(ostream& os, vtkIndent indent);
 
-  /// 
+  ///
   /// Get the intersecting plane;
   vtkGetObjectMacro(IntersectionPlane,vtkPlane);
 
@@ -89,7 +88,7 @@ public:
   virtual void WidgetInteraction(double e[2]);
   virtual void SetInteractionState(int state);
 
-  /// 
+  ///
   /// Methods supporting, and required by, the rendering process.
   virtual void ReleaseGraphicsResources(vtkWindow*);
   virtual int RenderOpaqueGeometry(vtkViewport*);
@@ -99,6 +98,9 @@ public:
   virtual int HasTranslucentPolygonalGeometry();
 
   virtual void SizeHandles();
+
+  vtkGetMacro(SliceIntersectionVisibility, int);
+  vtkSetMacro(SliceIntersectionVisibility, int);
 
   vtkGetMacro(HandlesVisibility, int);
   vtkSetMacro(HandlesVisibility, int);
@@ -115,10 +117,10 @@ public:
 protected:
   vtkAnnotationROIRepresentation2D();
   ~vtkAnnotationROIRepresentation2D();
-  
-  /// A face of the hexahedron
-  vtkActor2D          *HexFace2D;
-  vtkPolyDataMapper2D *HexFaceMapper2D;
+
+  // Compute intersection line of the inputIntersectionFace and the slice plane
+  // It is 50x faster than computing the intersection using vtkCutter
+  virtual void ComputeIntersectionLine(vtkPolyData* inputIntersectionFace, vtkPlane* inputPlane, vtkPolyData* outputIntersectionFacesIntersection);
 
   /// glyphs representing hot spots (e.g., handles)
   vtkActor2D          **Handle2D;
@@ -128,7 +130,7 @@ protected:
   /// Plane/Face intersection pipelines
   vtkPlane *IntersectionPlane;
   vtkTransform *IntersectionPlaneTransform;
-  vtkCutter *IntersectionCutters[6];
+  vtkPolyData *IntersectionLines[6]; // intersection lines of IntersectionFaces
   vtkPolyData *IntersectionFaces[6];
   vtkTransformPolyDataFilter *IntersectionPlaneTransformFilters[6];
   vtkActor2D *IntersectionActors[6];
@@ -151,6 +153,8 @@ protected:
 
   virtual void CreateDefaultProperties();
   virtual void PositionHandles();
+
+  int SliceIntersectionVisibility;
 
   double  HandleSizeInPixels;
   int HandlesVisibility;

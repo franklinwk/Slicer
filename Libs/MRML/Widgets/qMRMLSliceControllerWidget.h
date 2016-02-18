@@ -23,9 +23,11 @@
 
 // qMRMLWidget includes
 #include "qMRMLViewControllerBar.h"
+#include <vtkVersion.h>
 
 class QButtonGroup;
 class qMRMLSliceControllerWidgetPrivate;
+class vtkAlgorithmOutput;
 class vtkCollection;
 class vtkImageData;
 class vtkMRMLNode;
@@ -57,7 +59,7 @@ class QMRML_WIDGETS_EXPORT qMRMLSliceControllerWidget
 public:
   /// Superclass typedef
   typedef qMRMLViewControllerBar Superclass;
-  
+
   /// Constructors
   explicit qMRMLSliceControllerWidget(QWidget* parent = 0);
   virtual ~qMRMLSliceControllerWidget();
@@ -77,7 +79,7 @@ public:
   /// Background, Foreground or LabelMap.
   /// Or if the only volume assigned doesn't have have
   /// a display node or its display node image data is 0.
-  vtkImageData* imageData()const;
+  vtkAlgorithmOutput* imageDataConnection()const;
 
   /// Get \a sliceNode
   /// \sa setMRMLSliceCompositeNode();
@@ -145,7 +147,7 @@ public slots:
   void setMRMLSliceNode(vtkMRMLSliceNode* newSliceNode);
 
   /// Set a new imageData.
-  void setImageData(vtkImageData* newImageData);
+  void setImageDataConnection(vtkAlgorithmOutput* newImageDataConnection);
 
   /// \sa fitSliceToBackground();
   void setSliceViewSize(const QSize& newSize);
@@ -188,7 +190,7 @@ public slots:
 
   /// Rotate to volume plane
   void rotateSliceToBackground();
-  
+
   void setLabelMapHidden(bool hide);
   void setForegroundHidden(bool hide);
   void setBackgroundHidden(bool hide);
@@ -197,7 +199,7 @@ public slots:
   void setLabelMapOpacity(double opacity);
   void setForegroundOpacity(double opacity);
   void setBackgroundOpacity(double opacity);
-  
+
   /// Label outline
   void showLabelOutline(bool show);
   /// Reformat widget
@@ -234,6 +236,13 @@ public slots:
   void setSliceModelDimensionX(int dim);
   void setSliceModelDimensionY(int dim);
 
+  // Orientation marker
+  void setOrientationMarkerType(int type);
+  void setOrientationMarkerSize(int size);
+
+  // Ruler
+  void setRulerType(int type);
+
   // Lightbox
   void setLightbox(int rows, int columns);
   void setLightboxTo1x1();
@@ -248,12 +257,21 @@ public slots:
   // interpolation
   void setForegroundInterpolation(bool nearestNeighbor);
   void setBackgroundInterpolation(bool nearestNeighbor);
-  
+
 signals:
 
   /// This signal is emitted when the given \a imageData is modified.
-  void imageDataChanged(vtkImageData * imageData);
+  void imageDataConnectionChanged(vtkAlgorithmOutput * imageDataConnection);
   void renderRequested();
+
+protected:
+  /// Constructor allowing derived class to specify a specialized pimpl.
+  ///
+  /// \note You are responsible to call init() in the constructor of
+  /// derived class. Doing so ensures the derived class is fully
+  /// instantiated in case virtual method are called within init() itself.
+  qMRMLSliceControllerWidget(qMRMLSliceControllerWidgetPrivate* obj,
+                             QWidget* parent);
 
 private:
   Q_DECLARE_PRIVATE(qMRMLSliceControllerWidget);

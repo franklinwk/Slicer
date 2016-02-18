@@ -43,7 +43,7 @@ public:
 
 public slots:
 
-  /// 
+  ///
   /// Set the MRML scene that should be listened for events
   void setMRMLScene(vtkMRMLScene* scene);
 
@@ -51,13 +51,12 @@ public slots:
   void setConsoleOutputEnabled(bool enabled);
 
 protected slots:
-  
+
   virtual void onNodeAddedEvent(vtkObject* caller, vtkObject* call_data);
   virtual void onNodeRemovedEvent(vtkObject* caller, vtkObject* call_data);
   virtual void onNewSceneEvent();
   virtual void onSceneClosedEvent();
   virtual void onSceneAboutToBeClosedEvent();
-  virtual void onSceneEditedEvent();
   virtual void onMetadataAddedEvent();
   virtual void onImportProgressFeedbackEvent();
   virtual void onSaveProgressFeedbackEvent();

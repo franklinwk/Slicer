@@ -1,6 +1,7 @@
 import os
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
+from DICOMLib import DICOMUtils
 
 #
 # JRC2013Vis
@@ -119,47 +120,14 @@ class JRC2013VisWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="JRC2013Vis"):
     self.onReload()
     evalString = 'globals()["%s"].%sTest()' % (moduleName, moduleName)
     tester = eval(evalString)
     tester.runTest()
-  
+
   def onStartStopDicomPeer(self,flag):
     if flag:
       import os
@@ -168,21 +136,17 @@ class JRC2013VisWidget:
       configFilePath = dicomFilesDirectory + '/Dcmtk-db/dcmqrscp.cfg'
       processCurrentPath = dicomFilesDirectory + '/Dcmtk-db/'
 
-      msgBox = qt.QMessageBox()
-      msgBox.setText('Do you want to choose local DCMTK database folder?')
-      msgBox.setStandardButtons(qt.QMessageBox.Yes | qt.QMessageBox.No)
-      val = msgBox.exec_()
-      if(val == qt.QMessageBox.Yes):
+      if slicer.util.confirmYesNoDisplay('Do you want to choose local DCMTK database folder?'):
         print 'Yes'
         dicomFilesDirectory = qt.QFileDialog.getExistingDirectory(None, 'Select DCMTK database folder')
         configFilePath = dicomFilesDirectory + '/dcmqrscp.cfg'
         processCurrentPath = dicomFilesDirectory
       else:
-        downloads = ( 
+        downloads = (
           ('http://slicer.kitware.com/midas3/download?items=18822', 'Dcmtk-db.zip'),
           )
         print 'Downloading'
-      
+
         import urllib
         for url,name in downloads:
           filePath = slicer.app.temporaryPath + '/' + name
@@ -190,19 +154,19 @@ class JRC2013VisWidget:
             print 'Requesting download %s from %s...\n' % (name, url)
             urllib.urlretrieve(url, filePath)
         print 'Finished with download'
- 
+
         print 'Unzipping'
         qt.QDir().mkpath(dicomFilesDirectory)
         slicer.app.applicationLogic().Unzip(filePath, dicomFilesDirectory)
-    
+
       import subprocess
       dcmqrscpExeOptions = (
-        '/bin', 
+        '/bin',
         '/../CTK-build/CMakeExternals/Install/bin',
         '/../DCMTK-install/bin',
         '/../DCMTK-build/bin',
         )
-      
+
       dcmqrscpExePath = None
       dcmqrscpExeName = '/dcmqrscp'
       if slicer.app.os == 'win':
@@ -214,7 +178,7 @@ class JRC2013VisWidget:
           break
       if not dcmqrscpExePath:
         raise( UserWarning("Could not find dcmqrscp executable") )
-      
+
       args = (dcmqrscpExePath, '-c', configFilePath)
       print 'Start DICOM peer'
       self.popen = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=processCurrentPath)
@@ -228,8 +192,8 @@ class JRC2013VisWidget:
 #
 
 class JRC2013VisLogic:
-  """This class should implement all the actual 
-  computation done by your module.  The interface 
+  """This class should implement all the actual
+  computation done by your module.  The interface
   should be such that other python code can import
   this class and make use of the functionality without
   requiring an instance of the Widget
@@ -238,14 +202,14 @@ class JRC2013VisLogic:
     pass
 
   def hasImageData(self,volumeNode):
-    """This is a dummy logic method that 
+    """This is a dummy logic method that
     returns true if the passed in volume
     node has valid image data
     """
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -343,7 +307,7 @@ class JRC2013VisTest(unittest.TestCase):
     # first, get the data - a zip file of dicom data
     #
     import urllib
-    downloads = ( 
+    downloads = (
         ('http://slicer.kitware.com/midas3/download?items=18822', 'Dcmtk-db.zip'),
         )
 
@@ -362,30 +326,21 @@ class JRC2013VisTest(unittest.TestCase):
 
     try:
       self.delayDisplay("Switching to temp database directory")
-      tempDatabaseDirectory = slicer.app.temporaryPath + '/tempDICOMDatbase'
-      qt.QDir().mkpath(tempDatabaseDirectory)
-      if slicer.dicomDatabase:
-        originalDatabaseDirectory = os.path.split(slicer.dicomDatabase.databaseFilename)[0]
-      else:
-        originalDatabaseDirectory = None
-        settings = qt.QSettings()
-        settings.setValue('DatabaseDirectory', tempDatabaseDirectory)
-      dicomWidget = slicer.modules.dicom.widgetRepresentation().self()
-      dicomWidget.onDatabaseDirectoryChanged(tempDatabaseDirectory)
+      originalDatabaseDirectory = DICOMUtils.openTemporaryDatabase('tempDICOMDatbase')
 
       self.delayDisplay('Start Local DICOM Q/R SCP')
       import subprocess
       import os
       configFilePath = dicomFilesDirectory + '/Dcmtk-db/dcmqrscp.cfg'
       processCurrentPath = dicomFilesDirectory + '/Dcmtk-db/'
-      
+
       dcmqrscpExeOptions = (
-        '/bin', 
+        '/bin',
         '/../CTK-build/CMakeExternals/Install/bin',
         '/../DCMTK-install/bin',
         '/../DCMTK-build/bin',
         )
-      
+
       dcmqrscpExePath = None
       dcmqrscpExeName = '/dcmqrscp'
       if slicer.app.os == 'win':
@@ -397,8 +352,8 @@ class JRC2013VisTest(unittest.TestCase):
           break
       if not dcmqrscpExePath:
         raise( UserWarning("Could not find dcmqrscp executable") )
-      
-      args = (dcmqrscpExePath, '-c', configFilePath)  
+
+      args = (dcmqrscpExePath, '-c', configFilePath)
       popen = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=processCurrentPath)
 
       self.delayDisplay('Retrieve DICOM')
@@ -477,8 +432,7 @@ class JRC2013VisTest(unittest.TestCase):
       self.delayDisplay('Test caused exception!\n' + str(e))
 
     self.delayDisplay("Restoring original database directory")
-    if originalDatabaseDirectory:
-      dicomWidget.onDatabaseDirectoryChanged(originalDatabaseDirectory)
+    DICOMUtils.closeTemporaryDatabase(originalDatabaseDirectory)
 
   def test_Part2Head(self):
     """ Test using the head atlas - may not be needed - Slicer4Minute is already tested

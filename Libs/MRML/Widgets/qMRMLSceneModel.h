@@ -121,8 +121,8 @@ public:
     };
 
   /// 0 by default
-  virtual void setMRMLScene(vtkMRMLScene* scene);
-  vtkMRMLScene* mrmlScene()const;
+  Q_INVOKABLE virtual void setMRMLScene(vtkMRMLScene* scene);
+  Q_INVOKABLE vtkMRMLScene* mrmlScene()const;
 
   /// 0 until a valid scene is set
   QStandardItem* mrmlSceneItem()const;
@@ -194,6 +194,8 @@ public:
   /// Returns 0 by default.
   /// \sa nodeIndex(), canBeAChild(), canBeAParent()
   virtual vtkMRMLNode* parentNode(vtkMRMLNode* node)const;
+  /// Returns the row model index relative to its parent node indepentently of
+  /// any filtering or proxy model.
   /// Must be reimplemented in derived classes
   virtual int          nodeIndex(vtkMRMLNode* node)const;
   /// fast function that only check the type of the node to know if it can be a child.
@@ -237,8 +239,8 @@ protected slots:
   /// The node has its ID changed. The scene model needs to update the UIDRole
   /// associated with the node in order to keep being in sync.
   void onMRMLNodeIDChanged(vtkObject* node, void* callData);
-  void onItemChanged(QStandardItem * item);
-  void delayedItemChanged();
+  virtual void onItemChanged(QStandardItem * item);
+  virtual void delayedItemChanged();
 
   /// Recompute the number of columns in the model.
   /// To be called when a XXXColumn is set.

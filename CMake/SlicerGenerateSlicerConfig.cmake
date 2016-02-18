@@ -51,8 +51,7 @@ if(_module_targets)
     set(Slicer_INCLUDE_MODULE_DIRS_CONFIG
 "${Slicer_INCLUDE_MODULE_DIRS_CONFIG}
 set(${target}_INCLUDE_DIRS
-  \"${${target}_SOURCE_DIR}\"
-  \"${${target}_BINARY_DIR}\")"
+  \"${${target}_INCLUDE_DIRS}\")"
 )
   endforeach()
 endif()
@@ -63,8 +62,7 @@ if(_module_logic_targets)
     set(Slicer_INCLUDE_MODULE_LOGIC_DIRS_CONFIG
 "${Slicer_INCLUDE_MODULE_LOGIC_DIRS_CONFIG}
 set(${target}_INCLUDE_DIRS
-  \"${${target}_SOURCE_DIR}\"
-  \"${${target}_BINARY_DIR}\")"
+  \"${${target}_INCLUDE_DIRS}\")"
 )
     list(APPEND Slicer_ModuleLogic_INCLUDE_DIRS_CONFIG "\${${target}_INCLUDE_DIRS}")
   endforeach()
@@ -76,8 +74,7 @@ if(_module_mrml_targets)
     set(Slicer_INCLUDE_MODULE_MRML_DIRS_CONFIG
 "${Slicer_INCLUDE_MODULE_MRML_DIRS_CONFIG}
 set(${target}_INCLUDE_DIRS
-  \"${${target}_SOURCE_DIR}\"
-  \"${${target}_BINARY_DIR}\")"
+  \"${${target}_INCLUDE_DIRS}\")"
 )
     list(APPEND Slicer_ModuleMRML_INCLUDE_DIRS_CONFIG "\${${target}_INCLUDE_DIRS}")
   endforeach()
@@ -89,8 +86,7 @@ if(_module_widget_targets)
     set(Slicer_INCLUDE_MODULE_WIDGET_DIRS_CONFIG
 "${Slicer_INCLUDE_MODULE_WIDGET_DIRS_CONFIG}
 set(${target}_INCLUDE_DIRS
-  \"${${target}_SOURCE_DIR}\"
-  \"${${target}_BINARY_DIR}\")"
+  \"${${target}_INCLUDE_DIRS}\")"
 )
     list(APPEND Slicer_ModuleWidgets_INCLUDE_DIRS_CONFIG "\${${target}_INCLUDE_DIRS}")
   endforeach()
@@ -103,8 +99,11 @@ set(FreeSurfer_INCLUDE_DIRS_CONFIG ${FreeSurfer_INCLUDE_DIRS})
 set(ITKFactoryRegistration_INCLUDE_DIRS_CONFIG ${ITKFactoryRegistration_INCLUDE_DIRS})
 set(MRMLCore_INCLUDE_DIRS_CONFIG ${MRMLCore_INCLUDE_DIRS})
 set(MRMLLogic_INCLUDE_DIRS_CONFIG ${MRMLLogic_INCLUDE_DIRS})
+set(MRMLCLI_INCLUDE_DIRS_CONFIG ${MRMLCLI_INCLUDE_DIRS})
+set(qMRMLWidgets_INCLUDE_DIRS_CONFIG ${qMRMLWidgets_INCLUDE_DIRS})
 set(RemoteIO_INCLUDE_DIRS_CONFIG ${RemoteIO_INCLUDE_DIRS})
 set(vtkTeem_INCLUDE_DIRS_CONFIG ${vtkTeem_INCLUDE_DIRS})
+set(vtkAddon_INCLUDE_DIRS_CONFIG ${vtkAddon_INCLUDE_DIRS})
 set(vtkITK_INCLUDE_DIRS_CONFIG ${vtkITK_INCLUDE_DIRS})
 
 # Note: For sake of simplification, the macro 'slicer_config_set_ep' is not invoked conditionally, if
@@ -122,6 +121,10 @@ slicer_config_set_ep(
 ")
 endforeach()
 
+# Slicer external project component variables
+set(Slicer_EP_COMPONENT_VARS_CONFIG
+  "set(Slicer_VTK_COMPONENTS \"${Slicer_VTK_COMPONENTS}\")")
+
 # List all required external project
 set(Slicer_EXTERNAL_PROJECTS_CONFIG CTK ITK CURL Teem VTK)
 set(Slicer_EXTERNAL_PROJECTS_NO_USEFILE_CONFIG CURL)
@@ -138,9 +141,6 @@ endif()
 if(Slicer_BUILD_DICOM_SUPPORT)
   list(APPEND Slicer_EXTERNAL_PROJECTS_CONFIG DCMTK)
   list(APPEND Slicer_EXTERNAL_PROJECTS_NO_USEFILE_CONFIG DCMTK)
-endif()
-if(Slicer_USE_BatchMake)
-  list(APPEND Slicer_EXTERNAL_PROJECTS_CONFIG BatchMake)
 endif()
 if(Slicer_USE_OpenIGTLink)
   list(APPEND Slicer_EXTERNAL_PROJECTS_CONFIG OpenIGTLink)

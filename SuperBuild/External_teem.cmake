@@ -4,7 +4,7 @@ set(proj teem)
 # Set dependency list
 set(${proj}_DEPENDENCIES zlib)
 if(NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_teem)
-  list(APPEND ${proj}_DEPENDENCIES VTK)
+  list(APPEND teem_DEPENDENCIES ${VTK_EXTERNAL_NAME})
 endif()
 
 # Include dependent projects if any
@@ -15,7 +15,12 @@ if(${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
   find_package(Teem REQUIRED NO_MODULE)
 endif()
 
-if(NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
+# Sanity checks
+if(DEFINED Teem_DIR AND NOT EXISTS ${Teem_DIR})
+  message(FATAL_ERROR "Teem_DIR variable is defined but corresponds to nonexistent directory")
+endif()
+
+if(NOT DEFINED Teem_DIR AND NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
 
   set(EXTERNAL_PROJECT_OPTIONAL_ARGS)
 
@@ -39,14 +44,10 @@ if(NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
       )
   endif()
 
-  set(teem_URL http://svn.slicer.org/Slicer3-lib-mirrors/trunk/teem-1.10.0-src.tar.gz)
-  set(teem_MD5 efe219575adc89f6470994154d86c05b)
-
   ExternalProject_Add(${proj}
     ${${proj}_EP_ARGS}
-    URL ${teem_URL}
-    URL_MD5 ${teem_MD5}
-    DOWNLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR}
+    GIT_REPOSITORY "${git_protocol}://github.com/Slicer/teem"
+    GIT_TAG e4746083c0e1dc0c137124c41eca5d23adf73bfa
     SOURCE_DIR teem
     BINARY_DIR teem-build
     CMAKE_CACHE_ARGS
@@ -62,7 +63,7 @@ if(NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
       -DTeem_PTHREAD:BOOL=OFF
       -DTeem_BZIP2:BOOL=OFF
       -DTeem_ZLIB:BOOL=ON
-      -DTeem_PNG:BOOL=ON
+      -DTeem_PNG:BOOL=OFF
       -DZLIB_ROOT:PATH=${ZLIB_ROOT}
       -DZLIB_INCLUDE_DIR:PATH=${ZLIB_INCLUDE_DIR}
       -DZLIB_LIBRARY:FILEPATH=${ZLIB_LIBRARY}
@@ -76,6 +77,28 @@ if(NOT ${CMAKE_PROJECT_NAME}_USE_SYSTEM_${proj})
     )
 
   set(Teem_DIR ${CMAKE_BINARY_DIR}/teem-build)
+
+  #-----------------------------------------------------------------------------
+  # Launcher setting specific to build tree
+
+  # library paths
+  set(${proj}_LIBRARY_PATHS_LAUNCHER_BUILD ${Teem_DIR}/bin/<CMAKE_CFG_INTDIR>)
+  mark_as_superbuild(
+    VARS ${proj}_LIBRARY_PATHS_LAUNCHER_BUILD
+    LABELS "LIBRARY_PATHS_LAUNCHER_BUILD" "PATHS_LAUNCHER_BUILD"
+    )
+
+  #-----------------------------------------------------------------------------
+  # Launcher setting specific to install tree
+
+  # library paths
+  if(UNIX AND NOT APPLE)
+    set(${proj}_LIBRARY_PATHS_LAUNCHER_INSTALLED <APPLAUNCHER_DIR>/lib/Teem-1.12.0)
+    mark_as_superbuild(
+      VARS ${proj}_LIBRARY_PATHS_LAUNCHER_INSTALLED
+      LABELS "LIBRARY_PATHS_LAUNCHER_INSTALLED"
+      )
+  endif()
 
 else()
   ExternalProject_Add_Empty(${proj} DEPENDS ${${proj}_DEPENDENCIES})

@@ -1,7 +1,10 @@
 import os
-from __main__ import slicer
+import slicer
 import qt, ctk, vtk
 import EditorLib
+from EditorLib.EditUtil import EditUtil
+import slicer
+from slicer.util import VTKObservationMixin
 
 #
 # Editor
@@ -38,26 +41,20 @@ This work is partially supported by PAR-07-249: R01CA131718 NA-MIC Virtual Colon
 # qSlicerPythonModuleExampleWidget
 #
 
-class EditorWidget:
+class EditorWidget(VTKObservationMixin):
 
   # Lower priorities:
   #->> additional option for list of allowed labels - texts
 
   def __init__(self, parent=None, showVolumesFrame=True):
-    self.observerTags = []
+    VTKObservationMixin.__init__(self)
     self.shortcuts = []
     self.toolsBox = None
 
     # set attributes from ctor parameters
     self.showVolumesFrame = showVolumesFrame
-    # TODO: figure out why module/class hierarchy is different
-    # between developer builds ans packages
-    try:
-      # for developer build...
-      self.editUtil = EditorLib.EditUtil.EditUtil()
-    except AttributeError:
-      # for release package...
-      self.editUtil = EditorLib.EditUtil()
+
+    self.editUtil = EditUtil() # Kept for backward compatibility
 
     if not parent:
       self.parent = slicer.qMRMLWidget()
@@ -75,7 +72,7 @@ class EditorWidget:
     be sure to turn these off and warn the user about it"""
     warned = False
     layoutManager = slicer.app.layoutManager()
-    if layoutManager != None:
+    if layoutManager is not None:
       sliceLogics = layoutManager.mrmlSliceLogics()
       for i in xrange(sliceLogics.GetNumberOfItems()):
         sliceLogic = sliceLogics.GetItemAsObject(i)
@@ -83,7 +80,8 @@ class EditorWidget:
           sliceNode = sliceLogic.GetSliceNode()
           if sliceNode.GetLayoutGridRows() != 1 or sliceNode.GetLayoutGridColumns() != 1:
             if not warned:
-              qt.QMessageBox.warning(slicer.util.mainWindow(), 'Editor', 'The Editor Module is not compatible with slice viewers in light box mode.\nViews are being reset.')
+              slicer.util.warningDisplay('The Editor Module is not compatible with slice viewers in light box mode.\n'
+                                         'Views are being reset.', windowTitle='Editor')
               warned = True
             sliceNode.SetLayoutGrid(1,1)
 
@@ -94,12 +92,12 @@ class EditorWidget:
     Key_Space = 0x20 # not in PythonQt
     self.shortcuts = []
     keysAndCallbacks = (
-        ('e', self.editUtil.toggleLabel),
+        ('e', EditUtil.toggleLabel),
         ('z', self.toolsBox.undoRedo.undo),
         ('y', self.toolsBox.undoRedo.redo),
-        ('h', self.editUtil.toggleCrosshair),
-        ('o', self.editUtil.toggleLabelOutline),
-        ('t', self.editUtil.toggleForegroundBackground),
+        ('h', EditUtil.toggleCrosshair),
+        ('o', EditUtil.toggleLabelOutline),
+        ('t', EditUtil.toggleForegroundBackground),
         (Key_Escape, self.toolsBox.defaultEffect),
         ('p', lambda : self.toolsBox.selectEffect('PaintEffect')),
         ('d', lambda : self.toolsBox.selectEffect('DrawEffect')),
@@ -137,7 +135,7 @@ class EditorWidget:
         # since we are in the editor) to get the current background and label
         # - set the foreground layer as the active ID
         # in the selection node for later calls to PropagateVolumeSelection
-        compositeNode = self.editUtil.getCompositeNode()
+        compositeNode = EditUtil.getCompositeNode()
         selectionNode = slicer.app.applicationLogic().GetSelectionNode()
         selectionNode.SetReferenceSecondaryVolumeID( compositeNode.GetForegroundVolumeID() )
         bgID = lbID = ""
@@ -154,8 +152,10 @@ class EditorWidget:
 
     # Observe the parameter node in order to make changes to
     # button states as needed
-    self.parameterNode = self.editUtil.getParameterNode()
-    self.parameterNodeTag = self.parameterNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updateGUIFromMRML)
+    self.parameterNode = EditUtil.getParameterNode()
+    self.addObserver(self.parameterNode, vtk.vtkCommand.ModifiedEvent, self.updateGUIFromMRML)
+
+    self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.resetInterface)
 
     if self.helper:
       self.helper.onEnter()
@@ -164,13 +164,16 @@ class EditorWidget:
       self.toolsColor.updateGUIFromMRML(self.parameterNode, vtk.vtkCommand.ModifiedEvent)
 
   def exit(self):
-    self.parameterNode.RemoveObserver(self.parameterNodeTag)
+    self.removeObservers()
+    self.resetInterface()
+    self.removeShortcutKeys()
+
+  def resetInterface(self, caller=None, event=None):
     if self.helper:
       self.helper.onExit()
     if self.toolsBox:
       self.toolsBox.defaultEffect()
       self.toolsBox.cancelFloatingMode()
-    self.removeShortcutKeys()
 
   def updateGUIFromMRML(self, caller, event):
     if self.toolsBox:
@@ -191,9 +194,6 @@ class EditorWidget:
   # sets up the widget
   def setup(self):
 
-    if slicer.app.commandOptions().noMainWindow:
-      # don't build the widget if there's no place to put it
-      return
 
     #
     # Editor Volumes

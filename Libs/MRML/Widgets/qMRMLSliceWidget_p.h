@@ -47,7 +47,7 @@ class vtkMRMLDisplayableManagerGroup;
 class QResizeEvent;
 
 //-----------------------------------------------------------------------------
-class qMRMLSliceWidgetPrivate
+class QMRML_WIDGETS_EXPORT qMRMLSliceWidgetPrivate
   : public QObject
   , public Ui_qMRMLSliceWidget
 {
@@ -65,7 +65,8 @@ public:
 public slots:
   void endProcessing();
   /// Set the image data to the slice view
-  void setImageData(vtkImageData * imageData);
+  void setImageDataConnection(vtkAlgorithmOutput * imageDataConnection);
+
 
 };
 

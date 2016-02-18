@@ -35,10 +35,7 @@ class ctkPythonConsole;
 #include "qSlicerIO.h"
 #include "vtkSlicerConfigure.h" // For Slicer_BUILD_DICOM_SUPPORT, Slicer_USE_PYTHONQT, Slicer_USE_QtTesting
 
-class qSlicerAbstractCoreModule;
-class qSlicerModulePanel;
 class qSlicerModuleSelectorToolBar;
-class qSlicerAppMainWindowCore;
 class qSlicerAppMainWindowPrivate;
 
 // VTK includes
@@ -127,6 +124,10 @@ protected slots:
   virtual void onMRMLSceneModified(vtkObject*);
   virtual void onLayoutChanged(int);
   virtual void onWarningsOrErrorsOccurred(ctkErrorLogLevel::LogLevel logLevel);
+
+#ifdef Slicer_USE_PYTHONQT
+  virtual void onPythonConsoleUserInput(const QString&);
+#endif
 
 protected:
   /// Connect MainWindow action with slots defined in MainWindowCore

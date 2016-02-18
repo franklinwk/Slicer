@@ -26,6 +26,10 @@
 #include "qSlicerNodeWriter.h"
 #include "qSlicerNodeWriterOptionsWidget.h"
 
+// QTCore includes
+#include "qSlicerCoreApplication.h"
+#include "qSlicerCoreIOManager.h"
+
 // MRML includes
 #include <vtkMRMLScene.h>
 #include <vtkMRMLStorableNode.h>
@@ -103,8 +107,8 @@ bool qSlicerNodeWriter::canWriteObject(vtkObject* object)const
 QStringList qSlicerNodeWriter::extensions(vtkObject* object)const
 {
   QStringList supportedExtensions;
-  vtkMRMLStorableNode* node = vtkMRMLStorableNode::SafeDownCast(object);
-  vtkMRMLStorageNode* snode = node ? node->GetStorageNode() : 0;
+  vtkMRMLStorageNode* snode =
+      qSlicerCoreIOManager::createAndAddDefaultStorageNode(vtkMRMLStorableNode::SafeDownCast(object));
   if (snode)
     {
     const int formatCount = snode->GetSupportedWriteFileTypes()->GetNumberOfValues();
@@ -131,17 +135,7 @@ bool qSlicerNodeWriter::write(const qSlicerIO::IOProperties& properties)
     {
     return false;
     }
-  vtkMRMLStorageNode* snode = node ? node->GetStorageNode() : 0;
-  if (snode == 0 && node != 0)
-    {
-    snode = node->CreateDefaultStorageNode();
-    if (snode != 0)
-      {
-      node->GetScene()->AddNode(snode);
-      snode->Delete();
-      node->SetAndObserveStorageNodeID(snode->GetID());
-      }
-    }
+  vtkMRMLStorageNode* snode = qSlicerCoreIOManager::createAndAddDefaultStorageNode(node);
   if (snode == 0)
     {
     qDebug() << "No storage node for node" << properties["nodeID"].toString();
@@ -152,8 +146,11 @@ bool qSlicerNodeWriter::write(const qSlicerIO::IOProperties& properties)
   QString fileName = properties["fileName"].toString();
   snode->SetFileName(fileName.toLatin1());
 
+  qSlicerCoreIOManager* coreIOManager =
+    qSlicerCoreApplication::application()->coreIOManager();
+
   QString fileFormat =
-    properties.value("fileFormat", QFileInfo(fileName).suffix()).toString();
+    properties.value("fileFormat", coreIOManager->completeSlicerWritableFileNameSuffix(fileName)).toString();
   snode->SetWriteFileFormat(fileFormat.toLatin1());
   snode->SetURI(0);
   if (properties.contains("useCompression"))

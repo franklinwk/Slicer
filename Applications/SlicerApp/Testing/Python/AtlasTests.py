@@ -1,6 +1,6 @@
 import os
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # AtlasTests
@@ -16,7 +16,7 @@ class AtlasTests:
     This is a self test that downloads and displays volumetric atlases from the NA-MIC publication database.
 
     For more information:
-    
+
     Abdominal Atlas: <a>http://www.slicer.org/publications/item/view/1918</a>
     Brain Atlas: <a>http://www.slicer.org/publications/item/view/2037</a>
     Knee Atlas: <a>http://www.slicer.org/publications/item/view/1953</a>
@@ -122,40 +122,7 @@ class AtlasTestsWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="AtlasTests"):
     self.onReload()
@@ -168,8 +135,8 @@ class AtlasTestsWidget:
 #
 
 class AtlasTestsLogic:
-  """This class should implement all the actual 
-  computation done by your module.  The interface 
+  """This class should implement all the actual
+  computation done by your module.  The interface
   should be such that other python code can import
   this class and make use of the functionality without
   requiring an instance of the Widget
@@ -178,14 +145,14 @@ class AtlasTestsLogic:
     pass
 
   def hasImageData(self,volumeNode):
-    """This is a dummy logic method that 
+    """This is a dummy logic method that
     returns true if the passed in volume
     node has valid image data
     """
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -287,7 +254,7 @@ class AtlasTestsTest(unittest.TestCase):
 
     volumeNode = slicer.util.getNode(pattern=testVolumePattern)
     logic = AtlasTestsLogic()
-    self.assertTrue( logic.hasImageData(volumeNode) )
+    self.assertIsNotNone( logic.hasImageData(volumeNode) )
 
     m = slicer.util.mainWindow()
 
@@ -301,7 +268,7 @@ class AtlasTestsTest(unittest.TestCase):
     numModelHierarchiesToManipulate = 0
     for h in range(numModelHierarchies):
       mh = slicer.mrmlScene.GetNthNodeByClass(h, "vtkMRMLModelHierarchyNode")
-      if mh.GetNumberOfChildrenNodes() > 0 and mh.GetDisplayNode() != None:
+      if mh.GetNumberOfChildrenNodes() > 0 and mh.GetDisplayNode() is not None:
         numModelHierarchiesToManipulate += 1
     # iterate over all the hierarchies
     hierarchyManipulating = 0
@@ -311,7 +278,7 @@ class AtlasTestsTest(unittest.TestCase):
       if numChildren > 0:
         mhd = mh.GetDisplayNode()
         # manually added hierarchies may not have display nodes, skip
-        if mhd == None:
+        if mhd is None:
           self.delayDisplay("Skipping model hierarchy with no display node " + mh.GetName())
         else:
           hierarchyManipulating += 1
@@ -330,7 +297,7 @@ class AtlasTestsTest(unittest.TestCase):
           # expand, should see all models in correct colour
           mh.SetExpanded(1)
           self.delayDisplay("Model hierarchy " + mh.GetName() + ": expanded = true",msec=10)
-          # reset the hierarchy 
+          # reset the hierarchy
           mhd.SetVisibility(hierarchyOriginalVisibility)
           mhd.SetColor(hierarchyOriginalColour)
           mh.SetExpanded(hierarchyOriginalExpanded)
@@ -341,7 +308,7 @@ class AtlasTestsTest(unittest.TestCase):
 
     # iterate over the scene views and restore them
     numSceneViews = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLSceneViewNode")
-    for s in range(numSceneViews): 
+    for s in range(numSceneViews):
       sv = slicer.mrmlScene.GetNthNodeByClass(s, "vtkMRMLSceneViewNode")
       self.delayDisplay("Restoring scene " + sv.GetName() + " (" + str(s+1) + "/" + str(numSceneViews) + ")",msec=500)
       sv.RestoreScene()

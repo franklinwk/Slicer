@@ -1,6 +1,6 @@
 import os
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # sceneImport2428
@@ -106,40 +106,7 @@ class sceneImport2428Widget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onTest(self,moduleName="sceneImport2428"):
     evalString = 'globals()["%s"].%sTest()' % (moduleName, moduleName)
@@ -155,8 +122,8 @@ class sceneImport2428Widget:
 #
 
 class sceneImport2428Logic:
-  """This class should implement all the actual 
-  computation done by your module.  The interface 
+  """This class should implement all the actual
+  computation done by your module.  The interface
   should be such that other python code can import
   this class and make use of the functionality without
   requiring an instance of the Widget
@@ -165,14 +132,14 @@ class sceneImport2428Logic:
     pass
 
   def hasImageData(self,volumeNode):
-    """This is a dummy logic method that 
+    """This is a dummy logic method that
     returns true if the passed in volume
     node has valid image data
     """
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -302,9 +269,9 @@ class sceneImport2428Test(unittest.TestCase):
       waitCount += 1
 
     self.delayDisplay("Models built")
-    
+
     success = self.verifyModels()
-    
+
     success = success and (slicer.mrmlScene.GetNumberOfNodesByClass( "vtkMRMLModelNode" ) > 3)
 
     self.delayDisplay("Test finished")
@@ -317,7 +284,7 @@ class sceneImport2428Test(unittest.TestCase):
     self.assertTrue(success)
 
   def verifyModels(self):
-    """Return True if the models have unique polydata and have the 
+    """Return True if the models have unique polydata and have the
     same polydata as their display nodes have.
 
 # paste this in the slicer console for testing/verifying any scene
@@ -334,7 +301,7 @@ verifyModels()
     """
 
     #
-    # now check that all models have the same poly data in the 
+    # now check that all models have the same poly data in the
     # model node as in the display node
     #
     polyDataInScene = []
@@ -358,7 +325,7 @@ verifyModels()
           success = False
 
 
-    # 
+    #
     # now check that each model has a unique polydata
     #
     for n in xrange(numModels):

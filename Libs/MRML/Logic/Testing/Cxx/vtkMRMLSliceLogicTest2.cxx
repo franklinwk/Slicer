@@ -29,12 +29,13 @@
 #include <vtkMRMLVolumeArchetypeStorageNode.h>
 
 // VTK includes
+#include <vtkAlgorithmOutput.h>
 #include <vtkImageAppendComponents.h>
 #include <vtkImageData.h>
-#include <vtkImageCast.h>
+#include <vtkImageStencil.h>
 #include <vtkImageMapToColors.h>
 #include <vtkImageMapToWindowLevelColors.h>
-#include <vtkImageResliceMask.h>
+#include <vtkImageReslice.h>
 #include <vtkImageThreshold.h>
 #include <vtkImageViewer2.h>
 #include <vtkLookupTable.h>
@@ -43,21 +44,18 @@
 #include <vtkRenderWindowInteractor.h>
 #include <vtkScalarsToColors.h>
 #include <vtkTimerLog.h>
+#include <vtkVersion.h>
 
 // ITK includes
 #include <itkConfigure.h>
-#if ITK_VERSION_MAJOR > 3
-#  include <itkFactoryRegistration.h>
-#endif
+#include <itkFactoryRegistration.h>
 
 //-----------------------------------------------------------------------------
 int vtkMRMLSliceLogicTest2(int argc, char * argv [] )
 {
-#if ITK_VERSION_MAJOR > 3
   itk::itkFactoryRegistration();
-#endif
 //  vtkMultiThreader::SetGlobalMaximumNumberOfThreads(1);
-  
+
   if( argc < 2 )
     {
     std::cerr << "Error: missing arguments" << std::endl;
@@ -70,21 +68,21 @@ int vtkMRMLSliceLogicTest2(int argc, char * argv [] )
   vtkNew<vtkMRMLSliceLogic> sliceLogic;
   sliceLogic->SetName("Green");
   sliceLogic->SetMRMLScene(scene.GetPointer());
-  
+
   vtkMRMLSliceNode* sliceNode =sliceLogic->GetSliceNode();
-  vtkMRMLSliceCompositeNode* sliceCompositeNode = sliceLogic->GetSliceCompositeNode(); 
-  
+  vtkMRMLSliceCompositeNode* sliceCompositeNode = sliceLogic->GetSliceCompositeNode();
+
   vtkNew<vtkMRMLSliceLayerLogic> sliceLayerLogic;
-  
+
   sliceLogic->SetBackgroundLayer(sliceLayerLogic.GetPointer());
 
   vtkNew<vtkMRMLScalarVolumeDisplayNode> displayNode;
   vtkNew<vtkMRMLScalarVolumeNode> scalarNode;
   vtkNew<vtkMRMLVolumeArchetypeStorageNode> storageNode;
-  
+
   displayNode->SetAutoWindowLevel(true);
   displayNode->SetInterpolate(false);
-  
+
   storageNode->SetFileName(argv[1]);
   if (storageNode->SupportedFileType(argv[1]) == 0)
     {
@@ -102,18 +100,20 @@ int vtkMRMLSliceLogicTest2(int argc, char * argv [] )
   scalarNode->SetAndObserveDisplayNodeID(displayNode->GetID());
   scene->AddNode(scalarNode.GetPointer());
   storageNode->ReadData(scalarNode.GetPointer());
+  if (scalarNode->GetImageData()==NULL)
+    {
+    std::cerr << "Failed to read volume from " <<argv[1] << std::endl;
+    return EXIT_FAILURE;
+    }
 
   vtkMRMLColorTableNode* colorNode = vtkMRMLColorTableNode::New();
   colorNode->SetTypeToGrey();
   scene->AddNode(colorNode);
   colorNode->Delete();
   displayNode->SetAndObserveColorNodeID(colorNode->GetID());
-  
+
   //sliceLayerLogic->SetVolumeNode(scalarNode);
   sliceCompositeNode->SetBackgroundVolumeID(scalarNode->GetID());
-  sliceLogic->GetImageData();
-  // Not sure why sliceLayerLogic->GetVolumeDisplayNode() is different from displayNode
-  vtkMRMLScalarVolumeDisplayNode* displayNode2 = vtkMRMLScalarVolumeDisplayNode::SafeDownCast(sliceLayerLogic->GetVolumeDisplayNode());
 
   for (int i = 0; i < 10; ++i)
     {
@@ -132,32 +132,33 @@ int vtkMRMLSliceLogicTest2(int argc, char * argv [] )
     std::cout << "vtkMRMLSliceLogic::UpdatePipeline(): " << timerLog->GetElapsedTime() << " fps: " << 1. / timerLog->GetElapsedTime() << std::endl;
     timerLog->StartTimer();
     sliceLayerLogic->UpdateImageDisplay();
-    sliceLayerLogic->GetImageData();
+    sliceLayerLogic->GetImageDataConnection();
     timerLog->StopTimer();
     std::cout << "vtkMRMLSliceLayerLogic::UpdateImageData(): " << timerLog->GetElapsedTime() << " fps: " << 1. / timerLog->GetElapsedTime() << std::endl;
     }
-  
+
   // Duplicate the pipeline of vtkMRMLScalarVolumeDisplayNode
   vtkNew<vtkImageData> imageData;
-  imageData->DeepCopy(displayNode2->GetInputImageData());
-  vtkNew<vtkImageResliceMask> reslice;
+  imageData->DeepCopy(displayNode->GetInputImageData());
+  vtkNew<vtkImageReslice> reslice;
   reslice->SetBackgroundColor(0, 0, 0, 0); // only first two are used
   reslice->AutoCropOutputOff();
   reslice->SetOptimization(1);
   reslice->SetOutputOrigin( 0, 0, 0 );
   reslice->SetOutputSpacing( 1, 1, 1 );
   reslice->SetOutputDimensionality( 3 );
+  reslice->GenerateStencilOutputOn();
   int dimensions[3];
   sliceNode->GetDimensions(dimensions);
-  
+
   reslice->SetOutputExtent( 0, dimensions[0]-1,
                             0, dimensions[1]-1,
                             0, dimensions[2]-1);
-  reslice->SetInput(imageData.GetPointer());
+  reslice->SetInputData(imageData.GetPointer());
   //reslice->SetResliceTransform(sliceLayerLogic->GetXYToIJKTransform());
   vtkNew<vtkImageMapToWindowLevelColors> mapToWindow;
-  mapToWindow->SetInput(reslice->GetOutput());
-  
+  mapToWindow->SetInputConnection(reslice->GetOutputPort());
+
   vtkNew<vtkImageMapToColors> mapToColors;
   mapToColors->SetOutputFormatToRGB();
   if (colorNode->GetLookupTable() == 0)
@@ -165,33 +166,29 @@ int vtkMRMLSliceLogicTest2(int argc, char * argv [] )
     return EXIT_FAILURE;
     }
   mapToColors->SetLookupTable(colorNode->GetLookupTable());
-  mapToColors->SetInput(mapToWindow->GetOutput());
+  mapToColors->SetInputConnection(mapToWindow->GetOutputPort());
   //mapToWindow->Update();
-  
+
   vtkNew<vtkImageThreshold> threshold;
   threshold->SetOutputScalarTypeToUnsignedChar();
-  threshold->SetInput(reslice->GetOutput());
-  threshold->ThresholdBetween( 1, 0 ); 
+  threshold->SetInputConnection(reslice->GetOutputPort());
+  threshold->ThresholdBetween( 1, 0 );
   threshold->ReplaceInOn();
   threshold->SetInValue(255);
   threshold->ReplaceOutOn();
-  threshold->SetOutValue(255); 
-  
-  vtkNew<vtkImageCast> resliceAlphaCast;
-  resliceAlphaCast->SetInput(reslice->GetBackgroundMask());
-  resliceAlphaCast->SetOutputScalarTypeToUnsignedChar();
-  
-  vtkNew<vtkImageLogic> alphaLogic;
-  alphaLogic->SetOperationToAnd();
-  alphaLogic->SetOutputTrueValue(255);
-  alphaLogic->SetInput1(threshold->GetOutput());
-  alphaLogic->SetInput2(resliceAlphaCast->GetOutput());
-  
+  threshold->SetOutValue(255);
+
+  vtkNew<vtkImageStencil> alphaLogic;
+  alphaLogic->SetBackgroundValue(0);
+
+  alphaLogic->SetInputConnection(threshold->GetOutputPort());
+  alphaLogic->SetStencilConnection(reslice->GetOutputPort(1));
+
   vtkNew<vtkImageAppendComponents> appendComponents;
   appendComponents->RemoveAllInputs();
-  appendComponents->AddInputConnection(0, mapToColors->GetOutput()->GetProducerPort() );
-  appendComponents->AddInputConnection(0, alphaLogic->GetOutput()->GetProducerPort() );
-  
+  appendComponents->AddInputConnection(0, mapToColors->GetOutputPort() );
+  appendComponents->AddInputConnection(0, alphaLogic->GetOutputPort() );
+
   //displayNode2->GetInput()->SetScalarComponentFromFloat(0, 0, 0, 0, 10.);
   vtkNew<vtkTimerLog> timerLog;
   timerLog->StartTimer();
@@ -205,37 +202,36 @@ int vtkMRMLSliceLogicTest2(int argc, char * argv [] )
     appendComponents->Update();
     timerLog->StopTimer();
     std::cout << "vtkMRMLScalarVolumeDisplayNode::pipeline updated: " << timerLog->GetElapsedTime() << " fps: " << 1. / timerLog->GetElapsedTime() << std::endl;
-    
+
     timerLog->StartTimer();
     mapToWindow->SetWindow(mapToWindow->GetWindow() + 1);
     appendComponents->Update();
     timerLog->StopTimer();
     std::cout << "vtkMRMLScalarVolumeDisplayNode::window updated: " << timerLog->GetElapsedTime() << " fps: " << 1. / timerLog->GetElapsedTime() << std::endl;
-    
+
     timerLog->StartTimer();
     threshold->SetOutValue(threshold->GetOutValue()-1);
     appendComponents->Update();
     timerLog->StopTimer();
     std::cout << "vtkMRMLScalarVolumeDisplayNode::threshold updated: " << timerLog->GetElapsedTime() << " fps: " << 1. / timerLog->GetElapsedTime() << std::endl;
-    
+
     timerLog->StartTimer();
-    alphaLogic->SetOutputTrueValue(alphaLogic->GetOutputTrueValue()-1);
     appendComponents->Update();
     timerLog->StopTimer();
     std::cout << "vtkMRMLScalarVolumeDisplayNode::alpha updated: " << timerLog->GetElapsedTime() << " fps: " << 1. / timerLog->GetElapsedTime() << std::endl;
     }
   vtkNew<vtkImageViewer2> viewer;
-  viewer->SetInput(sliceLogic->GetImageData());
+  viewer->SetInputConnection(sliceLogic->GetImageDataConnection());
   //viewer->SetInput(appendComponents->GetOutput());
-  
+
   // Renderer, RenderWindow and Interactor
   vtkRenderWindow* rw = viewer->GetRenderWindow();
   rw->SetSize(600, 600);
   rw->SetMultiSamples(0); // Ensure to have the same test image everywhere
-  
+
   vtkRenderWindowInteractor* ri = vtkRenderWindowInteractor::New();
   viewer->SetupInteractor(ri);
-  
+
   rw->Render();
   if (argc > 2 && std::string(argv[2]) == "-I")
     {

@@ -4,7 +4,6 @@
 #include "vtkMRMLModelTransformNode.h"
 
 //------------------------------------------------------------------------------
-vtkCxxRevisionMacro ( vtkMRMLModelTransformNode, "$Revision: 1.0 $");
 
 //----------------------------------------------------------------------------
 vtkMRMLNodeNewMacro(vtkMRMLModelTransformNode);
@@ -52,7 +51,7 @@ void vtkMRMLModelTransformNode::Copy(vtkMRMLNode *anode)
 //----------------------------------------------------------------------------
 void vtkMRMLModelTransformNode::PrintSelf(ostream& os, vtkIndent indent)
 {
-  //TODO  
+  //TODO
   vtkMRMLNode::PrintSelf(os,indent);
 }
 
@@ -63,19 +62,19 @@ void vtkMRMLModelTransformNode::WriteXML(ostream& of, int nIndent)
 
   vtkIndent indent(nIndent);
 
-  if (this->InputModelID != NULL) 
+  if (this->InputModelID != NULL)
     {
     of << indent << " inputModelRef=\"" << this->InputModelID << "\"";
     }
-  if (this->TransformNodeID != NULL) 
+  if (this->TransformNodeID != NULL)
     {
     of << indent << " transformNodeRef=\"" << this->TransformNodeID << "\"";
     }
-  if (this->OutputModelID != NULL) 
+  if (this->OutputModelID != NULL)
     {
     of << indent << " outputModelRef=\"" << this->OutputModelID << "\"";
     }
-  if (this->NewModelName != NULL) 
+  if (this->NewModelName != NULL)
     {
     of << indent << " newModelName=\"" << this->NewModelName << "\"";
     }
@@ -92,33 +91,33 @@ void vtkMRMLModelTransformNode::ReadXMLAttributes(const char** atts)
 
   const char* attName;
   const char* attValue;
-  while (*atts != NULL) 
+  while (*atts != NULL)
     {
     attName = *(atts++);
     attValue = *(atts++);
-    if (!strcmp(attName, "inputModelRef")) 
+    if (!strcmp(attName, "inputModelRef"))
       {
       this->SetInputModelID(attValue);
       }
-    else if (!strcmp(attName, "transformNodeRef")) 
+    else if (!strcmp(attName, "transformNodeRef"))
       {
       this->SetTransformNodeID(attValue);
-      } 
-    else if (!strcmp(attName, "outputModelRef")) 
+      }
+    else if (!strcmp(attName, "outputModelRef"))
       {
       this->SetOutputModelID(attValue);
-      } 
-    else if (!strcmp(attName, "newModelName")) 
+      }
+    else if (!strcmp(attName, "newModelName"))
       {
       this->SetNewModelName(attValue);
       }
-    else if (!strcmp(attName, "transformNormals")) 
+    else if (!strcmp(attName, "transformNormals"))
       {
       std::stringstream ss;
       ss << attValue;
       ss >> TransformNormals;
       }
-    }  
+    }
 
   this->EndModify(disabledModify);
 }

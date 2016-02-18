@@ -19,6 +19,7 @@
 
 // VTK includes
 #include <vtkStdString.h>
+class vtkCollection;
 class vtkImageData;
 
 class vtkMRMLStorageNode;
@@ -31,28 +32,28 @@ class VTK_MRML_EXPORT vtkMRMLSceneViewNode : public vtkMRMLStorableNode
 
   virtual vtkMRMLNode* CreateNodeInstance();
 
-  /// 
+  ///
   /// Read node attributes from XML file
   virtual void ReadXMLAttributes( const char** atts);
 
-  /// 
+  ///
   /// Write this node's information to a MRML file in XML format.
   virtual void WriteXML(ostream& of, int indent);
 
-  /// 
+  ///
   /// Write this node's body to a MRML file in XML format.
   virtual void WriteNodeBodyXML(ostream& of, int indent);
 
-  /// 
+  ///
   /// Copy the node's attributes to this object
   virtual void Copy(vtkMRMLNode *node);
 
-  /// 
+  ///
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName() {return "SceneView";};
 
-  /// 
-  /// Updates scene nodes 
+  ///
+  /// Updates scene nodes
   virtual void UpdateScene(vtkMRMLScene *scene);
 
   ///
@@ -67,15 +68,23 @@ class VTK_MRML_EXPORT vtkMRMLSceneViewNode : public vtkMRMLStorableNode
   /// \sa StoreScene() RestoreScene()
   vtkMRMLScene* GetStoredScene();
 
-  /// 
+  ///
   /// Store content of the scene
   /// \sa GetStoredScene() RestoreScene()
   void StoreScene();
 
-  /// 
-  /// Restore content of the scene from the node
-  /// \sa GetStoredScene() StoreScene()
-  void RestoreScene();
+  /// Add missing nodes from the Slicer scene to the stored scene
+  /// \sa RestoreScene()
+  void AddMissingNodes();
+
+  ///
+  /// Restore content of the scene from the node.
+  /// If removeNodes is true (default), remove nodes from the main Slicer scene that
+  /// do no appear in the scene view. If it is false, and nodes are found that will be
+  /// deleted, don't remove them, print a warning, set the scene error code to 1, save
+  /// the warning to the scene error message, and return.
+  /// \sa GetStoredScene() StoreScene() AddMissingNodes()
+  void RestoreScene(bool removeNodes = true);
 
   void SetAbsentStorageFileNames();
 
@@ -98,12 +107,19 @@ class VTK_MRML_EXPORT vtkMRMLSceneViewNode : public vtkMRMLStorableNode
   vtkGetMacro(ScreenShotType, int);
 
 
-  /// 
+  ///
   /// Create default storage node or NULL if does not have one
   virtual vtkMRMLStorageNode* CreateDefaultStorageNode();
 
- /// Get vector of nodes of a specified class in the scene
+  /// Get vector of nodes of a specified class in the scene.
+  /// Returns 0 on failure, number of nodes on success.
+  /// \sa vtkMRMLScene;:GetNodesByClass
   int GetNodesByClass(const char *className, std::vector<vtkMRMLNode *> &nodes);
+  /// Get a collection of nodes of a specified class (for python access)
+  /// You are responsible for deleting the returned collection.
+  /// Returns NULL on failure.
+  /// \sa vtkMRMLScene::GetNodesByClass
+  vtkCollection* GetNodesByClass(const char *className);
 
   /// check if a node should be included in the save/restore cycle. Returns
   /// false if it's a scene view node, scene view storage node, scene view

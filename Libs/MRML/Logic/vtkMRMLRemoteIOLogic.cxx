@@ -27,7 +27,6 @@
 
 #include "vtkMRMLRemoteIOLogic.h"
 
-vtkCxxRevisionMacro(vtkMRMLRemoteIOLogic, "$Revision: 16232 $");
 vtkStandardNewMacro(vtkMRMLRemoteIOLogic);
 
 vtkCxxSetObjectMacro(vtkMRMLRemoteIOLogic, CacheManager, vtkCacheManager);
@@ -67,9 +66,12 @@ void vtkMRMLRemoteIOLogic::AddDataIOToScene()
 {
   // TODO more of the cache and DataIOManager code
   // from qSlicerCoreApplication::setMRMLScene(vtkMRMLScene* newMRMLScene)
-  // should be moved to here so they can be used outside of the 
+  // should be moved to here so they can be used outside of the
   // context of a qSlicer based application
-
+  // Update 2015/03/20: split qSlicerCoreApplication::setMRMLScene so that
+  // a user can call vtkSlicerApplicationLogic::SetMRMLSceneDataIO to trigger
+  /// this method on a independent scene with separate remote io logic and data
+  /// io manager logic
   if (!this->GetMRMLScene())
     {
     vtkErrorMacro("Cannot add DataIOHandlers -- scene not set");

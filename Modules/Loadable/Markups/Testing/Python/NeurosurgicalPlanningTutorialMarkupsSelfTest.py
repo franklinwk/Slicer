@@ -1,8 +1,9 @@
 import os
 import time
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 import EditorLib
+from EditorLib.EditUtil import EditUtil
 
 #
 # NeurosurgicalPlanningTutorialMarkupsSelfTest
@@ -136,46 +137,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent().parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-
-    # delete the old widget instance
-    if hasattr(globals()['slicer'].modules, widgetName):
-      getattr(globals()['slicer'].modules, widgetName).cleanup()
-
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
-    setattr(globals()['slicer'].modules, widgetName, globals()[widgetName.lower()])
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="NeurosurgicalPlanningTutorialMarkupsSelfTest"):
     try:
@@ -186,8 +148,8 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestWidget:
     except Exception, e:
       import traceback
       traceback.print_exc()
-      qt.QMessageBox.warning(slicer.util.mainWindow(),
-          "Reload and Test", 'Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace")
+      slicer.util.warningDisplay('Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace",
+                                 windowTitle="Reload and Test")
 
 
 #
@@ -219,24 +181,26 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
     lm = slicer.app.layoutManager()
     # switch on the type to get the requested window
     widget = 0
-    if type == -1:
-      # full window
-      widget = slicer.util.mainWindow()
-    elif type == slicer.qMRMLScreenShotDialog().FullLayout:
+    if type == slicer.qMRMLScreenShotDialog.FullLayout:
       # full layout
       widget = lm.viewport()
-    elif type == slicer.qMRMLScreenShotDialog().ThreeD:
+    elif type == slicer.qMRMLScreenShotDialog.ThreeD:
       # just the 3D window
       widget = lm.threeDWidget(0).threeDView()
-    elif type == slicer.qMRMLScreenShotDialog().Red:
+    elif type == slicer.qMRMLScreenShotDialog.Red:
       # red slice window
       widget = lm.sliceWidget("Red")
-    elif type == slicer.qMRMLScreenShotDialog().Yellow:
+    elif type == slicer.qMRMLScreenShotDialog.Yellow:
       # yellow slice window
       widget = lm.sliceWidget("Yellow")
-    elif type == slicer.qMRMLScreenShotDialog().Green:
+    elif type == slicer.qMRMLScreenShotDialog.Green:
       # green slice window
       widget = lm.sliceWidget("Green")
+    else:
+      # default to using the full window
+      widget = slicer.util.mainWindow()
+      # reset the type so that the node is set correctly
+      type = slicer.qMRMLScreenShotDialog.FullLayout
 
     # grab and convert to vtk image data
     qpixMap = qt.QPixmap().grabWidget(widget)
@@ -315,7 +279,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
       # for the tutorial, pop up the linking control
       sliceController = slicer.app.layoutManager().sliceWidget("Red").sliceController()
       popupWidget = sliceController.findChild("ctkPopupWidget")
-      if popupWidget != None:
+      if popupWidget is not None:
         popupWidget.pinPopup(1)
         self.takeScreenshot('NeurosurgicalPlanning-Link','Link slice viewers',-1)
         popupWidget.pinPopup(0)
@@ -379,8 +343,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
     #
     # paint
     #
-    editUtil = EditorLib.EditUtil.EditUtil()
-    parameterNode = editUtil.getParameterNode()
+    parameterNode = EditUtil.getParameterNode()
     paintEffect = EditorLib.PaintEffectOptions()
     paintEffect.setMRMLDefaults()
     paintEffect.__del__()
@@ -392,7 +355,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
     # paint in cystic part of tumor, using converstion from RAS coords to
     # avoid slice widget size differences
     #
-    editUtil.setLabel(293)
+    EditUtil.setLabel(293)
     displayCoords = self.rasToDisplay(-7.4, 71, sliceOffset)
     paintTool.paintAddPoint(displayCoords[0], displayCoords[1])
     displayCoords = self.rasToDisplay(-11, 73, sliceOffset)
@@ -409,7 +372,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
     #
     # paint in solid part of tumor
     #
-    editUtil.setLabel(7)
+    EditUtil.setLabel(7)
     displayCoords = self.rasToDisplay(-0.5 , 118.5, sliceOffset)
     paintTool.paintAddPoint(displayCoords[0], displayCoords[1])
     displayCoords = self.rasToDisplay(-7.4 , 116, sliceOffset)
@@ -420,7 +383,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
     #
     # paint around the tumor
     #
-    editUtil.setLabel(295)
+    EditUtil.setLabel(295)
     rMax = 25
     rMin = -50
     aMax = 145
@@ -496,7 +459,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
     # Threshold tool
     #
     slicer.modules.EditorWidget.toolsBox.selectEffect('ThresholdEffect')
-    parameterNode = slicer.modules.EditorWidget.toolsBox.currentOption.editUtil.getParameterNode()
+    parameterNode = EditUtil.getParameterNode()
     parameterNode.SetParameter('ThresholdEffect,min', str(1700))
     slicer.modules.EditorWidget.toolsBox.currentTools[0].apply()
     self.takeScreenshot('NeurosurgicalPlanning-Ventricles','Ventricles segmentation',-1)
@@ -545,7 +508,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
     # Dilate
     #
     slicer.modules.EditorWidget.toolsBox.selectEffect('DilateEffect')
-    editUtil.setLabel(293)
+    EditUtil.setLabel(293)
     self.takeScreenshot('NeurosurgicalPlanning-Dilate','Dilate tool',-1)
     # tutorial says to click apply three times
     for d in range (1,3):
@@ -564,6 +527,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
     parameters = {}
     parameters['InputVolume'] = dtiVolume.GetID()
     baselinelabel293 = slicer.mrmlScene.GetFirstNodeByName("BaselineVolume-region 1-label")
+# VTK6 TODO - set 'InputROIPipelineInfo'
     parameters['InputROI'] = baselinelabel293.GetID()
     fibers = slicer.vtkMRMLFiberBundleNode()
     slicer.mrmlScene.AddNode(fibers)
@@ -616,7 +580,7 @@ class NeurosurgicalPlanningTutorialMarkupsSelfTestLogic:
 
     # make it active
     selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-    if (selectionNode != None):
+    if (selectionNode is not None):
       selectionNode.SetReferenceActivePlaceNodeID(fidNode.GetID())
 
     self.takeScreenshot('NeurosurgicalPlanning-TIS-Fid1','Fiducial in Tractography Interactive Seeding Module',-1)

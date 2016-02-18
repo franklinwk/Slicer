@@ -35,7 +35,7 @@
 #include "qMRMLVolumeInfoWidget.h"
 
 // MRML includes
-#include <vtkMRMLColorTableNode.h>
+#include <vtkMRMLColorLogic.h>
 #include <vtkMRMLScene.h>
 #include <vtkMRMLScalarVolumeDisplayNode.h>
 #include <vtkMRMLScalarVolumeNode.h>
@@ -43,6 +43,7 @@
 // VTK includes
 #include <vtkImageData.h>
 #include <vtkNew.h>
+#include <vtkVersion.h>
 
 // STD includes
 #include <cstdlib>
@@ -76,25 +77,22 @@ int qMRMLVolumeInfoWidgetEventTranslatorPlayerTest1(int argc, char * argv [] )
 
   vtkNew<vtkImageData> imageData;
   imageData->SetDimensions(256, 256, 1);
-  imageData->SetScalarTypeToUnsignedShort();
-  imageData->SetNumberOfScalarComponents(1); // image holds one value intensities
   //imageData->SetSpacing(2., 2., 512.); not used by vtkMRMLVolumeNode
   //imageData->SetOrigin(0.0,0.0,0.0); not used by vtkMRMLVolumeNode
-  imageData->AllocateScalars(); // allocate storage for image data
-
+  imageData->AllocateScalars(VTK_UNSIGNED_SHORT, 1); // allocate storage for image data
   volumeNode->SetAndObserveImageData(imageData.GetPointer());
   volumeNode->SetSpacing(2., 2., 512.);
   volumeNode->SetOrigin(0, 0, 0);
 
   vtkNew<vtkMRMLScalarVolumeDisplayNode> displayNode;
   vtkNew<vtkMRMLScene> scene;
+
+  // Add default color nodes
+  vtkNew<vtkMRMLColorLogic> colorLogic;
+  colorLogic->SetMRMLScene(scene.GetPointer());
+
   scene->AddNode(volumeNode.GetPointer());
   scene->AddNode(displayNode.GetPointer());
-
-  vtkNew<vtkMRMLColorTableNode> colorNode;
-  colorNode->SetTypeToGrey();
-  scene->AddNode(colorNode.GetPointer());
-  displayNode->SetAndObserveColorNodeID(colorNode->GetID());
 
   volumeNode->SetAndObserveDisplayNodeID(displayNode->GetID());
 

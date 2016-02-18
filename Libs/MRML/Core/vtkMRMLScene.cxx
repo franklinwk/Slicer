@@ -12,7 +12,6 @@ Version:   $Revision: 1.18 $
 
 =========================================================================auto=*/
 
-
 #include "vtkMRMLScene.h"
 #include "vtkMRMLParser.h"
 
@@ -20,6 +19,7 @@ Version:   $Revision: 1.18 $
 #include "vtkDataIOManager.h"
 #include "vtkTagTable.h"
 
+#include "vtkMRMLTransformNode.h"
 #include "vtkMRMLBSplineTransformNode.h"
 #include "vtkMRMLCameraNode.h"
 #include "vtkMRMLChartNode.h"
@@ -35,9 +35,12 @@ Version:   $Revision: 1.18 $
 #include "vtkMRMLGridTransformNode.h"
 #include "vtkMRMLHierarchyStorageNode.h"
 #include "vtkMRMLLabelMapVolumeDisplayNode.h"
+#include "vtkMRMLLabelMapVolumeNode.h"
 #include "vtkMRMLLinearTransformNode.h"
 #include "vtkMRMLModelNode.h"
 #include "vtkMRMLModelHierarchyNode.h"
+#include "vtkMRMLProceduralColorNode.h"
+#include "vtkMRMLProceduralColorStorageNode.h"
 #include "vtkMRMLROINode.h"
 #include "vtkMRMLROIListNode.h"
 #include "vtkMRMLScriptedModuleNode.h"
@@ -45,6 +48,10 @@ Version:   $Revision: 1.18 $
 #include "vtkMRMLSliceCompositeNode.h"
 #include "vtkMRMLSliceNode.h"
 #include "vtkMRMLSnapshotClipNode.h"
+#include "vtkMRMLTableNode.h"
+#include "vtkMRMLTableStorageNode.h"
+#include "vtkMRMLTableViewNode.h"
+#include "vtkMRMLTransformDisplayNode.h"
 #include "vtkMRMLTransformStorageNode.h"
 #include "vtkMRMLUnstructuredGridDisplayNode.h"
 #include "vtkMRMLUnstructuredGridNode.h"
@@ -77,14 +84,18 @@ Version:   $Revision: 1.18 $
 #include <vtkSmartPointer.h>
 
 // VTKSYS includes
+#include <vtksys/RegularExpression.hxx>
 #include <vtksys/SystemTools.hxx>
 
 // STD includes
 #include <algorithm>
-#include <cassert>
 #include <numeric>
 
-//#define MRMLSCENE_VERBOSE 1
+//#define MRMLSCENE_VERBOSE
+
+#ifdef MRMLSCENE_VERBOSE
+# include <vtkTimerLog.h>
+#endif
 
 vtkCxxSetObjectMacro(vtkMRMLScene, CacheManager, vtkCacheManager)
 vtkCxxSetObjectMacro(vtkMRMLScene, DataIOManager, vtkDataIOManager)
@@ -124,6 +135,7 @@ vtkMRMLScene::vtkMRMLScene()
 
   this->LastLoadedVersion = NULL;
   this->Version = NULL;
+  this->SetVersion(CURRENT_MRML_VERSION);
 
   this->DeleteEventCallback = vtkCallbackCommand::New();
   this->DeleteEventCallback->SetClientData( reinterpret_cast<void *>(this) );
@@ -160,6 +172,7 @@ vtkMRMLScene::vtkMRMLScene()
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLVolumeArchetypeStorageNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLScalarVolumeDisplayNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLLabelMapVolumeDisplayNode >::New() );
+  this->RegisterNodeClass( vtkSmartPointer< vtkMRMLLabelMapVolumeNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLColorNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLDiffusionWeightedVolumeNode >::New() );
 #ifdef MRML_USE_vtkTeem
@@ -185,8 +198,11 @@ vtkMRMLScene::vtkMRMLScene()
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLUnstructuredGridStorageNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLColorTableNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLColorTableStorageNode >::New() );
+  this->RegisterNodeClass( vtkSmartPointer< vtkMRMLProceduralColorNode >::New() );
+  this->RegisterNodeClass( vtkSmartPointer< vtkMRMLProceduralColorStorageNode >::New() );
+  this->RegisterNodeClass( vtkSmartPointer< vtkMRMLTransformDisplayNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLTransformStorageNode >::New() );
-  this->RegisterNodeClass( vtkSmartPointer< vtkMRMLNonlinearTransformNode >::New() );
+  this->RegisterNodeClass( vtkSmartPointer< vtkMRMLTransformNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLGridTransformNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLBSplineTransformNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLDoubleArrayNode >::New() );
@@ -195,6 +211,9 @@ vtkMRMLScene::vtkMRMLScene()
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLInteractionNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLChartNode >::New() );
   this->RegisterNodeClass( vtkSmartPointer< vtkMRMLChartViewNode >::New() );
+  this->RegisterNodeClass( vtkSmartPointer< vtkMRMLTableNode >::New() );
+  this->RegisterNodeClass( vtkSmartPointer< vtkMRMLTableStorageNode >::New() );
+  this->RegisterNodeClass( vtkSmartPointer< vtkMRMLTableViewNode >::New() );
 }
 
 //------------------------------------------------------------------------------
@@ -219,7 +238,6 @@ vtkMRMLScene::~vtkMRMLScene()
     this->RegisteredNodeClasses[n]->Delete();
     }
 
-
   if ( this->CacheManager != NULL )
     {
     this->CacheManager->Delete();
@@ -241,6 +259,8 @@ vtkMRMLScene::~vtkMRMLScene()
     this->UserTagTable->Delete();
     this->UserTagTable = NULL;
     }
+  this->SetLastLoadedVersion(0);
+  this->SetVersion(0);
   if ( this->DeleteEventCallback != NULL )
     {
     this->DeleteEventCallback->Delete();
@@ -350,9 +370,60 @@ void vtkMRMLScene::ResetNodes()
     }
   for(unsigned int i=0; i<nodes.size(); i++)
     {
-    nodes[i]->Reset();
+    nodes[i]->Reset(GetDefaultNodeByClass(nodes[i]->GetClassName()));
     }
+}
 
+//----------------------------------------------------------------------------
+vtkMRMLNode* vtkMRMLScene::GetDefaultNodeByClass(const char* className)
+{
+  if (className==NULL)
+    {
+    return NULL;
+    }
+  std::map< std::string, vtkSmartPointer<vtkMRMLNode> >::iterator it = this->DefaultNodes.find(std::string(className));
+  if (it == this->DefaultNodes.end())
+    {
+    return NULL;
+    }
+  return it->second;
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLScene::AddDefaultNode(vtkMRMLNode* node)
+{
+  if (node==NULL)
+    {
+    vtkErrorMacro("vtkMRMLScene::AddDefaultNode failed: invalid node");
+    return;
+    }
+  const char* className = node->GetClassName();
+  if (className==NULL)
+    {
+    vtkErrorMacro("vtkMRMLScene::AddDefaultNode failed: invalid className");
+    return;
+    }
+  this->DefaultNodes[std::string(className)] = node;
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLScene::RemoveAllDefaultNodes()
+{
+  this->DefaultNodes.clear();
+}
+
+//------------------------------------------------------------------------------
+void vtkMRMLScene::CopyDefaultNodesToScene(vtkMRMLScene *scene)
+{
+  if (!scene)
+    {
+    return;
+    }
+  for (std::map< std::string, vtkSmartPointer<vtkMRMLNode> >::iterator it = this->DefaultNodes.begin();
+    it != this->DefaultNodes.end(); ++it)
+    {
+    scene->AddDefaultNode(it->second);
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -394,6 +465,13 @@ vtkMRMLNode* vtkMRMLScene::CreateNodeByClass(const char* className)
       vtkDebugLeaks::DestructClass(className);
 #endif
       }
+    }
+  // If a default node is specified for this class then initialize the
+  // node contents with that
+  vtkMRMLNode* defaultNode = this->GetDefaultNodeByClass(className);
+  if (defaultNode)
+    {
+    node->Reset(defaultNode);
     }
   return node;
 }
@@ -516,10 +594,6 @@ const char* vtkMRMLScene::GetClassNameByTag(const char *tagName)
 //------------------------------------------------------------------------------
 const char* vtkMRMLScene::GetTagByClassName(const char *className)
 {
-  if ( !this )
-    {
-    return NULL;
-    }
   if ( !className )
     {
     vtkErrorMacro("GetTagByClassName: className is null");
@@ -553,7 +627,6 @@ int bitwiseOr(int firstValue, int secondValue)
 //------------------------------------------------------------------------------
 int vtkMRMLScene::GetStates()const
 {
-  
   return std::accumulate(this->States.begin(), this->States.end(),
                          0x0000, bitwiseOr);
 }
@@ -579,7 +652,15 @@ void vtkMRMLScene::StartState(unsigned long state, int anticipatedMaxProgress)
 //------------------------------------------------------------------------------
 void vtkMRMLScene::EndState(unsigned long state)
 {
-  assert(this->States.back() == state);
+  if (this->States.empty())
+  {
+    vtkErrorMacro("vtkMRMLScene::EndState failed: there was no previous state");
+    return;
+  }
+  if (this->States.back() != state)
+  {
+    vtkWarningMacro("vtkMRMLScene::EndState found inconsistent state");
+  }
   this->States.pop_back();
 
   bool isInState = ((this->GetStates() & state) == state);
@@ -616,8 +697,14 @@ void vtkMRMLScene::ProgressState(unsigned long state, int progress)
 //------------------------------------------------------------------------------
 int vtkMRMLScene::Connect()
 {
-  assert(!this->IsClosing());
-  assert(!this->IsImporting());
+  if (this->IsClosing())
+    {
+    vtkWarningMacro("vtkMRMLScene::Connect(): scene is in closing state");
+    }
+  if (this->IsImporting())
+    {
+    vtkWarningMacro("vtkMRMLScene::Connect(): scene is in importing state");
+    }
 
 #ifdef MRMLSCENE_VERBOSE
   vtkTimerLog* timer = vtkTimerLog::New();
@@ -678,10 +765,14 @@ int vtkMRMLScene::Import()
 #ifdef MRMLSCENE_VERBOSE
     addNodesTimer->StartTimer();
 #endif
+    // Loaded node is not always the same the one that is actually added:
+    // in case of singleton nodes the existing singleton node is kept
+    // and only the contents is overwritten.
+    vtkSmartPointer<vtkCollection> addedNodes = vtkSmartPointer<vtkCollection>::New();
     for (loadedNodes->InitTraversal(it);
          (node = (vtkMRMLNode*)loadedNodes->GetNextItemAsObject(it)) ;)
       {
-      this->AddNode(node);
+      addedNodes->AddItem(this->AddNode(node));
       }
 #ifdef MRMLSCENE_VERBOSE
     addNodesTimer->StopTimer();
@@ -689,7 +780,7 @@ int vtkMRMLScene::Import()
 #endif
     // Update the node references to the changed node IDs
     // (that conflicted in the current scene and the imported scene)
-    this->UpdateNodeReferences(loadedNodes);
+    this->UpdateNodeReferences(addedNodes);
     this->RemoveReservedIDs();
 
     this->InvokeEvent(vtkMRMLScene::NewSceneEvent, NULL);
@@ -697,8 +788,8 @@ int vtkMRMLScene::Import()
     // Notify the imported nodes about that all nodes are created
     // (so the observers can be attached to referenced nodes, etc.)
     // by calling UpdateScene on each node
-    for (loadedNodes->InitTraversal(it);
-         (node = (vtkMRMLNode*)loadedNodes->GetNextItemAsObject(it)) ;)
+    for (addedNodes->InitTraversal(it);
+         (node = (vtkMRMLNode*)addedNodes->GetNextItemAsObject(it)) ;)
       {
       //double progress = n / (1. * nnodes);
       //this->InvokeEvent(vtkCommand::ProgressEvent,(void *)&progress);
@@ -848,7 +939,7 @@ int vtkMRMLScene::Commit(const char* url)
       {
       vtkErrorMacro("Commit: URL is not set");
       this->SetErrorCode(vtkErrorCode::GetErrorCodeFromString("CannotOpenFileError"));
-      return 1;
+      return 0;
       }
     }
 
@@ -866,6 +957,9 @@ int vtkMRMLScene::Commit(const char* url)
   else
     {
     os = &ofs;
+    // set the root directory from the URL
+    this->RootDirectory = vtksys::SystemTools::GetParentDirectory(url);
+
     // Open file
 #ifdef _WIN32
     ofs.open(url, std::ios::out | std::ios::binary);
@@ -875,17 +969,12 @@ int vtkMRMLScene::Commit(const char* url)
     if (ofs.fail())
       {
       vtkErrorMacro("Write: Could not open file " << url);
-#if (VTK_MAJOR_VERSION <= 5)
-      this->SetErrorCode(2);
-#else
      this->SetErrorCode(vtkErrorCode::GetErrorCodeFromString("CannotOpenFileError"));
-#endif
-      return 1;
+      return 0;
       }
     }
 
   int indent=0, deltaIndent;
-
 
     // this event is being detected by GUI to provide feedback during load
     // of data. But,
@@ -981,13 +1070,26 @@ int vtkMRMLScene::Commit(const char* url)
     {
     ofs.close();
     }
-#if (VTK_MAJOR_VERSION <= 5)
-  this->SetErrorCode(0);
-#else
   this->SetErrorCode(vtkErrorCode::GetErrorCodeFromString("NoError"));
-#endif
   this->StoredTime.Modified();
   return 1;
+}
+
+namespace
+{
+
+//------------------------------------------------------------------------------
+inline bool IsNodeWithoutID(vtkMRMLNode* node)
+{
+  return node->GetID() == NULL || node->GetID()[0] == '\0';
+}
+
+//------------------------------------------------------------------------------
+inline bool IsNodeWithoutName(vtkMRMLNode* node)
+{
+  return node->GetName() == NULL|| node->GetName()[0] == '\0';
+}
+
 }
 
 //------------------------------------------------------------------------------
@@ -1007,9 +1109,8 @@ vtkMRMLNode*  vtkMRMLScene::AddNodeNoNotify(vtkMRMLNode *n)
   int wasModifying = n->StartModify();
 
   //TODO convert URL to Root directory
-  //n->SetSceneRootDir("");
 
-  // check if node is a singletone
+  // check if node is a singleton
   if (n->GetSingletonTag() != NULL)
     {
     // check if there is a singleton of this class in the scene
@@ -1018,27 +1119,30 @@ vtkMRMLNode*  vtkMRMLScene::AddNodeNoNotify(vtkMRMLNode *n)
     if (sn != NULL)
       {
       // A node can't be added twice into the scene
-      assert(sn != n);
-      std::string oldId(sn->GetID());
-      std::string newId(n->GetID() ? n->GetID() : sn->GetID());
-      sn->CopyWithSceneWithSingleModifiedEvent(n);
-
-      this->RemoveNodeReferences(n);
-      // cache the node so the whole scene cache stays up-to-date
-      // Remove the old node ID only if the ID was associated with sn.
-      std::map< std::string, vtkSmartPointer<vtkMRMLNode> >::iterator nodeID =
-        this->NodeIDs.find(oldId);
-      if (nodeID != this->NodeIDs.end() &&
-          nodeID->second == sn)
+      if (sn == n)
         {
-        this->RemoveNodeID((char*)nodeID->first.c_str());
+        vtkWarningMacro("Same node is already added to the scene");
         }
-      // If NodeIDs[newId] already contains a value, that node can't be found
-      // anymore in the NodeIDs cache.
-      this->NodeIDs[newId] = sn;
-      this->NodeIDsMTime = this->Nodes->GetMTime();
 
-      n->EndModify(wasModifying);
+      // Keep the existing singleton node and its node ID,
+      // just copy the contents of the new node into the existing singleton node
+
+      // If the node ID is changed (not very common) then save that
+      // info so that the nodes that are being imported can update
+      // their references.
+      std::string newId(sn->GetID());
+      std::string oldId(n->GetID() ? n->GetID() : sn->GetID());
+      if (oldId != newId)
+        {
+        this->ReferencedIDChanges[oldId] = newId;
+        }
+
+      // Update contents of existing singleton node
+      sn->Copy(n);
+
+      // Stores the node references in this->NodeReferences.
+      // This is required for UpdateNodeReferences() to work.
+      sn->SetSceneReferences();
       return sn;
       }
     }
@@ -1047,7 +1151,7 @@ vtkMRMLNode*  vtkMRMLScene::AddNodeNoNotify(vtkMRMLNode *n)
   // ID. This can create a node ID conflict with the nodes already in the
   // scene. A new unique ID  must be set to the node to add and references to
   // the node must be updated with the new ID.
-  if (n->GetID() == NULL || n->GetID()[0] == '\0' || this->GetNodeByID(n->GetID()) != NULL)
+  if (IsNodeWithoutID(n) || this->GetNodeByID(n->GetID()) != NULL)
     {
     std::string oldID;
     if (n->GetID())
@@ -1070,7 +1174,7 @@ vtkMRMLNode*  vtkMRMLScene::AddNodeNoNotify(vtkMRMLNode *n)
     }
 
   // Set a default name if none is given automatically
-  if (n->GetName() == NULL|| n->GetName()[0] == '\0')
+  if (IsNodeWithoutName(n))
     {
     n->SetName(this->GenerateUniqueName(n).c_str());
     }
@@ -1129,11 +1233,13 @@ vtkMRMLNode*  vtkMRMLScene::AddNode(vtkMRMLNode *n)
     this->InvokeEvent(this->NodeAboutToBeAddedEvent, n);
     }
   vtkMRMLNode* node = this->AddNodeNoNotify(n);
-  // If the node is a singleton, the returned node is the existing singleton
-  assert( add || node != n);
   if (add)
     {
     this->InvokeEvent(this->NodeAddedEvent, n);
+    }
+  else if (node==n)
+    {
+    vtkWarningMacro("vtkMRMLScene::AddNode: Adding of a new node is not notified");
     }
   this->Modified();
 #ifdef MRMLSCENE_VERBOSE
@@ -1141,9 +1247,9 @@ vtkMRMLNode*  vtkMRMLScene::AddNode(vtkMRMLNode *n)
   std::cerr << "AddNode: " << n->GetID() << " :" << timer->GetElapsedTime() << "\n";
   timer->Delete();
 #endif
+  // If the node is a singleton, the returned node is the existing singleton
   return node;
 }
-
 
 //------------------------------------------------------------------------------
 void vtkMRMLScene::NodeAdded(vtkMRMLNode *n)
@@ -1362,7 +1468,6 @@ int vtkMRMLScene::IsNodePresent(vtkMRMLNode *n)
 //------------------------------------------------------------------------------
 void vtkMRMLScene::InitTraversal()
 {
-  assert(this);
   this->Nodes->InitTraversal();
 }
 
@@ -1458,16 +1563,11 @@ std::list< std::string > vtkMRMLScene::GetNodeClassesList()
   classes.sort();
   classes.unique();
   return classes;
-
 }
 
 //------------------------------------------------------------------------------
 vtkMRMLNode *vtkMRMLScene::GetNextNodeByClass(const char *className)
 {
-  if ( !this || !this->Nodes)
-    {
-    return NULL;
-    }
   if (!className)
     {
     vtkErrorMacro("GetNextNodeByClass: class name is null.");
@@ -1492,8 +1592,16 @@ vtkMRMLNode *vtkMRMLScene::GetNextNodeByClass(const char *className)
 //------------------------------------------------------------------------------
 vtkMRMLNode* vtkMRMLScene::GetSingletonNode(const char* singletonTag, const char* className)
 {
-  assert(singletonTag);
-  assert(className);
+  if (singletonTag==0 || strlen(singletonTag)==0)
+    {
+    vtkErrorMacro("vtkMRMLScene::GetSingletonNode: received invalid singletonTag");
+    return NULL;
+    }
+  if (className==0 || strlen(className)==0)
+    {
+    vtkErrorMacro("vtkMRMLScene::GetSingletonNode: received invalid className");
+    return NULL;
+    }
 
   vtkCollectionSimpleIterator it;
   vtkMRMLNode* node = NULL;
@@ -1527,6 +1635,8 @@ vtkMRMLNode* vtkMRMLScene::GetSingletonNode(vtkMRMLNode* n)
 
   // No singleton node found, but it may be possible that a non-singleton node exists with
   // the same ID, which is probably a singleton node where the tag was not set by mistake.
+  // The vtkMRMLNode was updated to serialize the singleton tag but legacy scene files from
+  // before October 2015 may have saved nodes without the singleton tag having been set.
   std::string singletonId = this->GenerateUniqueID(n);
   sn = this->GetNodeByID(singletonId.c_str());
   if (sn != NULL)
@@ -1550,7 +1660,6 @@ vtkMRMLNode* vtkMRMLScene::GetSingletonNode(vtkMRMLNode* n)
 //------------------------------------------------------------------------------
 vtkMRMLNode* vtkMRMLScene::GetNthNode(int n)
 {
-
   if(n < 0 || n >= this->Nodes->GetNumberOfItems())
     {
     return NULL;
@@ -1591,7 +1700,6 @@ vtkMRMLNode* vtkMRMLScene::GetNthNodeByClass(int n, const char *className)
 //------------------------------------------------------------------------------
 vtkCollection* vtkMRMLScene::GetNodesByName(const char* name)
 {
-
   vtkCollection* nodes = vtkCollection::New();
 
   if (!name)
@@ -1616,7 +1724,8 @@ vtkCollection* vtkMRMLScene::GetNodesByName(const char* name)
 //-----------------------------------------------------------------------------
 vtkMRMLNode* vtkMRMLScene::GetFirstNode(const char* byName,
                                         const char* byClass,
-                                        const int* byHideFromEditors)
+                                        const int* byHideFromEditors,
+                                        bool exactNameMatch)
 {
   vtkCollectionSimpleIterator it;
   vtkMRMLNode* node;
@@ -1624,7 +1733,13 @@ vtkMRMLNode* vtkMRMLScene::GetFirstNode(const char* byName,
        (node= vtkMRMLNode::SafeDownCast(
           this->Nodes->GetNextItemAsObject(it))) ;)
     {
-    if (byName && node->GetName() != 0 && strcmp(node->GetName(), byName) != 0)
+    if (exactNameMatch && byName &&
+        node->GetName() != 0 && strcmp(node->GetName(), byName) != 0)
+      {
+      continue;
+      }
+    if (!exactNameMatch && byName &&
+        node->GetName() != 0 && !vtksys::RegularExpression(byName).find(node->GetName()))
       {
       continue;
       }
@@ -1672,11 +1787,6 @@ vtkMRMLNode* vtkMRMLScene::GetNodeByID(std::string id)
 //------------------------------------------------------------------------------
 vtkMRMLNode* vtkMRMLScene::GetNodeByID(const char* id)
 {
-  if (this == NULL)
-    {
-    vtkErrorMacro("GetNodeByID: That's scary, you accessed a null scene !");
-    return NULL;
-    }
   if (id == NULL)
     {
     // don't use a macro here, can cause a crash on exit
@@ -1739,16 +1849,6 @@ vtkCollection* vtkMRMLScene::GetNodesByClassByName(const char* className, const 
 }
 
 //------------------------------------------------------------------------------
-int  vtkMRMLScene::GetTransformBetweenNodes(vtkMRMLNode * vtkNotUsed(node1),
-                                            vtkMRMLNode * vtkNotUsed(node2),
-                                            vtkGeneralTransform * vtkNotUsed(xform))
-{
-  vtkErrorMacro("NOT IMPLEMENTEED YET");
-  return 1;
-}
-
-
-//------------------------------------------------------------------------------
 vtkMRMLNode* vtkMRMLScene::InsertAfterNode(vtkMRMLNode *item, vtkMRMLNode *n)
 {
   if (!n)
@@ -1769,7 +1869,7 @@ vtkMRMLNode* vtkMRMLScene::InsertAfterNode(vtkMRMLNode *item, vtkMRMLNode *n)
   this->InvokeEvent(this->NodeAboutToBeAddedEvent, n);
 
   // code from add node no notify
-  if (n->GetID() == NULL || n->GetID()[0] == '\0' || this->GetNodeByID(n->GetID()) != NULL)
+  if (IsNodeWithoutID(n) || this->GetNodeByID(n->GetID()) != NULL)
     {
     std::string oldID;
     if (n->GetID())
@@ -1795,8 +1895,7 @@ vtkMRMLNode* vtkMRMLScene::InsertAfterNode(vtkMRMLNode *item, vtkMRMLNode *n)
   int modifyStatus = n->GetDisableModifiedEvent();
   n->SetDisableModifiedEvent(1);
 
-  n->SetSceneRootDir(this->RootDirectory.c_str());
-  if (n->GetName() == NULL|| n->GetName()[0] == '\0')
+  if (IsNodeWithoutName(n))
     {
     n->SetName(n->GetID());
     }
@@ -1853,7 +1952,7 @@ vtkMRMLNode* vtkMRMLScene::InsertBeforeNode(vtkMRMLNode *item, vtkMRMLNode *n)
   this->InvokeEvent(this->NodeAboutToBeAddedEvent, n);
 
   // code from add node no notify
-  if (n->GetID() == NULL || n->GetID()[0] == '\0' || this->GetNodeByID(n->GetID()) != NULL)
+  if (IsNodeWithoutID(n) || this->GetNodeByID(n->GetID()) != NULL)
     {
     std::string oldID;
     if (n->GetID())
@@ -1879,8 +1978,7 @@ vtkMRMLNode* vtkMRMLScene::InsertBeforeNode(vtkMRMLNode *item, vtkMRMLNode *n)
   int modifyStatus = n->GetDisableModifiedEvent();
   n->SetDisableModifiedEvent(1);
 
-  n->SetSceneRootDir(this->RootDirectory.c_str());
-  if (n->GetName() == NULL|| n->GetName()[0] == '\0')
+  if (IsNodeWithoutName(n))
     {
     n->SetName(n->GetID());
     }
@@ -1960,7 +2058,7 @@ void vtkMRMLScene::PrintSelf(ostream& os, vtkIndent indent)
 //------------------------------------------------------------------------------
 void vtkMRMLScene::SetURL(const char *url)
 {
-  this->URL = std::string(url);
+  this->URL = std::string(url?url:"");
 }
 
 //------------------------------------------------------------------------------
@@ -2004,7 +2102,11 @@ vtkMRMLNode *vtkMRMLScene::GetNthRegisteredNodeClass(int n)
 //------------------------------------------------------------------------------
 std::string vtkMRMLScene::GenerateUniqueID(vtkMRMLNode* node)
 {
-  assert(node != 0);
+  if (!node)
+    {
+    vtkWarningMacro("vtkMRMLScene::GenerateUniqueID: invalid node");
+    return this->GenerateUniqueID("Node");
+    }
   std::string baseID = node->GetClassName();
   if (node->GetSingletonTag())
     {
@@ -2026,7 +2128,10 @@ std::string vtkMRMLScene::GenerateUniqueID(const std::string& baseID)
 //------------------------------------------------------------------------------
 int vtkMRMLScene::GetUniqueIDIndex(const std::string& baseID)
 {
-  assert(baseID.size() != 0);
+  if (baseID.empty())
+    {
+    vtkWarningMacro("vtkMRMLScene::GetUniqueIDIndex: baseID is empty");
+    }
   int lastIDIndex = 0;
   std::map< std::string, int>::const_iterator uidIt =
     this->UniqueIDs.find(baseID);
@@ -2044,7 +2149,7 @@ int vtkMRMLScene::GetUniqueIDIndex(const std::string& baseID)
     std::string candidateID = this->BuildID(baseID, index);
     isUnique =
       (this->GetNodeByID(candidateID) == 0) &&
-      (this->ReservedIDs.find(candidateID) == this->ReservedIDs.end());
+      (!this->IsReservedID(candidateID));
     }
   return index;
 }
@@ -2065,7 +2170,10 @@ std::string vtkMRMLScene::BuildID(const std::string& baseID, int idIndex)const
 //------------------------------------------------------------------------------
 std::string vtkMRMLScene::GenerateUniqueName(vtkMRMLNode* node)
 {
-  assert(node);
+  if (!node)
+    {
+    vtkWarningMacro("vtkMRMLScene::GenerateUniqueName: input node is invalid");
+    }
   return this->GenerateUniqueName(node->GetNodeTagName());
 }
 
@@ -2090,7 +2198,10 @@ const char* vtkMRMLScene::GetUniqueNameByString(const char* baseName)
 //------------------------------------------------------------------------------
 int vtkMRMLScene::GetUniqueNameIndex(const std::string& baseName)
 {
-  assert(baseName.size() > 0);
+  if (baseName.empty())
+    {
+    vtkWarningMacro("vtkMRMLScene::GetUniqueNameIndex: baseName is invalid");
+    }
   int lastNameIndex = -1;
   std::map< std::string, int>::const_iterator uNameIt =
     this->UniqueNames.find(baseName);
@@ -2122,6 +2233,12 @@ std::string vtkMRMLScene::BuildName(const std::string& baseName, int nameIndex)c
     name << "_" << nameIndex;
     }
   return name.str();
+}
+
+//------------------------------------------------------------------------------
+bool vtkMRMLScene::IsReservedID(const std::string& id)
+{
+  return !(this->ReservedIDs.find(id) == this->ReservedIDs.end());
 }
 
 //------------------------------------------------------------------------------
@@ -2267,7 +2384,6 @@ void vtkMRMLScene::PushIntoUndoStack()
     {
     return;
     }
-
 
   vtkCollection* newScene = vtkCollection::New();
 
@@ -2719,16 +2835,8 @@ int vtkMRMLScene::IsFilePathRelative(const char * filepath)
       }
     }
 
-  std::vector<std::string> components;
-  vtksys::SystemTools::SplitPath((const char*)filepath, components);
-  if (components[0] == "")
-    {
-    return 1;
-    }
-  else
-    {
-    return 0;
-    }
+  const bool absoluteFilePath = vtksys::SystemTools::FileIsFullPath(filepath);
+  return absoluteFilePath ? 0 : 1;
 }
 
 //------------------------------------------------------------------------------
@@ -2751,7 +2859,9 @@ void vtkMRMLScene::UpdateNodeReferences(vtkCollection* checkNodes/*=NULL*/)
   for (std::map< std::string, std::string>::const_iterator iterChanged = this->ReferencedIDChanges.begin();
     iterChanged != this->ReferencedIDChanges.end(); iterChanged++)
     {
-    NodeReferencesType::iterator referencedIdIt=this->NodeReferences.find(iterChanged->first);
+    const std::string& oldID = iterChanged->first;
+    const std::string& newID = iterChanged->second;
+    NodeReferencesType::iterator referencedIdIt=this->NodeReferences.find(oldID);
     if (referencedIdIt==this->NodeReferences.end())
       {
       // this updated ID is not observed by any node
@@ -2772,7 +2882,7 @@ void vtkMRMLScene::UpdateNodeReferences(vtkCollection* checkNodes/*=NULL*/)
         {
         continue;
         }
-      node->UpdateReferenceID(iterChanged->first.c_str(), iterChanged->second.c_str());
+      node->UpdateReferenceID(oldID.c_str(), newID.c_str());
       }
     }
 }
@@ -2962,7 +3072,7 @@ void vtkMRMLScene::ClearNodeIDs()
   if (this->Nodes)
     {
     this->NodeIDs.clear();
-    this->NodeIDsMTime = this->Nodes->GetMTime();    
+    this->NodeIDsMTime = this->Nodes->GetMTime();
   }
 }
 
@@ -3016,9 +3126,7 @@ vtkURIHandler * vtkMRMLScene::FindURIHandlerByName(const char *name)
     }
   vtkWarningMacro("FindURIHandlerByName: unable to find a URI handler in the collection of " << this->GetURIHandlerCollection()->GetNumberOfItems() << " handlers to match the name " << name);
   return NULL;
-
 }
-
 
 //------------------------------------------------------------------------------
 vtkURIHandler * vtkMRMLScene::FindURIHandler(const char *URI)
@@ -3047,7 +3155,6 @@ vtkURIHandler * vtkMRMLScene::FindURIHandler(const char *URI)
   return NULL;
 }
 
-
 //-----------------------------------------------------------------------------
 void vtkMRMLScene
 ::GetReferencedSubScene(vtkMRMLNode *rnode, vtkMRMLScene* newScene)
@@ -3056,7 +3163,6 @@ void vtkMRMLScene
   // clear scene
   //
   newScene->Clear(1);
-
 
   if (rnode == NULL)
     {
@@ -3101,7 +3207,6 @@ void vtkMRMLScene
   // clear scene
   //
   newScene->Clear(1);
-
 
   //
   // copy over nodes from the current scene to the new scene
@@ -3172,12 +3277,6 @@ const char * vtkMRMLScene::GetErrorMessagePointer()
   }
 
 //-----------------------------------------------------------------------------
-void vtkMRMLScene::Edited()
-{
-  this->InvokeEvent(vtkMRMLScene::SceneEditedEvent);
-}
-
-//-----------------------------------------------------------------------------
 bool vtkMRMLScene::GetModifiedSinceRead()
 {
   int hideFromEditors = 0;
@@ -3213,6 +3312,32 @@ bool vtkMRMLScene
       }
     }
   return found;
+}
+
+//-----------------------------------------------------------------------------
+void vtkMRMLScene::SetStorableNodesModifiedSinceRead()
+{
+  vtkSmartPointer<vtkCollection> storableNodes;
+  storableNodes.TakeReference(this->GetNodesByClass("vtkMRMLStorableNode"));
+  vtkMRMLScene::SetStorableNodesModifiedSinceRead(storableNodes);
+}
+
+//-----------------------------------------------------------------------------
+void vtkMRMLScene::
+SetStorableNodesModifiedSinceRead(vtkCollection* storableNodes)
+{
+  vtkCollectionSimpleIterator it;
+  vtkMRMLStorableNode* storableNode;
+  for (storableNodes->InitTraversal(it);
+       (storableNode = vtkMRMLStorableNode::SafeDownCast(
+          storableNodes->GetNextItemAsObject(it))) ;)
+    {
+    if (!storableNode->GetHideFromEditors() &&
+        !storableNode->GetModifiedSinceRead())
+      {
+      storableNode->StorableModified();
+      }
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -3255,7 +3380,7 @@ const char* vtkMRMLScene::GetNthReferencedID(int n)
     {
     if (n<static_cast<int>(referenceIt->second.size()))
       {
-      NodeReferencesType::value_type::second_type::iterator referringNodesIt=referenceIt->second.begin();
+      //NodeReferencesType::value_type::second_type::iterator referringNodesIt=referenceIt->second.begin();
       return referenceIt->first.c_str();
       }
     n-=referenceIt->second.size();

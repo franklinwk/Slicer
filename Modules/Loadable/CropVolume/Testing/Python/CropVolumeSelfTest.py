@@ -1,6 +1,6 @@
 import os
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # CropVolumeSelfTest
@@ -76,40 +76,7 @@ class CropVolumeSelfTestWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="CropVolumeSelfTest"):
     self.onReload()
@@ -139,7 +106,7 @@ class CropVolumeSelfTestLogic:
     if not volumeNode:
       print('no volume node')
       return False
-    if volumeNode.GetImageData() == None:
+    if volumeNode.GetImageData() is None:
       print('no image data')
       return False
     return True
@@ -202,15 +169,25 @@ class CropVolumeSelfTestTest(unittest.TestCase):
     cropVolumeLogic = slicer.modules.cropvolume.logic()
     cropVolumeLogic.Apply(cropVolumeNode)
 
-    slicer.mrmlScene.RemoveNode(roi)
+    self.delayDisplay('First test passed, closing the scene and running again')
+    # test clearing the scene and running a second time
+    slicer.mrmlScene.Clear(0)
+    # the module will re-add the removed parameters node
+    cropVolumeNode = slicer.mrmlScene.GetNodeByID('vtkMRMLCropVolumeParametersNode1')
+    vol = self.downloadMRHead()
+    roi = slicer.vtkMRMLAnnotationROINode()
+    roi.Initialize(slicer.mrmlScene)
+    cropVolumeNode.SetInputVolumeNodeID(vol.GetID())
+    cropVolumeNode.SetROINodeID(roi.GetID())
+    cropVolumeLogic.Apply(cropVolumeNode)
 
     self.delayDisplay('Test passed')
 
   def downloadMRHead(self):
-    uri = 'http://www.slicer.org/slicerWiki/images/4/43/MR-head.nrrd'
-    name = 'MRHead'
-    vl = slicer.modules.volumes.logic()
-    volumeNode = vl.AddArchetypeVolume(uri, name, 0)
-    return volumeNode
+    import SampleData
+    sampleDataLogic = SampleData.SampleDataLogic()
+    self.delayDisplay('Getting MR Head Volume')
+    mrHeadVolume = sampleDataLogic.downloadMRHead()
+    return mrHeadVolume
 
 

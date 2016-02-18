@@ -32,7 +32,7 @@ namespace itk
  */
 
 template <class TData>
-class DiffusionTensor3DRead : public Object
+class ITK_ABI_EXPORT DiffusionTensor3DRead : public Object
 {
 public:
   typedef TData                                DataType;
@@ -49,6 +49,9 @@ public:
   typedef SmartPointer<Self>                   Pointer;
   typedef SmartPointer<const Self>             ConstPointer;
 
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(DiffusionTensor3DRead, Object);
+
   itkNewMacro( Self );
   int Update( const char* input );
 
@@ -62,11 +65,13 @@ public:
 
   // /Set Number Of Threads
   itkSetMacro( NumberOfThreads, unsigned int);
+  itkGetMacro( HasMeasurementFrame , bool ) ;
 private:
   DiffusionTensor3DRead();
   typename FileReaderType::Pointer m_Reader;
   MatrixType   m_MeasurementFrame;
   unsigned int m_NumberOfThreads;
+  bool m_HasMeasurementFrame ;
 };
 
 } // end namespace itk

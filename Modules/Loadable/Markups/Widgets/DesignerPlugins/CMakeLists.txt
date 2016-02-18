@@ -11,12 +11,15 @@ set(${KIT}_SRCS
 
   qMRML${MODULE_NAME}FiducialProjectionPropertyWidgetPlugin.cxx
   qMRML${MODULE_NAME}FiducialProjectionPropertyWidgetPlugin.h
+  qSlicerSimpleMarkupsWidgetPlugin.cxx
+  qSlicerSimpleMarkupsWidgetPlugin.h
   )
 
 set(${KIT}_MOC_SRCS
   qSlicer${MODULE_NAME}ModuleWidgetsPlugin.h
 
   qMRML${MODULE_NAME}FiducialProjectionPropertyWidgetPlugin.h
+  qSlicerSimpleMarkupsWidgetPlugin.h
   )
 
 set(${KIT}_TARGET_LIBRARIES
@@ -27,6 +30,7 @@ set(${KIT}_TARGET_LIBRARIES
 ctkMacroBuildQtDesignerPlugin(
   NAME ${KIT}
   EXPORT_DIRECTIVE ${${KIT}_EXPORT}
+  FOLDER "Module-${MODULE_NAME}"
   SRCS ${${KIT}_SRCS}
   MOC_SRCS ${${KIT}_MOC_SRCS}
   TARGET_LIBRARIES ${${KIT}_TARGET_LIBRARIES}

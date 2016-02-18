@@ -1,49 +1,56 @@
-from __main__ import vtk, qt, ctk, slicer
+import os
+import unittest
+import vtk, qt, ctk, slicer
+from slicer.ScriptedLoadableModule import *
+import logging
 
 #
 # LabelStatistics
 #
 
-class LabelStatistics:
+class LabelStatistics(ScriptedLoadableModule):
+  """Uses ScriptedLoadableModule base class, available at:
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
+  """
+
   def __init__(self, parent):
     import string
-    parent.title = "Label Statistics"
-    parent.categories = ["Quantification"]
-    parent.contributors = ["Steve Pieper (Isomics)"]
+    ScriptedLoadableModule.__init__(self, parent)
+    self.parent.title = "Label Statistics"
+    self.parent.categories = ["Quantification"]
+    self.parent.dependencies = []
+    self.parent.contributors = ["Steve Pieper (Isomics), Andras Lasso (PerkLab)"]
     parent.helpText = string.Template("""
 Use this module to calculate counts and volumes for different labels of a label map plus statistics on the grayscale background volume.  Note: volumes must have same dimensions.  See <a href=\"$a/Documentation/$b.$c/Modules/LabelStatistics\">$a/Documentation/$b.$c/Modules/LabelStatistics</a> for more information.
     """).substitute({ 'a':parent.slicerWikiUrl, 'b':slicer.app.majorVersion, 'c':slicer.app.minorVersion })
     parent.acknowledgementText = """
     Supported by NA-MIC, NAC, BIRN, NCIGT, and the Slicer Community. See http://www.slicer.org for details.  Module implemented by Steve Pieper.
     """
-    self.parent = parent
 
 #
-# qSlicerPythonModuleExampleWidget
+# LabelStatisticsWidget
 #
 
-class LabelStatisticsWidget:
-  def __init__(self, parent=None):
+class LabelStatisticsWidget(ScriptedLoadableModuleWidget):
+  """Uses ScriptedLoadableModuleWidget base class, available at:
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
+  """
+
+  def setup(self):
+    ScriptedLoadableModuleWidget.setup(self)
+
     self.chartOptions = ("Count", "Volume mm^3", "Volume cc", "Min", "Max", "Mean", "StdDev")
-    if not parent:
-      self.parent = slicer.qMRMLWidget()
-      self.parent.setLayout(qt.QVBoxLayout())
-      self.parent.setMRMLScene(slicer.mrmlScene)
-    else:
-      self.parent = parent
+
     self.logic = None
     self.grayscaleNode = None
     self.labelNode = None
     self.fileName = None
     self.fileDialog = None
-    if not parent:
-      self.setup()
-      self.grayscaleSelector.setMRMLScene(slicer.mrmlScene)
-      self.labelSelector.setMRMLScene(slicer.mrmlScene)
-      self.parent.show()
 
-  def setup(self):
+
+    # Instantiate and connect widgets ...
     #
+
     # the grayscale volume selector
     #
     self.grayscaleSelectorFrame = qt.QFrame(self.parent)
@@ -55,8 +62,7 @@ class LabelStatisticsWidget:
     self.grayscaleSelectorFrame.layout().addWidget(self.grayscaleSelectorLabel)
 
     self.grayscaleSelector = slicer.qMRMLNodeComboBox(self.grayscaleSelectorFrame)
-    self.grayscaleSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
-    self.grayscaleSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    self.grayscaleSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
     self.grayscaleSelector.selectNodeUponCreation = False
     self.grayscaleSelector.addEnabled = False
     self.grayscaleSelector.removeEnabled = False
@@ -80,20 +86,21 @@ class LabelStatisticsWidget:
     self.labelSelectorFrame.layout().addWidget( self.labelSelectorLabel )
 
     self.labelSelector = slicer.qMRMLNodeComboBox()
-    self.labelSelector.nodeTypes = ( "vtkMRMLScalarVolumeNode", "" )
-    self.labelSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", "1" )
+    self.labelSelector.nodeTypes = ["vtkMRMLLabelMapVolumeNode"]
     # todo addAttribute
     self.labelSelector.selectNodeUponCreation = False
     self.labelSelector.addEnabled = False
     self.labelSelector.noneEnabled = True
     self.labelSelector.removeEnabled = False
     self.labelSelector.showHidden = False
-    self.labelSelector.showChildNodeTypes = False
+    self.labelSelector.showChildNodeTypes = True
     self.labelSelector.setMRMLScene( slicer.mrmlScene )
     self.labelSelector.setToolTip( "Pick the label map to edit" )
     self.labelSelectorFrame.layout().addWidget( self.labelSelector )
 
-    # Apply button
+    #
+    # Apply Button
+    #
     self.applyButton = qt.QPushButton("Apply")
     self.applyButton.toolTip = "Calculate Statistics."
     self.applyButton.enabled = False
@@ -123,10 +130,10 @@ class LabelStatisticsWidget:
 
 
     # Save button
-    self.saveButton = qt.QPushButton("Save")
-    self.saveButton.toolTip = "Calculate Statistics."
-    self.saveButton.enabled = False
-    self.parent.layout().addWidget(self.saveButton)
+    self.exportToTableButton = qt.QPushButton("Export to table")
+    self.exportToTableButton.toolTip = "Export statistics to table node"
+    self.exportToTableButton.enabled = False
+    self.parent.layout().addWidget(self.exportToTableButton)
 
     # Add vertical spacer
     self.parent.layout().addStretch(1)
@@ -134,7 +141,7 @@ class LabelStatisticsWidget:
     # connections
     self.applyButton.connect('clicked()', self.onApply)
     self.chartButton.connect('clicked()', self.onChart)
-    self.saveButton.connect('clicked()', self.onSave)
+    self.exportToTableButton.connect('clicked()', self.onExportToTable)
     self.grayscaleSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onGrayscaleSelect)
     self.labelSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onLabelSelect)
 
@@ -146,33 +153,33 @@ class LabelStatisticsWidget:
     self.labelNode = node
     self.applyButton.enabled = bool(self.grayscaleNode) and bool(self.labelNode)
 
-  def volumesAreValid(self):
-    """Verify that volumes are compatible with label calculation
-    algorithm assumptions"""
-    if not self.grayscaleNode or not self.labelNode:
-      return False
-    if not self.grayscaleNode.GetImageData() or not self.labelNode.GetImageData():
-      return False
-    if self.grayscaleNode.GetImageData().GetDimensions() != self.labelNode.GetImageData().GetDimensions():
-      return False
-    return True
-
   def onApply(self):
     """Calculate the label statistics
     """
-    if not self.volumesAreValid():
-      qt.QMessageBox.warning(slicer.util.mainWindow(),
-          "Label Statistics", "Volumes do not have the same geometry.")
-      return
 
     self.applyButton.text = "Working..."
     # TODO: why doesn't processEvents alone make the label text change?
     self.applyButton.repaint()
     slicer.app.processEvents()
-    self.logic = LabelStatisticsLogic(self.grayscaleNode, self.labelNode)
+    # resample the label to the space of the grayscale if needed
+    volumesLogic = slicer.modules.volumes.logic()
+    warnings = volumesLogic.CheckForLabelVolumeValidity(self.grayscaleNode, self.labelNode)
+    resampledLabelNode = None
+    if warnings != "":
+      if 'mismatch' in warnings:
+        resampledLabelNode = volumesLogic.ResampleVolumeToReferenceVolume(self.labelNode, self.grayscaleNode)
+        # resampledLabelNode does not have a display node, therefore the colorNode has to be passed to it
+        self.logic = LabelStatisticsLogic(self.grayscaleNode, resampledLabelNode, colorNode=self.labelNode.GetDisplayNode().GetColorNode(), nodeBaseName=self.labelNode.GetName())
+      else:
+        slicer.util.warnDisplay("Volumes do not have the same geometry.\n%s" % warnings, windowTitle="Label Statistics")
+        return
+    else:
+      self.logic = LabelStatisticsLogic(self.grayscaleNode, self.labelNode)
     self.populateStats()
+    if resampledLabelNode:
+      slicer.mrmlScene.RemoveNode(resampledLabelNode)
     self.chartFrame.enabled = True
-    self.saveButton.enabled = True
+    self.exportToTableButton.enabled = True
     self.applyButton.text = "Apply"
 
   def onChart(self):
@@ -181,6 +188,11 @@ class LabelStatisticsWidget:
     valueToPlot = self.chartOptions[self.chartOption.currentIndex]
     ignoreZero = self.chartIgnoreZero.checked
     self.logic.createStatsChart(self.labelNode,valueToPlot,ignoreZero)
+
+  def onExportToTable(self):
+    """write the label statistics to a table node
+    """
+    self.logic.exportToTable()
 
   def onSave(self):
     """save the label statistics
@@ -209,19 +221,32 @@ class LabelStatisticsWidget:
     self.view.verticalHeader().visible = False
     row = 0
     for i in self.logic.labelStats["Labels"]:
+      col = 0
+      
       color = qt.QColor()
       rgb = lut.GetTableValue(i)
       color.setRgb(rgb[0]*255,rgb[1]*255,rgb[2]*255)
       item = qt.QStandardItem()
-      item.setData(color,1)
+      item.setData(color,qt.Qt.DecorationRole)
       item.setToolTip(colorNode.GetColorName(i))
-      self.model.setItem(row,0,item)
+      item.setEditable(False)
+      self.model.setItem(row,col,item)
       self.items.append(item)
-      col = 1
+      col += 1
+      
+      item = qt.QStandardItem()
+      item.setData(colorNode.GetColorName(i),qt.Qt.DisplayRole)
+      item.setEditable(False)
+      self.model.setItem(row,col,item)
+      self.items.append(item)
+      col += 1
+      
       for k in self.logic.keys:
         item = qt.QStandardItem()
-        item.setText(str(self.logic.labelStats[i,k]))
+        # set data as float with Qt::DisplayRole
+        item.setData(float(self.logic.labelStats[i,k]),qt.Qt.DisplayRole)
         item.setToolTip(colorNode.GetColorName(i))
+        item.setEditable(False)
         self.model.setItem(row,col,item)
         self.items.append(item)
         col += 1
@@ -229,33 +254,47 @@ class LabelStatisticsWidget:
 
     self.view.setColumnWidth(0,30)
     self.model.setHeaderData(0,1," ")
-    col = 1
+    self.model.setHeaderData(1,1,"Type")
+    col = 2
     for k in self.logic.keys:
       self.view.setColumnWidth(col,15*len(k))
       self.model.setHeaderData(col,1,k)
       col += 1
 
-class LabelStatisticsLogic:
+#
+# LabelStatisticsLogic
+#
+
+class LabelStatisticsLogic(ScriptedLoadableModuleLogic):
   """Implement the logic to calculate label statistics.
   Nodes are passed in as arguments.
   Results are stored as 'statistics' instance variable.
+  Uses ScriptedLoadableModuleLogic base class, available at:
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
-  def __init__(self, grayscaleNode, labelNode, fileName=None):
+  def __init__(self, grayscaleNode, labelNode, colorNode=None, nodeBaseName=None, fileName=None):
     #import numpy
-
+    
     self.keys = ("Index", "Count", "Volume mm^3", "Volume cc", "Min", "Max", "Mean", "StdDev")
     cubicMMPerVoxel = reduce(lambda x,y: x*y, labelNode.GetSpacing())
     ccPerCubicMM = 0.001
 
     # TODO: progress and status updates
     # this->InvokeEvent(vtkLabelStatisticsLogic::StartLabelStats, (void*)"start label stats")
+    
+    self.labelNode = labelNode
+    self.colorNode = colorNode
+
+    self.nodeBaseName = nodeBaseName
+    if not self.nodeBaseName:
+      self.nodeBaseName = labelNode.GetName() if labelNode.GetName() else 'Labels'
 
     self.labelStats = {}
     self.labelStats['Labels'] = []
 
     stataccum = vtk.vtkImageAccumulate()
-    stataccum.SetInput(labelNode.GetImageData())
+    stataccum.SetInputConnection(labelNode.GetImageDataConnection())
     stataccum.Update()
     lo = int(stataccum.GetMin()[0])
     hi = int(stataccum.GetMax()[0])
@@ -271,7 +310,7 @@ class LabelStatisticsLogic:
       # //logic copied from slicer2 LabelStatistics MaskStat
       # // create the binary volume of the label
       thresholder = vtk.vtkImageThreshold()
-      thresholder.SetInput(labelNode.GetImageData())
+      thresholder.SetInputConnection(labelNode.GetImageDataConnection())
       thresholder.SetInValue(1)
       thresholder.SetOutValue(0)
       thresholder.ReplaceOutOn()
@@ -283,14 +322,16 @@ class LabelStatisticsLogic:
 
       #  use vtk's statistics class with the binary labelmap as a stencil
       stencil = vtk.vtkImageToImageStencil()
-      stencil.SetInput(thresholder.GetOutput())
+      stencil.SetInputConnection(thresholder.GetOutputPort())
       stencil.ThresholdBetween(1, 1)
 
       # this.InvokeEvent(vtkLabelStatisticsLogic::LabelStatsInnerLoop, (void*)"0.5")
 
       stat1 = vtk.vtkImageAccumulate()
-      stat1.SetInput(grayscaleNode.GetImageData())
-      stat1.SetStencil(stencil.GetOutput())
+      stat1.SetInputConnection(grayscaleNode.GetImageDataConnection())
+      stencil.Update()
+      stat1.SetStencilData(stencil.GetOutput())
+
       stat1.Update()
 
       # this.InvokeEvent(vtkLabelStatisticsLogic::LabelStatsInnerLoop, (void*)"0.75")
@@ -310,6 +351,18 @@ class LabelStatisticsLogic:
         # this.InvokeEvent(vtkLabelStatisticsLogic::LabelStatsInnerLoop, (void*)"1")
 
     # this.InvokeEvent(vtkLabelStatisticsLogic::EndLabelStats, (void*)"end label stats")
+
+  def getColorNode(self):
+    """Returns the color node corresponding to the labelmap. If a color node is explicitly
+    specified then that will be used. Otherwise the color node is retrieved from the display node
+    of the labelmap node
+    """
+    if self.colorNode:
+      return self.colorNode
+    displayNode = self.labelNode.GetDisplayNode()
+    if not displayNode:
+      return None
+    return displayNode.GetColorNode()
 
   def createStatsChart(self, labelNode, valueToPlot, ignoreZero=False):
     """Make a MRML chart of the current stats
@@ -342,6 +395,9 @@ class LabelStatisticsLogic:
           tuple += 1
 
     chartNode = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
+
+    state = chartNode.StartModify()
+
     chartNode.AddArray(valueToPlot, arrayNode.GetID())
 
     chartViewNode.SetChartNodeID(chartNode.GetID())
@@ -354,22 +410,68 @@ class LabelStatisticsLogic:
     chartNode.SetProperty('default', 'showLegend', 'off')
 
     # series level properties
-    if labelNode.GetDisplayNode() != None and labelNode.GetDisplayNode().GetColorNode() != None:
-      chartNode.SetProperty(valueToPlot, 'lookupTable', labelNode.GetDisplayNode().GetColorNodeID());
+    if labelNode.GetDisplayNode() is not None and self.getColorNode() is not None:
+      chartNode.SetProperty(valueToPlot, 'lookupTable', self.getColorNode().GetID());
 
+    chartNode.EndModify(state)
+
+  def exportToTable(self):
+    """
+    Export statistics to table node
+    """
+
+    colorNode = self.getColorNode()
+
+    table = slicer.vtkMRMLTableNode()
+    tableWasModified = table.StartModify()
+
+    table.SetName(slicer.mrmlScene.GenerateUniqueName(self.nodeBaseName+' statistics'))
+    
+    # Define table columns
+    if colorNode:
+      col=table.AddColumn()
+      col.SetName("Type")
+    for k in self.keys:
+      col=table.AddColumn()
+      col.SetName(k)
+    for i in self.labelStats["Labels"]:
+      rowIndex = table.AddEmptyRow()
+      if colorNode:
+        columnIndex = 0
+        table.SetCellText(rowIndex, columnIndex, colorNode.GetColorName(i))
+        columnIndex += 1
+      # Add other values
+      for k in self.keys:
+        table.SetCellText(rowIndex, columnIndex, str(self.labelStats[i,k]))
+        columnIndex += 1
+
+    table.EndModify(tableWasModified)
+
+    # Add table to the scene and show it
+    slicer.mrmlScene.AddNode(table)
+    slicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutFourUpTableView)
+    slicer.app.applicationLogic().GetSelectionNode().SetReferenceActiveTableID(table.GetID())
+    slicer.app.applicationLogic().PropagateTableSelection()
 
   def statsAsCSV(self):
     """
     print comma separated value file with header keys in quotes
     """
+    
+    colorNode = self.getColorNode()
+    
     csv = ""
     header = ""
+    if colorNode:
+      header += "\"%s\"" % "Type" + ","
     for k in self.keys[:-1]:
       header += "\"%s\"" % k + ","
     header += "\"%s\"" % self.keys[-1] + "\n"
     csv = header
     for i in self.labelStats["Labels"]:
       line = ""
+      if colorNode:
+        line += colorNode.GetColorName(i) + ","
       for k in self.keys[:-1]:
         line += str(self.labelStats[i,k]) + ","
       line += str(self.labelStats[i,self.keys[-1]]) + "\n"
@@ -381,6 +483,58 @@ class LabelStatisticsLogic:
     fp.write(self.statsAsCSV())
     fp.close()
 
+
+
+class LabelStatisticsTest(ScriptedLoadableModuleTest):
+  """
+  This is the test case for your scripted module.
+  Uses ScriptedLoadableModuleTest base class, available at:
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
+  """
+
+  def setUp(self):
+    """ Do whatever is needed to reset the state - typically a scene clear will be enough.
+    """
+    slicer.mrmlScene.Clear(0)
+
+  def runTest(self,scenario=None):
+    """Run as few or as many tests as needed here.
+    """
+    self.setUp()
+    self.test_LabelStatisticsBasic()
+
+  def test_LabelStatisticsBasic(self):
+    """
+    This tests some aspects of the label statistics
+    """
+
+    self.delayDisplay("Starting test_LabelStatisticsBasic")
+    #
+    # first, get some data
+    #
+    import SampleData
+    sampleDataLogic = SampleData.SampleDataLogic()
+    mrHead = sampleDataLogic.downloadMRHead()
+    ctChest = sampleDataLogic.downloadCTChest()
+    self.delayDisplay('Two data sets loaded')
+
+    volumesLogic = slicer.modules.volumes.logic()
+
+    mrHeadLabel = volumesLogic.CreateAndAddLabelVolume( slicer.mrmlScene, mrHead, "mrHead-label" )
+
+    warnings = volumesLogic.CheckForLabelVolumeValidity(ctChest, mrHeadLabel)
+
+    self.delayDisplay("Warnings for mismatch:\n%s" % warnings)
+
+    self.assertNotEqual( warnings, "" )
+
+    warnings = volumesLogic.CheckForLabelVolumeValidity(mrHead, mrHeadLabel)
+
+    self.delayDisplay("Warnings for match:\n%s" % warnings)
+
+    self.assertEqual( warnings, "" )
+
+    self.delayDisplay('test_LabelStatisticsBasic passed!')
 
 class Slicelet(object):
   """A slicer slicelet is a module widget that comes up in stand alone mode

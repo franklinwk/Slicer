@@ -20,7 +20,6 @@
 #include <itkInterpolateImageFunction.h>
 #include "itkSeparateComponentsOfADiffusionTensorImage.h"
 // #include <itkMutexLock.h>
-// #include <itkSemaphore.h>
 
 namespace itk
 {
@@ -61,6 +60,10 @@ public:
   typedef typename DiffusionImageType::RegionType                        itkRegionType;
   typedef typename DiffusionImageType::SizeType                          SizeType;
   typedef typename Superclass::ContinuousIndexType                       ContinuousIndexType;
+
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(DiffusionTensor3DInterpolateImageFunctionReimplementation, DiffusionTensor3DInterpolateImageFunction);
+
   /** Evaluate the interpolated tensor at a position
    */
   // TensorDataType Evaluate( const PointType &point ) ;

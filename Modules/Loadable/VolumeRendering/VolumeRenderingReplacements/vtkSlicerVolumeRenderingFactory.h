@@ -12,7 +12,7 @@
      PURPOSE.  See the above copyright notice for more information.
 
 =========================================================================*/
-// .NAME vtkSlicerVolumeRenderingFactory - 
+// .NAME vtkSlicerVolumeRenderingFactory -
 // .SECTION Description
 
 #ifndef __vtkSlicerVolumeRenderingFactory_h
@@ -26,13 +26,13 @@ class Q_SLICER_QTMODULES_VOLUMERENDERING_REPLACEMENTS_EXPORT vtkSlicerVolumeRend
 {
 public:
   static vtkSlicerVolumeRenderingFactory *New();
-  vtkTypeRevisionMacro(vtkSlicerVolumeRenderingFactory,vtkObject);
+  vtkTypeMacro(vtkSlicerVolumeRenderingFactory,vtkObject);
   virtual void PrintSelf(ostream& os, vtkIndent indent);
 
   // Description:
   // Create and return an instance of the named vtk object.
   // This method first checks the vtkObjectFactory to support
-  // dynamic loading. 
+  // dynamic loading.
   static vtkObject* CreateInstance(const char* vtkclassname);
 
 protected:

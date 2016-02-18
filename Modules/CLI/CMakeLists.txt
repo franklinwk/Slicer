@@ -1,5 +1,4 @@
 
-
 #-----------------------------------------------------------------------------
 # WARNING: CLI modules should be topologically ordered.
 #-----------------------------------------------------------------------------
@@ -34,70 +33,41 @@ set(cli_modules
   ResampleDTIVolume # Needed by ResampleScalarVectorDWIVolume
   ResampleScalarVectorDWIVolume # Depends on DiffusionApplications, needed by CropVolume
   RobustStatisticsSegmenter
-  ROITest
   SimpleRegionGrowingSegmentation
   SubtractScalarVolumes
   ThresholdScalarVolume
   VotingBinaryHoleFillingImageFilter
   )
+if(BUILD_TESTING)
+  list(APPEND cli_modules ROITest)
+endif()
 
 if(Slicer_BUILD_DICOM_SUPPORT)
   list(APPEND cli_modules CreateDICOMSeries)
   list(APPEND cli_modules PETStandardUptakeValueComputation)
 endif()
 
-if(Slicer_BUILD_DIFFUSION_SUPPORT)
-  list(APPEND cli_modules
-    DiffusionTensorScalarMeasurements
-    DiffusionWeightedVolumeMasking
-    DWIJointRicianLMMSEFilter
-    DWIRicianLMMSEFilter
-    DWIToDTIEstimation
-    DWIUnbiasedNonLocalMeansFilter
-    DTIImportExport
-    TractographyLabelMapSeeding
-    FiberBundleLabelSelect
-    )
-endif()
-
 if(Slicer_BUILD_LEGACY_CLI)
   set(legacy_cli_modules
-    AffineRegistration
-    BSplineDeformableRegistration
     BSplineToDeformationField
-    DiffusionTensorTest
     ExpertAutomatedRegistration
     FiducialRegistration
-    LinearRegistration
-    MultiResolutionAffineRegistration
-    OtsuThresholdImageFilter
-    OtsuThresholdSegmentation
     ResampleScalarVolume
-    RigidRegistration
-    TestGridTransformRegistration
     )
+  if(BUILD_TESTING)
+    list(APPEND legacy_cli_modules
+      DiffusionTensorTest
+      TestGridTransformRegistration
+      )
+  endif()
   list(APPEND cli_modules ${legacy_cli_modules})
 endif()
 
 if (Slicer_BUILD_EMSegment)
   ## EMSegment requires some LEGACY_CLI to work. Add them if not already added
-  if (NOT Slicer_BUILD_LEGACY_CLI)
+  if(NOT Slicer_BUILD_LEGACY_CLI)
     list(APPEND cli_modules BSplineToDeformationField)
   endif()
-endif()
-
-if("${ITK_VERSION_MAJOR}" LESS 4)
-  if(Slicer_BUILD_DICOM_SUPPORT)
-    list(APPEND cli_modules DicomToNrrdConverter)
-  endif()
-endif()
-
-if(Slicer_USE_MIDAS)
-  list(APPEND cli_modules MIDASApplications)
-endif()
-
-if(Slicer_USE_BatchMake)
-  list(APPEND cli_modules BatchMakeApplications)
 endif()
 
 if(BUILD_TESTING)
@@ -109,23 +79,24 @@ if(BUILD_TESTING)
     DOC "Directory with data taken from http://public.kitware.com/pub/itk/Data/BrainWeb/")
   mark_as_advanced(SLICER_BRAINWEB_DATA_ROOT)
 
-  set(SEM_LAUNCH_COMMAND ${Slicer_LAUNCH_COMMAND})
-  if(USE_VALGRIND)
-    set(SEM_LAUNCH_COMMAND "${Slicer_BINARY_DIR}/Scripts/runValgrindForOneModule.sh")
-  endif()
-
-  set(BASELINE "${Slicer_SOURCE_DIR}/Testing/Data/Baseline/CLI")
-  set(TEST_DATA "${Slicer_SOURCE_DIR}/Testing/Data/Input")
-  set(MRML_TEST_DATA "${Slicer_SOURCE_DIR}/Libs/MRML/Core/Testing/TestData")
-  set(TEMP "${Slicer_BINARY_DIR}/Testing/Temporary")
+  # Set CLI testing directories as cache variable so that it can be used by
+  # remote module SlicerDMRI included from top-level CMakeLists.txt
+  set(BASELINE "${Slicer_SOURCE_DIR}/Testing/Data/Baseline/CLI"
+    CACHE PATH "MRML CLI baseline directory")
+  set(TEST_DATA "${Slicer_SOURCE_DIR}/Testing/Data/Input"
+    CACHE PATH "MRML CLI testing input data directory")
+  set(MRML_TEST_DATA "${Slicer_SOURCE_DIR}/Libs/MRML/Core/Testing/TestData"
+    CACHE PATH "MRML CLI testing common data directory")
+  set(TEMP "${Slicer_BINARY_DIR}/Testing/Temporary"
+    CACHE PATH "MRML CLI testing temp directory")
 
   set(MRML_DATA "${Slicer_HOME}/share/MRML/Testing/TestData")
 endif()
 
 foreach(module ${cli_modules})
   list(FIND Slicer_CLIMODULES_DISABLED ${module} _module_disabled)
+  set(${module}_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${module})
   if(${_module_disabled} STREQUAL "-1")
-    set(${module}_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${module})
     add_subdirectory(${module})
   endif()
 endforeach(module)

@@ -26,11 +26,14 @@
 #include <vtkMRMLScene.h>
 
 // VTK includes
+#include <vtkAlgorithmOutput.h>
 #include <vtkDataSetAttributes.h>
 #include <vtkImageData.h>
 #include <vtkNew.h>
 #include <vtkStringArray.h>
 #include <vtkSmartPointer.h>
+#include <vtkTrivialProducer.h>
+#include <vtkStreamingDemandDrivenPipeline.h>
 
 // ITK includes
 #include "itkImage.h"
@@ -44,27 +47,30 @@
 
 // ITK includes
 #include <itkConfigure.h>
-#if ITK_VERSION_MAJOR > 3
-#  include <itkFactoryRegistration.h>
-#endif
+#include <itkFactoryRegistration.h>
 
 //-----------------------------------------------------------------------------
-bool isImageDataValid(vtkImageData* imageData)
+bool isImageDataValid(vtkAlgorithmOutput* imageDataConnection)
 {
-  if (!imageData)
+  if (!imageDataConnection ||
+      !imageDataConnection->GetProducer())
     {
+    std::cout << "No image data port" << std::endl;
     return false;
     }
-  imageData->GetProducerPort();
-  vtkInformation* info = imageData->GetPipelineInformation();
+  imageDataConnection->GetProducer()->Update();
+  vtkInformation* info =
+    imageDataConnection->GetProducer()->GetOutputInformation(0);
   if (!info)
     {
+    std::cout << "No output information" << std::endl;
     return false;
     }
   vtkInformation *scalarInfo = vtkDataObject::GetActiveFieldInformation(info,
     vtkDataObject::FIELD_ASSOCIATION_POINTS, vtkDataSetAttributes::SCALARS);
   if (!scalarInfo)
     {
+    std::cout << "No scalar information" << std::endl;
     return false;
     }
   return true;
@@ -73,9 +79,7 @@ bool isImageDataValid(vtkImageData* imageData)
 //-----------------------------------------------------------------------------
 int main( int argc, char * argv[] )
 {
-#if ITK_VERSION_MAJOR > 3
   itk::itkFactoryRegistration();
-#endif
 
   if(argc<2)
     {
@@ -122,7 +126,7 @@ int main( int argc, char * argv[] )
       logic->AddArchetypeVolume(fileNameList->GetValue(0), "rgbVolume", 0, fileNameList));
 
   if (!vectorVolume ||
-      !isImageDataValid(vectorVolume->GetImageData()))
+      !isImageDataValid(vectorVolume->GetImageDataConnection()))
     {
     std::cerr << "Failed to load RGB image." << std::endl;
     return EXIT_FAILURE;

@@ -186,7 +186,7 @@ def versionDataModulesDirectory(sourceVersion, destVersion, token, communicator,
     if sourceIndex == -1:
       _error("No folder named " + sourceVersion + " in module: " + availableModulesFolders[num_module]["name"])
     sourceID = _getIDfromIndex(availableVersions, "folder", sourceIndex)
-    
+
     # Create a new folder for destination under the module folder
     print "Creating folder", destVersion, "under", availableModulesFolders[num_module]["name"], "module directory"
     dest_folder = communicator.create_folder(token, destVersion, moduleFolderID)
@@ -318,7 +318,7 @@ def _checkRequiredArguments(options, parser):
     parser -- OptionParser."""
   missing_options = []
   for option in parser.option_list:
-    if re.match(r'^\[REQUIRED\]', option.help) and eval('options.' + option.dest) == None:
+    if re.match(r'^\[REQUIRED\]', option.help) and eval('options.' + option.dest) is None:
       missing_options.extend(option._long_opts)
   if len(missing_options) > 0:
     _error('Missing REQUIRED parameters: ' + str(missing_options))

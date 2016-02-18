@@ -53,12 +53,12 @@ public:
   itkSetMacro(DontShowParameters, bool);
   itkSetMacro(UpdateInterval, int);
 
-  void Execute( Object * caller, const EventObject & event )
+  void Execute( Object * caller, const EventObject & event ) ITK_OVERRIDE
   {
     Execute( (const Object *)caller, event );
   }
 
-  void Execute( const Object * object, const EventObject & event )
+  void Execute( const Object * object, const EventObject & event ) ITK_OVERRIDE
   {
     if( typeid( event ) != typeid( IterationEvent ) || object == NULL )
       {
@@ -69,11 +69,7 @@ public:
 
     if( ++m_Iteration % m_UpdateInterval == 0 )
       {
-#if ITK_VERSION_MAJOR < 4
-      RealTimeClock::TimeStampType t = m_Clock->GetTimeStamp();
-#else
       RealTimeClock::TimeStampType t = m_Clock->GetTimeInSeconds();
-#endif
       if( !m_DontShowParameters )
         {
         std::cout << "   " << m_Iteration << " : "
@@ -110,11 +106,7 @@ protected:
   BSplineImageRegistrationViewer()
   {
     m_Clock = RealTimeClock::New();
-#if ITK_VERSION_MAJOR < 4
-    m_LastTime = m_Clock->GetTimeStamp();
-#else
     m_LastTime = m_Clock->GetTimeInSeconds();
-#endif
     m_Iteration = 0;
     m_UpdateInterval = 1;
     m_DontShowParameters = false;
@@ -832,7 +824,6 @@ BSplineImageToImageRegistrationMethod<TImage>
   typedef BSplineResampleImageFunction<ParametersImageType, double>
   FunctionType;
   typedef IdentityTransform<double, ImageDimension> IdentityTransformType;
-  typedef itk::ImageFileWriter<ParametersImageType> WriterType;
   for( unsigned int k = 0; k < ImageDimension; k++ )
     {
     typename ResamplerType::Pointer upsampler = ResamplerType::New();
@@ -865,7 +856,7 @@ BSplineImageToImageRegistrationMethod<TImage>
     */
 
     upsampler->SetInput( this->GetTypedTransform()
-                         ->GetCoefficientImage()[k] );
+                         ->GetCoefficientImages()[k] );
     upsampler->SetInterpolator( function );
     upsampler->SetTransform( identity );
     upsampler->SetSize( gridSize );

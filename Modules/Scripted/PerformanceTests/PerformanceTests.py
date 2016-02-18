@@ -1,4 +1,4 @@
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # PerformanceTests
@@ -76,7 +76,7 @@ class PerformanceTestsWidget:
       self.log.insertHtml('<i>Displaying...</i>')
       self.log.insertPlainText('\n')
       self.log.repaint()
-      mrmlLogic = slicer.app.mrmlApplicationLogic()
+      mrmlLogic = slicer.app.applicationLogic()
       selNode = mrmlLogic.GetSelectionNode()
       selNode.SetReferenceActiveVolumeID(volumeNode.GetID())
       mrmlLogic.PropagateVolumeSelection(1)
@@ -140,14 +140,11 @@ class PerformanceTestsWidget:
   def chartCallback(self, mrmlID, pointIndex, x, y):
     node = slicer.util.getNode(mrmlID)
     name = node.GetName()
-    qt.QMessageBox.information(
-        slicer.util.mainWindow(), "Chart Callback",
-        """Clicked at point {x}, {y}
-on node {name} (id {mrmlID})
-with point index of {pointIndex}
-        """.format(x=x,y=y,name=name,mrmlID=mrmlID,pointIndex=pointIndex))
-
-
+    slicer.util.infoDisplay("""Clicked at point {x}, {y}
+                               on node {name} (id {mrmlID})
+                               with point index of {pointIndex}
+                            """.format(x=x,y=y,name=name,mrmlID=mrmlID,pointIndex=pointIndex),
+                            windowTitle="Chart Callback")
 
   def chartTest(self):
     import math,random

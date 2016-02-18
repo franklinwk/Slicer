@@ -1,13 +1,18 @@
 
 # Install VTK python module
-list(GET VTK_PYTHONPATH_DIRS 0 VTK_PYTHON_MODULE)
+set(VTK_PYTHON_MODULE "${VTK_DIR}/Wrapping/Python")
 install(DIRECTORY ${VTK_PYTHON_MODULE}/vtk
   DESTINATION ${Slicer_INSTALL_BIN_DIR}/Python
   USE_SOURCE_PERMISSIONS
   COMPONENT Runtime)
 
 # Install external python runtime libraries that we don't link to (fixupbundle won't copy them)
-file(GLOB vtk_python_modules "${VTK_DIR}/bin/*Python.so")
+if(UNIX)
+  set(vtk_python_library_subdir "lib")
+else()
+  set(vtk_python_library_subdir "bin")
+endif()
+file(GLOB vtk_python_modules "${VTK_DIR}/${vtk_python_library_subdir}/*Python.so")
 install(FILES ${vtk_python_modules}
         DESTINATION ${Slicer_INSTALL_LIB_DIR}
         COMPONENT Runtime)

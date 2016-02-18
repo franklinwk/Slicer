@@ -38,21 +38,18 @@ class QMRML_WIDGETS_EXPORT qMRMLVolumeInfoWidget : public qMRMLWidget
   Q_OBJECT
   QVTK_OBJECT
   Q_PROPERTY(bool dataTypeEditable READ isDataTypeEditable WRITE setDataTypeEditable)
-  Q_PROPERTY(bool labelMapEditable READ isLabelMapEditable WRITE setLabelMapEditable)
 public:
   typedef qMRMLWidget Superclass;
 
   qMRMLVolumeInfoWidget(QWidget *parent=0);
   virtual ~qMRMLVolumeInfoWidget();
-  
+
   vtkMRMLVolumeNode* volumeNode()const;
   // Depends on the dimension, spacing and origin of the volume
   bool isCentered()const;
-  
+
   // Disabled by default
   bool isDataTypeEditable()const;
-  // Enabled by default
-  bool isLabelMapEditable()const;
 
 public slots:
   /// Utility function to be connected with generic signals
@@ -60,15 +57,13 @@ public slots:
   /// Set the volume node to display
   void setVolumeNode(vtkMRMLVolumeNode *node);
   void setDataTypeEditable(bool enable);
-  void setLabelMapEditable(bool enable);
-  
+
   void setImageSpacing(double*);
   void setImageOrigin(double*);
   void center();
   void setScanOrder(int);
   void setNumberOfScalars(int);
   void setScalarType(int);
-  void setLabelMap(bool);
 
 protected slots:
   void updateWidgetFromMRML();

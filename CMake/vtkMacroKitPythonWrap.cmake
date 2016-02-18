@@ -58,10 +58,34 @@ macro(vtkMacroKitPythonWrap)
     add_library(${MY_KIT_NAME}PythonD ${KitPython_SRCS} ${MY_KIT_PYTHON_EXTRA_SRCS})
 
     set(VTK_KIT_PYTHON_LIBRARIES)
-    foreach(c ${VTK_LIBRARIES})
-      list(APPEND VTK_KIT_PYTHON_LIBRARIES ${c}PythonD)
+    # XXX Hard-coded list of VTK kits available when building
+    #     with VTK_ENABLE_KITS set to 1
+    set(vtk_kits
+      vtkCommonKit
+      vtkFiltersKit
+      vtkImagingKit
+      vtkRenderingKit
+      vtkIOKit
+      vtkOpenGLKit
+      vtkInteractionKit
+      vtkViewsKit
+      vtkParallelKit
+      vtkWrappingKit
+      )
+    foreach(c ${VTK_LIBRARIES} ${vtk_kits})
+      if(${c} MATCHES "^vtk.+" AND TARGET ${c}PythonD) # exclude system libraries
+        list(APPEND VTK_KIT_PYTHON_LIBRARIES ${c}PythonD)
+      endif()
     endforeach()
-    target_link_libraries(${MY_KIT_NAME}PythonD ${MY_KIT_NAME} vtkPythonCore ${VTK_PYTHON_LIBRARIES}  ${VTK_KIT_PYTHON_LIBRARIES} ${MY_KIT_PYTHON_LIBRARIES})
+    set(VTK_PYTHON_CORE vtkWrappingPythonCore)
+    target_link_libraries(
+      ${MY_KIT_NAME}PythonD
+      ${MY_KIT_NAME}
+      ${VTK_PYTHON_CORE}
+      ${VTK_PYTHON_LIBRARIES}
+      ${VTK_KIT_PYTHON_LIBRARIES}
+      ${MY_KIT_PYTHON_LIBRARIES}
+      )
 
     install(TARGETS ${MY_KIT_NAME}PythonD
       RUNTIME DESTINATION ${MY_KIT_INSTALL_BIN_DIR} COMPONENT RuntimeLibraries

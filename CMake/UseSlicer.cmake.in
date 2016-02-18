@@ -107,6 +107,9 @@ endif()
 if(NOT DEFINED ${EXTENSION_NAME}_SOURCE_DIR
   AND NOT DEFINED ${EXTENSION_NAME}_BINARY_DIR
   AND NOT Slicer_DONT_USE_EXTENSION)
+  if(POLICY CMP0048)
+    cmake_policy(SET CMP0048 NEW)
+  endif()
   project(${EXTENSION_NAME})
 endif()
 
@@ -116,11 +119,9 @@ endif()
 
 # Expose mechanism allowing extensions to register ITK IOFactories.
 # For details: http://viewvc.slicer.org/viewvc.cgi/Slicer4?view=revision&revision=21592
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
-  list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
-  list(APPEND ITK_INCLUDE_DIRS ${ITKFactoryRegistration_INCLUDE_DIRS})
-endif()
+set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
+list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
+list(APPEND ITK_INCLUDE_DIRS ${ITKFactoryRegistration_INCLUDE_DIRS})
 
 # By default, the "<PROJECT>_USE_FILE" of each slicer external project will be included.
 # This can be changed by setting the variable Slicer_SKIP_EXTERNAL_PROJECTS_USEFILE to TRUE
@@ -141,7 +142,7 @@ else()
 endif()
 
 # Set '<PROJECTNAME>_DIR' variable(s) so that find_package(<PROJECTNAME>) works as expected.
-set(PYTHONQT_INSTALL_DIR ${CTK_PYTHONQT_INSTALL_DIR})
+# NA
 
 # Find PythonQt package so that PYTHONQT_USE_RELEASE_PYTHON_FALLBACK is defined
 # See https://github.com/commontk/PythonQt/issues/7
@@ -247,6 +248,7 @@ include(SlicerMacroBuildModuleMRML)
 include(SlicerMacroBuildModuleWidgets)
 include(SlicerMacroBuildQtModule)
 include(SlicerMacroBuildScriptedModule)
+include(SlicerFunctionAddPythonQtResources)
 include(SlicerMacroExtractRepositoryInfo)
 include(vtkMacroKitPythonWrap)
 

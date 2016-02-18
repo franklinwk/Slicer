@@ -45,6 +45,7 @@
 // STD includes
 #include <cassert>
 #include <algorithm>
+#include <functional>
 
 #if (_MSC_VER >= 1700 && _MSC_VER < 1800)
 // Visual Studio 2012 moves bind1st to <functional>
@@ -53,10 +54,9 @@
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro(vtkMRMLAbstractDisplayableManager);
-vtkCxxRevisionMacro(vtkMRMLAbstractDisplayableManager, "$Revision: 13525 $");
 
 
-struct EventEquals 
+struct EventEquals
 {
   typedef int first_argument_type;
   typedef std::pair<int,float> second_argument_type;
@@ -670,7 +670,7 @@ vtkRenderer * vtkMRMLAbstractDisplayableManager::GetRenderer()
 //---------------------------------------------------------------------------
 vtkRenderWindowInteractor * vtkMRMLAbstractDisplayableManager::GetInteractor()
 {
-  
+
   if (!this->Internal->Interactor)
     {
     vtkDebugMacro(<< this->GetClassName() << " (" << this << "): returning Interactor address 0");

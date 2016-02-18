@@ -26,13 +26,15 @@
 #include "qMRMLUtils.h"
 
 // MRML includes
-#include <vtkMRMLLinearTransformNode.h>
 #include <vtkMRMLScene.h>
+#include <vtkMRMLTransformNode.h>
 #include <vtkMRMLViewNode.h>
 
 // VTK includes
-#include <vtkTransform.h>
 #include <vtkImageData.h>
+#include <vtkNew.h>
+#include <vtkQImageToImageSource.h>
+#include <vtkTransform.h>
 
 //-----------------------------------------------------------------------------
 qMRMLUtils::qMRMLUtils(QObject* _parent)
@@ -65,12 +67,12 @@ void qMRMLUtils::vtkMatrixToQVector(vtkMatrix4x4* matrix, QVector<double> & vect
 void qMRMLUtils::getTransformInCoordinateSystem(vtkMRMLNode* node, bool global,
     vtkTransform* transform)
 {
-  Self::getTransformInCoordinateSystem(vtkMRMLLinearTransformNode::SafeDownCast( node ),
+  Self::getTransformInCoordinateSystem(vtkMRMLTransformNode::SafeDownCast( node ),
     global, transform);
 }
 
 //------------------------------------------------------------------------------
-void qMRMLUtils::getTransformInCoordinateSystem(vtkMRMLLinearTransformNode* transformNode,
+void qMRMLUtils::getTransformInCoordinateSystem(vtkMRMLTransformNode* transformNode,
   bool global, vtkTransform* transform)
 {
   Q_ASSERT(transform);
@@ -81,19 +83,20 @@ void qMRMLUtils::getTransformInCoordinateSystem(vtkMRMLLinearTransformNode* tran
 
   transform->Identity();
 
-  if (!transformNode)
+  if (!transformNode || !transformNode->IsLinear())
     {
     return;
     }
 
-  vtkMatrix4x4 *matrix = transformNode->GetMatrixTransformToParent();
-  Q_ASSERT(matrix);
-  if (!matrix)
+  vtkNew<vtkMatrix4x4> matrix;
+  int matrixDefined=transformNode->GetMatrixTransformToParent(matrix.GetPointer());
+  Q_ASSERT(matrixDefined);
+  if (!matrixDefined)
     {
     return;
     }
 
-  transform->SetMatrix(matrix);
+  transform->SetMatrix(matrix.GetPointer());
 
   if ( global )
     {
@@ -155,59 +158,10 @@ bool qMRMLUtils::qImageToVtkImageData(const QImage& qImage, vtkImageData* vtkima
     }
 
   QImage img = qImage;
-  if (qImage.hasAlphaChannel())
-    {
-    if (qImage.format() != QImage::Format_ARGB32)
-      {
-      img = qImage.convertToFormat(QImage::Format_ARGB32);
-      }
-    }
-  else
-    {
-    if (qImage.format() != QImage::Format_RGB32)
-      {
-      img = qImage.convertToFormat(QImage::Format_RGB32);
-      }
-    }
-
-  int height = img.height();
-  int width = img.width();
-  int numcomponents = img.hasAlphaChannel() ? 4 : 3;
-
-  vtkimage->SetWholeExtent(0, width-1, 0, height-1, 0, 0);
-  vtkimage->SetSpacing(1.0, 1.0, 1.0);
-  vtkimage->SetOrigin(0.0, 0.0, 0.0);
-  vtkimage->SetNumberOfScalarComponents(numcomponents);
-  vtkimage->SetScalarType(VTK_UNSIGNED_CHAR);
-  vtkimage->SetExtent(vtkimage->GetWholeExtent());
-  vtkimage->AllocateScalars();
-  for(int i=0; i<height; i++)
-    {
-    unsigned char* row;
-
-    row = static_cast<unsigned char*>(vtkimage->GetScalarPointer(0, height-i-1, 0));
-    const QRgb* linePixels = reinterpret_cast<const QRgb*>(img.scanLine(i));
-
-    /*
-     * TODO: consider using this to speed up the conversion:
-     *
-    memcpy(row, linePixels, width*numcomponents);
-    */
-
-    unsigned char* pixel;
-    pixel = row;
-    for(int j=0; j<width; j++)
-      {
-      const QRgb& col = linePixels[j];
-      *pixel++ = qRed(col);
-      *pixel++ = qGreen(col);
-      *pixel++ = qBlue(col);
-      if(numcomponents == 4)
-        {
-        *pixel++ = qAlpha(col);
-        }
-      }
-    }
+  vtkNew<vtkQImageToImageSource> converter;
+  converter->SetQImage(&img);
+  converter->Update();
+  vtkimage->DeepCopy(converter->GetOutput());
   return true;
 }
 

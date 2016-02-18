@@ -72,6 +72,7 @@
      <addaction name="ViewLayoutConventionalQuantitativeAction"/>
      <addaction name="ViewLayoutFourUpAction"/>
      <addaction name="ViewLayoutFourUpQuantitativeAction"/>
+     <addaction name="ViewLayoutFourUpTableAction"/>
      <addaction name="ViewLayoutDual3DAction"/>
      <addaction name="ViewLayoutTriple3DAction"/>
      <addaction name="ViewLayoutOneUp3DAction"/>
@@ -164,7 +165,7 @@
      <item>
       <widget class="QLabel" name="LogoLabel">
        <property name="pixmap">
-        <pixmap resource="../../../../Resources/qSlicer.qrc">:/Logos/Slicer3.png</pixmap>
+        <pixmap resource="../SlicerApp.qrc">:/ModulePanelLogo.png</pixmap>
        </property>
        <property name="alignment">
         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
@@ -253,6 +254,7 @@
    <addaction name="ViewLayoutConventionalQuantitativeAction"/>
    <addaction name="ViewLayoutFourUpAction"/>
    <addaction name="ViewLayoutFourUpQuantitativeAction"/>
+   <addaction name="ViewLayoutFourUpTableAction"/>
    <addaction name="ViewLayoutDual3DAction"/>
    <addaction name="ViewLayoutTriple3DAction"/>
    <addaction name="ViewLayoutOneUp3DAction"/>
@@ -493,7 +495,7 @@
   <action name="EditUndoAction">
    <property name="icon">
     <iconset resource="../../../../Base/QTGUI/Resources/qSlicerBaseQTGUI.qrc">
-     <normaloff>:/Icons/Undo.png</normaloff>:/Icons/Undo.png</iconset>
+     <normaloff>:/Icons/Small/SlicerUndo.png</normaloff>:/Icons/Small/SlicerUndo.png</iconset>
    </property>
    <property name="text">
     <string>Undo</string>
@@ -508,7 +510,7 @@
   <action name="EditRedoAction">
    <property name="icon">
     <iconset resource="../../../../Base/QTGUI/Resources/qSlicerBaseQTGUI.qrc">
-     <normaloff>:/Icons/Redo.png</normaloff>:/Icons/Redo.png</iconset>
+     <normaloff>:/Icons/Small/SlicerRedo.png</normaloff>:/Icons/Small/SlicerRedo.png</iconset>
    </property>
    <property name="text">
     <string>Redo</string>
@@ -714,7 +716,7 @@
     <string>Report a bug</string>
    </property>
    <property name="toolTip">
-    <string>Open your favorite web browser to http://www.na-mic.org/Bug/my_view_page.php so that any bug you encounter can quickly and easily be reported.</string>
+    <string>Report error or request enhancement or new feature.</string>
    </property>
   </action>
   <action name="FeedbackReportUsabilityIssueAction">
@@ -789,6 +791,18 @@
    </property>
    <property name="text">
     <string>Four-Up Quantitative</string>
+   </property>
+   <property name="iconVisibleInMenu">
+    <bool>true</bool>
+   </property>
+  </action>
+  <action name="ViewLayoutFourUpTableAction">
+   <property name="icon">
+    <iconset resource="../../../../Libs/MRML/Widgets/Resources/qMRMLWidgets.qrc">
+     <normaloff>:/Icons/LayoutFourUpTableView.png</normaloff>:/Icons/LayoutFourUpTableView.png</iconset>
+   </property>
+   <property name="text">
+    <string>Four-Up Table</string>
    </property>
    <property name="iconVisibleInMenu">
     <bool>true</bool>
@@ -1188,7 +1202,7 @@
   <action name="ViewLayoutFourByThreeSliceAction">
    <property name="icon">
     <iconset resource="../../../../Libs/MRML/Widgets/Resources/qMRMLWidgets.qrc">
-     <normaloff>:/Icons/LayoutFourByThreeSliceView.png</normaloff>:/Icons/LayoutFourByThreeThreeSliceView.png</iconset>
+     <normaloff>:/Icons/LayoutFourByThreeSliceView.png</normaloff>:/Icons/LayoutFourByThreeSliceView.png</iconset>
    </property>
    <property name="text">
     <string>Four by three slice</string>
@@ -1273,7 +1287,6 @@
   <include location="../SlicerApp.qrc"/>
   <include location="../../../../Base/QTGUI/Resources/qSlicerBaseQTGUI.qrc"/>
   <include location="../../../../Libs/MRML/Widgets/Resources/qMRMLWidgets.qrc"/>
-  <include location="../../../../Resources/qSlicer.qrc"/>
  </resources>
  <connections/>
 </ui>

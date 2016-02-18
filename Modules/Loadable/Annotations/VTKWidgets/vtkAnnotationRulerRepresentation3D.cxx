@@ -17,11 +17,11 @@
 #include <vtkTransform.h>
 #include <vtkTransformPolyDataFilter.h>
 #include <vtkVectorText.h>
+#include <vtkVersion.h>
 #include <vtkWindow.h>
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro (vtkAnnotationRulerRepresentation3D);
-vtkCxxRevisionMacro (vtkAnnotationRulerRepresentation3D, "$Revision: 1.0 $");
 
 //---------------------------------------------------------------------------
 void vtkAnnotationRulerRepresentation3D::PrintSelf(ostream& os, vtkIndent indent)
@@ -164,7 +164,7 @@ vtkProperty * vtkAnnotationRulerRepresentation3D::GetLineProperty()
 //----------------------------------------------------------------------
 void vtkAnnotationRulerRepresentation3D::SetLabelPosition(double labelPosition)
 {
-  vtkDebugMacro(<< this->GetClassName() << " (" << this << "): setting LabelPosition to " << labelPosition); 
+  vtkDebugMacro(<< this->GetClassName() << " (" << this << "): setting LabelPosition to " << labelPosition);
 
   if (this->LabelPosition == labelPosition)
     {
@@ -200,11 +200,11 @@ void vtkAnnotationRulerRepresentation3D::UpdateLabelActorPosition()
   // and p2 multiplied by the label position, and offset it from the line by
   // the tick length
   double tickLength =  this->GlyphCylinder->GetRadius() * this->Glyph3D->GetScaleFactor();
- 
+
   pos[0] = p1[0] + ((p2[0] - p1[0]) * this->LabelPosition) + tickLength;
   pos[1] = p1[1] + ((p2[1] - p1[1]) * this->LabelPosition) + tickLength;
   pos[2] = p1[2] + ((p2[2] - p1[2]) * this->LabelPosition) + tickLength;
-  
+
   // and set it on the actor
   double * actorPos = this->LabelActor->GetPosition();
   //std::cout << "UpdateLabelActorPosition: LabelPos = " << this->LabelPosition << ", current label actor position = "  << actorPos[0] << ", " << actorPos[1] << ", " << actorPos[2] << ", calculated pos = " << pos[0] << ", " << pos[1] << ", " << pos[2] << std::endl;
@@ -213,7 +213,7 @@ void vtkAnnotationRulerRepresentation3D::UpdateLabelActorPosition()
   if (diff > 0.001)
     {
     this->LabelActor->SetPosition(pos);
-   
+
 //  this->Modified();
     }
   else
@@ -236,13 +236,26 @@ void vtkAnnotationRulerRepresentation3D::UpdateGlyphPolyData(vtkPolyData *polyDa
   this->GlyphPolyData->DeepCopy(polyData);
   this->GlyphPolyData->SetPoints(this->GlyphPoints);
   this->GlyphPolyData->GetPointData()->SetVectors(this->GlyphVectors);
-
-  this->GlyphXForm->SetInput(this->GlyphPolyData);
+  this->GlyphXForm->SetInputData(this->GlyphPolyData);
   vtkNew<vtkTransform> xform;
   this->GlyphXForm->SetTransform(xform.GetPointer());
-  
-  this->Glyph3D->SetInput(this->GlyphPolyData);
+
+  this->Glyph3D->SetInputData(this->GlyphPolyData);
   // set the transform to identity
-  this->Glyph3D->SetSourceConnection(this->GlyphXForm->GetOutputPort());  
+  this->Glyph3D->SetSourceConnection(this->GlyphXForm->GetOutputPort());
   */
+}
+
+//----------------------------------------------------------------------
+int vtkAnnotationRulerRepresentation3D::HasTranslucentPolygonalGeometry()
+{
+  int result = 0;
+  this->BuildRepresentation();
+
+  result |= this->LabelActor->HasTranslucentPolygonalGeometry();
+  result |= this->GlyphActor->HasTranslucentPolygonalGeometry();
+  result |= this->LineActor->HasTranslucentPolygonalGeometry();
+
+  return result;
+
 }

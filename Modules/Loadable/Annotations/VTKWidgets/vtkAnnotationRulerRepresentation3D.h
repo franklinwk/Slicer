@@ -29,7 +29,7 @@ vtkAnnotationRulerRepresentation3D
 public:
 
   static vtkAnnotationRulerRepresentation3D *New();
-  vtkTypeRevisionMacro(vtkAnnotationRulerRepresentation3D, vtkDistanceRepresentation3D);
+  vtkTypeMacro(vtkAnnotationRulerRepresentation3D, vtkDistanceRepresentation3D);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   void SetDistance(double distance);
@@ -66,6 +66,11 @@ public:
   // Description:
   // Get the label actor
   vtkGetObjectMacro(LabelActor, vtkFollower);
+
+  // Required by the rendering process, check if the glyph and label actors
+  // have translucency and return true if so. Fixes a bug when the label
+  // was set to a non 1 opacity but was not being rendered.
+  virtual int HasTranslucentPolygonalGeometry();
 
 protected:
 

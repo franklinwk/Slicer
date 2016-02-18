@@ -27,7 +27,7 @@ class vtkMRMLUnitNode;
 ///
 /// This node stores the information about the currently selected volume,
 /// label volume, fiducial list, place node class name, place node id, ROI
-/// list, camera, view, layout, units
+/// list, camera, table, view, layout, units
 /// Note: the SetReferenceActive* routines are added because
 /// the vtkSetReferenceStringMacro is not wrapped (vtkSetStringMacro
 /// on which it is based is a special case in vtk's parser).
@@ -129,6 +129,11 @@ class VTK_MRML_EXPORT vtkMRMLSelectionNode : public vtkMRMLNode
   void SetActiveCameraID(const char* id);
   void SetReferenceActiveCameraID (const char *id) { this->SetActiveCameraID(id); };
 
+  /// the ID of a MRMLTableNode
+  vtkGetStringMacro (ActiveTableID);
+  void SetActiveTableID(const char* id);
+  void SetReferenceActiveTableID (char *id) { this->SetActiveTableID(id); };
+
   /// the ID of a MRMLViewNode
   vtkGetStringMacro (ActiveViewID );
   void SetActiveViewID(const char* id );
@@ -183,8 +188,13 @@ class VTK_MRML_EXPORT vtkMRMLSelectionNode : public vtkMRMLNode
 
   /// Get all the unit node currently observed by the selection node.
   /// \sa GetReferenceNodes()
-  /// \sa GetUnitNodeID(), SetUnitNodeID()
+  /// \sa GetUnitNodeID(), SetUnitNodeID(), GetUnitNodeIDs()
   void GetUnitNodes(std::vector<vtkMRMLUnitNode*>& units);
+
+  /// Get all the unit node IDs currently observed by the selection node.
+  /// \sa GetUnitNodes()
+  void GetUnitNodeIDs(std::vector<const char*>& quantities,
+                      std::vector<const char*>& unitIDs);
 
   /// Method to propagate events generated in units nodes.
   /// \sa GetNodeReferenceID(), SetAndObserveNodeReferenceID()
@@ -213,6 +223,28 @@ class VTK_MRML_EXPORT vtkMRMLSelectionNode : public vtkMRMLNode
   std::string GetPlaceNodeResourceByClassName(std::string className);
   /// Get the number of class names in the list
   int GetNumberOfPlaceNodeClassNamesInList() { return static_cast<int>(this->PlaceNodeClassNameList.size()); };
+
+  /// Get node display class name for a displayable class name
+  /// to which display node to apply properties in hierarchy display widgets
+  std::string GetModelHierarchyDisplayNodeClassName(const std::string& dispayableNodeClass)const;
+
+  /// Get node display class names
+  /// to which display node to apply properties in hierarchy display widgets
+  std::map<std::string, std::string>  GetModelHierarchyDisplayNodeClassNames()const;
+
+  /// Add display node class for a displayable class.
+  /// Controls which display node to apply properties in hierarchy display widgets
+  /// affected by setting visibility and other properties.
+  /// This mostly applies to displayable nodes that have mutiple display nodes
+  /// For example, parameters of "vtkMRMLFiberbundleNode" , "vtkMRMLFiberbundleTubeDisplayNode"
+  /// will change tube visibility
+  void AddModelHierarchyDisplayNodeClassName(const std::string& dispayableNodeClass,
+                                             const std::string& displayNodeClass);
+
+  /// Clear node display class names
+  /// to which display node to apply properties in hierarchy display widgets
+   void ClearModelHierarchyDisplayNodeClassNames();
+
 protected:
   vtkMRMLSelectionNode();
   ~vtkMRMLSelectionNode();
@@ -233,8 +265,13 @@ protected:
   char *ActivePlaceNodeClassName;
   char *ActiveROIListID;
   char *ActiveCameraID;
+  char *ActiveTableID;
   char *ActiveViewID;
   char *ActiveLayoutID;
+
+  /// displayable/Display node class pairs for contolling
+  /// to which display node to apply properties in hierarchy display widgets
+  std::map<std::string, std::string> ModelHierarchyDisplayNodeClassName;
 
   std::vector<std::string> PlaceNodeClassNameList;
   std::vector<std::string> PlaceNodeResourceList;

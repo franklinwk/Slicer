@@ -114,13 +114,13 @@ int DoIt( int argc, char * argv[])
               << std::endl
               << std::flush;
 
-    itksys_ios::ostringstream value;
     typename Image3DType::PointType    origin;
     typename Image3DType::IndexType    index;
     index.Fill(0);
     index[2] = i;
     image->TransformIndexToPhysicalPoint(index, origin);
 
+    std::ostringstream value;
     // Set all required DICOM fields
     value.str("");
     value << origin[0] << "\\" << origin[1] << "\\" << origin[2];
@@ -251,9 +251,7 @@ int DoIt( int argc, char * argv[])
 
     typedef itk::ExtractImageFilter<Image3DType, Image2DType> ExtractType;
     typename ExtractType::Pointer extract = ExtractType::New();
-#if  ITK_VERSION_MAJOR >= 4
     extract->SetDirectionCollapseToGuess();  // ITKv3 compatible, but not recommended
-#endif
     extract->SetInput(image );
     extract->SetExtractionRegion(extractRegion);
     extract->GetOutput()->SetMetaDataDictionary(dictionary);
@@ -364,6 +362,6 @@ int main( int argc, char* argv[] )
     std::cerr << excep << std::endl;
     return EXIT_FAILURE;
     }
-    
+
   return EXIT_SUCCESS;
 }

@@ -64,9 +64,21 @@ macro(slicerMacroBuildScriptedModule)
   set(expected_existing_vars SCRIPTS RESOURCES)
   foreach(var ${expected_existing_vars})
     foreach(value ${MY_SLICER_${var}})
-      if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${value}"
-         AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${value}.py")
-        message(FATAL_ERROR "Variable ${var} contains a value pointing to an inexistent directory or file ! [${CMAKE_CURRENT_SOURCE_DIR}/${value}]")
+      if(NOT IS_ABSOLUTE ${value})
+        set(value_absolute ${CMAKE_CURRENT_SOURCE_DIR}/${value})
+      else()
+        set(value_absolute ${value})
+      endif()
+      if(NOT EXISTS ${value_absolute} AND NOT EXISTS ${value_absolute}.py)
+        if(NOT IS_ABSOLUTE ${value})
+          set(value_absolute ${CMAKE_CURRENT_BINARY_DIR}/${value})
+        endif()
+        get_source_file_property(is_generated ${value_absolute} GENERATED)
+        if(NOT is_generated)
+          message(FATAL_ERROR
+            "slicerMacroBuildScriptedModule(${var}) given nonexistent"
+            " file or directory '${value}'")
+        endif()
       endif()
     endforeach()
   endforeach()
@@ -95,7 +107,7 @@ macro(slicerMacroBuildScriptedModule)
     foreach(script_name ${_generic_unitest_scripts})
       slicer_add_python_unittest(
         SCRIPT ${script_name}
-        SLICER_ARGS --no-main-window --disable-cli-modules --disable-loadable-modules
+        SLICER_ARGS --no-main-window --disable-cli-modules
                     --additional-module-path ${CMAKE_BINARY_DIR}/${Slicer_QTSCRIPTEDMODULES_LIB_DIR}
         TESTNAME_PREFIX nomainwindow_
         )

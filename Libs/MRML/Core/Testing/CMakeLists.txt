@@ -1,5 +1,9 @@
 set(KIT ${PROJECT_NAME})
-set(CMAKE_TESTDRIVER_BEFORE_TESTMAIN "DEBUG_LEAKS_ENABLE_EXIT_ERROR();" )
+
+set(EXTRA_INCLUDE "vtkMRMLDebugLeaksMacro.h\"\n\#include \"vtkTestingOutputWindow.h")
+set(CMAKE_TESTDRIVER_BEFORE_TESTMAIN "DEBUG_LEAKS_ENABLE_EXIT_ERROR();\nTESTING_OUTPUT_ASSERT_WARNINGS_ERRORS(0);" )
+set(CMAKE_TESTDRIVER_AFTER_TESTMAIN "TESTING_OUTPUT_ASSERT_WARNINGS_ERRORS(0);" )
+
 create_test_sourcelist(Tests ${KIT}CxxTests.cxx
   vtkMRMLBSplineTransformNodeTest1.cxx
   vtkMRMLCameraNodeTest1.cxx
@@ -7,6 +11,7 @@ create_test_sourcelist(Tests ${KIT}CxxTests.cxx
   vtkMRMLColorNodeTest1.cxx
   vtkMRMLColorTableNodeTest1.cxx
   vtkMRMLColorTableStorageNodeTest1.cxx
+  vtkMRMLCoreTestingUtilitiesTest.cxx
   vtkMRMLCrosshairNodeTest1.cxx
   vtkMRMLDiffusionImageVolumeNodeTest1.cxx
   vtkMRMLDiffusionTensorDisplayPropertiesNodeTest1.cxx
@@ -27,7 +32,6 @@ create_test_sourcelist(Tests ${KIT}CxxTests.cxx
   vtkMRMLFreeSurferModelOverlayStorageNodeTest1.cxx
   vtkMRMLFreeSurferModelStorageNodeTest1.cxx
   vtkMRMLFreeSurferProceduralColorNodeTest1.cxx
-  vtkMRMLGlyphVolumeDisplayPropertiesNodeTest1.cxx
   vtkMRMLGlyphableVolumeDisplayNodeTest1.cxx
   vtkMRMLGlyphableVolumeSliceDisplayNodeTest1.cxx
   vtkMRMLGridTransformNodeTest1.cxx
@@ -47,6 +51,7 @@ create_test_sourcelist(Tests ${KIT}CxxTests.cxx
   vtkMRMLNonlinearTransformNodeTest1.cxx
   vtkMRMLPETProceduralColorNodeTest1.cxx
   vtkMRMLProceduralColorNodeTest1.cxx
+  vtkMRMLProceduralColorStorageNodeTest1.cxx
   vtkMRMLROIListNodeTest1.cxx
   vtkMRMLROINodeTest1.cxx
   vtkMRMLScalarVolumeDisplayNodeTest1.cxx
@@ -60,7 +65,7 @@ create_test_sourcelist(Tests ${KIT}CxxTests.cxx
   vtkMRMLSceneImportIDModelHierarchyParentIDConflictTest.cxx
   vtkMRMLSceneImportTest.cxx
   vtkMRMLSceneTest1.cxx
-  #vtkMRMLSceneTest2.cxx
+  vtkMRMLSceneTest2.cxx
   vtkMRMLSceneViewNodeImportSceneTest.cxx
   vtkMRMLSceneViewNodeEventsTest.cxx
   vtkMRMLSceneViewNodeRestoreSceneTest.cxx
@@ -73,9 +78,13 @@ create_test_sourcelist(Tests ${KIT}CxxTests.cxx
   vtkMRMLSnapshotClipNodeTest1.cxx
   vtkMRMLStorableNodeTest1.cxx
   vtkMRMLStorageNodeTest1.cxx
+  vtkMRMLTableNodeTest1.cxx
+  vtkMRMLTableStorageNodeTest1.cxx
+  vtkMRMLTableViewNodeTest1.cxx
   vtkMRMLTensorVolumeNodeTest1.cxx
   vtkMRMLTransformableNodeReferenceSaveImportTest.cxx
   vtkMRMLTransformableNodeOnNodeReferenceAddTest.cxx
+  vtkMRMLTransformDisplayNodeTest1.cxx
   vtkMRMLTransformNodeTest1.cxx
   vtkMRMLTransformStorageNodeTest1.cxx
   vtkMRMLTransformableNodeTest1.cxx
@@ -93,18 +102,29 @@ create_test_sourcelist(Tests ${KIT}CxxTests.cxx
   vtkMRMLVolumeNodeTest1.cxx
   vtkMRMLdGEMRICProceduralColorNodeTest1.cxx
   vtkObserverManagerTest1.cxx
-  EXTRA_INCLUDE vtkMRMLDebugLeaksMacro.h
+  vtkOrientedBSplineTransformTest1.cxx
+  vtkOrientedGridTransformTest1.cxx
+  vtkThinPlateSplineTransformTest1.cxx
+  EXTRA_INCLUDE ${EXTRA_INCLUDE}
   )
 
 add_executable(${KIT}CxxTests ${Tests} vtkMRMLSceneEventRecorder.cxx)
 target_link_libraries(${KIT}CxxTests ${KIT})
 
+set_target_properties(${KIT}CxxTests PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+
+#-----------------------------------------------------------------------------
+set(TEMP "${CMAKE_BINARY_DIR}/Testing/Temporary")
+set(DATAPATH "${CMAKE_CURRENT_SOURCE_DIR}/TestData")
+
+#-----------------------------------------------------------------------------
 simple_test( vtkMRMLBSplineTransformNodeTest1 )
 simple_test( vtkMRMLCameraNodeTest1 )
 simple_test( vtkMRMLClipModelsNodeTest1 )
 simple_test( vtkMRMLColorNodeTest1 )
-simple_test( vtkMRMLColorTableNodeTest1 ${CMAKE_BINARY_DIR}/Testing/Temporary/colorNamesTicksTest.mrml)
+simple_test( vtkMRMLColorTableNodeTest1 ${TEMP})
 simple_test( vtkMRMLColorTableStorageNodeTest1 )
+simple_test( vtkMRMLCoreTestingUtilitiesTest )
 simple_test( vtkMRMLCrosshairNodeTest1 )
 simple_test( vtkMRMLdGEMRICProceduralColorNodeTest1 )
 simple_test( vtkMRMLDiffusionImageVolumeNodeTest1 )
@@ -116,7 +136,7 @@ simple_test( vtkMRMLDiffusionWeightedVolumeDisplayNodeTest1 )
 simple_test( vtkMRMLDiffusionWeightedVolumeNodeTest1 )
 simple_test( vtkMRMLDisplayableNodeTest1 )
 simple_test( vtkMRMLDisplayNodeTest1 )
-simple_test( vtkMRMLDoubleArrayNodeTest1 )
+simple_test( vtkMRMLDoubleArrayNodeTest1 ${TEMP} ${DATAPATH})
 simple_test( vtkMRMLFiducialListNodeTest1 )
 simple_test( vtkMRMLFiducialListStorageNodeTest1 )
 simple_test( vtkMRMLFreeSurferModelOverlayStorageNodeTest1 )
@@ -124,7 +144,6 @@ simple_test( vtkMRMLFreeSurferModelStorageNodeTest1 )
 simple_test( vtkMRMLFreeSurferProceduralColorNodeTest1 )
 simple_test( vtkMRMLGlyphableVolumeDisplayNodeTest1 )
 simple_test( vtkMRMLGlyphableVolumeSliceDisplayNodeTest1 )
-simple_test( vtkMRMLGlyphVolumeDisplayPropertiesNodeTest1 )
 simple_test( vtkMRMLGridTransformNodeTest1 )
 simple_test( vtkMRMLHierarchyNodeTest1 )
 simple_test( vtkMRMLHierarchyNodeTest3 )
@@ -142,10 +161,11 @@ simple_test( vtkMRMLModelNodeTest1 )
 simple_test( vtkMRMLModelStorageNodeTest1 )
 simple_test( vtkMRMLNodeTest1 )
 simple_test( vtkMRMLLinearTransformNodeEventsTest )
-simple_test( vtkMRMLNonlinearTransformNodeTest1 )
+simple_test( vtkMRMLNonlinearTransformNodeTest1 ${CMAKE_CURRENT_SOURCE_DIR}/NonLinearTransformScene.mrml)
 simple_test( vtkMRMLNRRDStorageNodeTest1 )
 simple_test( vtkMRMLPETProceduralColorNodeTest1 )
 simple_test( vtkMRMLProceduralColorNodeTest1 )
+simple_test( vtkMRMLProceduralColorStorageNodeTest1 )
 simple_test( vtkMRMLROIListNodeTest1 )
 simple_test( vtkMRMLROINodeTest1 )
 simple_test( vtkMRMLScalarVolumeDisplayNodeTest1 )
@@ -170,10 +190,14 @@ simple_test( vtkMRMLSliceNodeTest1 )
 simple_test( vtkMRMLSnapshotClipNodeTest1 )
 simple_test( vtkMRMLStorableNodeTest1 )
 simple_test( vtkMRMLStorageNodeTest1 )
+simple_test( vtkMRMLTableNodeTest1 )
+simple_test( vtkMRMLTableStorageNodeTest1 )
+simple_test( vtkMRMLTableViewNodeTest1 )
 simple_test( vtkMRMLTensorVolumeNodeTest1 )
 simple_test( vtkMRMLTransformableNodeReferenceSaveImportTest )
 simple_test( vtkMRMLTransformableNodeOnNodeReferenceAddTest )
 simple_test( vtkMRMLTransformableNodeTest1 )
+simple_test( vtkMRMLTransformDisplayNodeTest1 )
 simple_test( vtkMRMLTransformNodeTest1 )
 simple_test( vtkMRMLTransformStorageNodeTest1 )
 simple_test( vtkMRMLUnitNodeTest1 )
@@ -188,6 +212,8 @@ simple_test( vtkMRMLVolumeDisplayNodeTest1 )
 simple_test( vtkMRMLVolumeHeaderlessStorageNodeTest1 )
 simple_test( vtkMRMLVolumeNodeTest1 )
 simple_test( vtkObserverManagerTest1 )
+simple_test( vtkOrientedBSplineTransformTest1 )
+simple_test( vtkThinPlateSplineTransformTest1 )
 
 macro(SIMPLE_TEST_WITH_SCENE TESTNAME SCENEFILENAME)
   add_test(
@@ -202,9 +228,7 @@ set( ScenesToTest
   clipCube.mrml
   cube.mrml
   diffusionEditor.mrml
-  fiducial_tract.mrml
   helixGlyphs.mrml
-  helix_roi_tract.mrml
   hier_test.mrml
   multi_display.mrml
   name.mrml
@@ -213,12 +237,10 @@ set( ScenesToTest
   vol_and_cube_camera.mrml
   vol_and_cube.mrml
   vol.mrml
-  volRender.mrml
   volScene.mrml
   )
 
 foreach(SceneToTest ${ScenesToTest})
-  #SIMPLE_TEST_WITH_SCENE( vtkMRMLSCeneTest2 ${SceneToTest} )
+  SIMPLE_TEST_WITH_SCENE( vtkMRMLSCeneTest2 ${SceneToTest} )
   SIMPLE_TEST_WITH_SCENE( vtkMRMLSceneImportTest ${SceneToTest} )
 endforeach()
-

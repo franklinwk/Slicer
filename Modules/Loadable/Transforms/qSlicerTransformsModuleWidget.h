@@ -46,26 +46,39 @@ public:
   void setMRMLScene(vtkMRMLScene* scene);
 
 public slots:
-  /// Set the matrix to identity, the sliders are reset to the position 0
+
+  /// Set the transform to identity. Only for linear transforms.
+  /// The sliders are reset to the position 0.
   void identity();
 
-  /// Invert the matrix. The sliders are reset to the position 0.
+  /// Invert the transform.
   void invert();
 
+  /// Split composite transform to its components
+  void split();
+
 protected:
+
   virtual void setup();
 
 protected slots:
-  void onCoordinateReferenceButtonPressed(int id);
+
+  void onTranslateFirstButtonPressed(bool checked);
   void onNodeSelected(vtkMRMLNode* node);
-  void onTranslationRangeChanged(double newMin, double newMax);
+  void onMRMLTransformNodeModified(vtkObject* caller);
+
+  void copyTransform();
+  void pasteTransform();
 
   void transformSelectedNodes();
   void untransformSelectedNodes();
   void hardenSelectedNodes();
 
+  void onDisplaySectionClicked(bool);
+  void onTransformableSectionClicked(bool);
+
 protected:
-  /// 
+  ///
   /// Convenient method to return the coordinate system currently selected
   int coordinateReference()const;
 

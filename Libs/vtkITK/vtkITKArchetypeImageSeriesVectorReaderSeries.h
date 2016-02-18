@@ -16,6 +16,7 @@
 #define __vtkITKArchetypeImageSeriesVectorReaderSeries_h
 
 #include "vtkITKArchetypeImageSeriesReader.h"
+#include <vtkVersion.h>
 namespace itk
 {
   class ProcessObject;
@@ -26,7 +27,7 @@ class VTK_ITK_EXPORT vtkITKArchetypeImageSeriesVectorReaderSeries : public vtkIT
 {
 public:
   static vtkITKArchetypeImageSeriesVectorReaderSeries *New();
-  vtkTypeRevisionMacro(vtkITKArchetypeImageSeriesVectorReaderSeries,vtkITKArchetypeImageSeriesReader);
+  vtkTypeMacro(vtkITKArchetypeImageSeriesVectorReaderSeries,vtkITKArchetypeImageSeriesReader);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   static void ReadProgressCallback(itk::ProcessObject* obj,
@@ -36,7 +37,7 @@ protected:
   vtkITKArchetypeImageSeriesVectorReaderSeries();
   ~vtkITKArchetypeImageSeriesVectorReaderSeries();
 
-  void ExecuteData(vtkDataObject *data);
+  void ExecuteDataWithInformation(vtkDataObject *output, vtkInformation *outInfo);
 };
 
 #endif

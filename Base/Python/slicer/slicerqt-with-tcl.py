@@ -12,12 +12,13 @@ def tcl(cmd):
     import tpycl
     _tpycl = tpycl.tpycl()
 
-    packages = ['freesurfer', 'mrml', 'mrmlLogic', 'teem', 'vtk', 'vtkITK']
+    packages = ['freesurfer', 'mrml', 'mrmlLogic', 'teem', 'vtk', 'vtkAddon', 'vtkITK']
     for p in packages:
       _tpycl.py_package(p)
 
     import os
     tcl_dir = os.path.dirname(os.path.realpath(__file__)) + '/tcl/'
+    tcl_dir = tcl_dir.replace('\\','/')
     _tpycl.tcl_eval("""
         set dir \"%s\"
         source $dir/Slicer3Adapters.tcl
@@ -27,7 +28,7 @@ def tcl(cmd):
   return _tpycl.tcl_eval(cmd)
 
 class _sliceWidget(object):
-  """ an empty class that can be instanced as a place to store 
+  """ an empty class that can be instanced as a place to store
   references to sliceWidget components
   """
   def __init__(self):

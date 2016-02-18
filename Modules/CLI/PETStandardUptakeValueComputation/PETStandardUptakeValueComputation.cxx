@@ -21,6 +21,7 @@
 #include <vtkImageThreshold.h>
 #include <vtkImageToImageStencil.h>
 #include <vtkNew.h>
+#include <vtkVersion.h>
 
 // ITK includes
 #include <itkGDCMImageIO.h>
@@ -147,12 +148,10 @@ double ConvertTimeToSeconds(const char *time )
   // --- convert to a double count of seconds.
   // ---
   std::string timeStr = time;
-  size_t      i = timeStr.find_first_of(":");
   h = timeStr.substr( 0, 2 );
   hours = atof( h.c_str() );
 
   minAndsecStr = timeStr.substr( 3 );
-  i = minAndsecStr.find_first_of( ":" );
   m = minAndsecStr.substr(0, 2 );
   minutes = atof( m.c_str() );
 
@@ -738,11 +737,11 @@ double DecayCorrection(parameters & list, double inVal )
 // ...
 // ...............................................................................................
 // ...
-const char * MapLabelIDtoColorName( int id, std::string colorFile )
+std::string MapLabelIDtoColorName( int id, std::string colorFile )
 {
   // use the colour table that was passed in with the VOI volume
 
-  const char *colorName = "";
+  std::string colorName;
 
   vtkNew<vtkMRMLColorTableNode> colorNode;
   vtkNew<vtkMRMLColorTableStorageNode> colorStorageNode;
@@ -765,20 +764,6 @@ const char * MapLabelIDtoColorName( int id, std::string colorFile )
 template <class T>
 int LoadImagesAndComputeSUV( parameters & list, T )
 {
-
-
-  typedef    T                           InputPixelType;
-  typedef itk::Image<InputPixelType,  3> InputImageType;
-
-  typedef itk::Image<unsigned char, 3> LabelImageType;
-
-  typedef    T                           OutputPixelType;
-  typedef itk::Image<OutputPixelType, 3> OutputImageType;
-
-  typedef itk::ImageFileReader<InputImageType>  ReaderType;
-  typedef itk::ImageFileReader<LabelImageType>  LabelReaderType;
-  typedef itk::ImageFileWriter<OutputImageType> WriterType;
-
   //
   // for writing csv output files
   //
@@ -790,6 +775,8 @@ int LoadImagesAndComputeSUV( parameters & list, T )
   vtkImageData *                    voiVolume;
   vtkITKArchetypeImageSeriesReader *reader1 = NULL;
   vtkITKArchetypeImageSeriesReader *reader2 = NULL;
+  vtkAlgorithmOutput* petVolumeConnection = 0;
+  vtkAlgorithmOutput* voiVolumeConnection = 0;
 
   // check for the input files
   FILE * petfile;
@@ -833,12 +820,10 @@ int LoadImagesAndComputeSUV( parameters & list, T )
   std::cout << "Done reading the file " << list.VOIVolumeName.c_str() << endl;
 
   // stuff the images.
-//  reader1->Update();
-//  reader2->Update();
   petVolume = reader1->GetOutput();
-  petVolume->Update();
+  petVolumeConnection = reader1->GetOutputPort();
   voiVolume = reader2->GetOutput();
-  voiVolume->Update();
+  voiVolumeConnection = reader2->GetOutputPort();
 
 
   //
@@ -863,11 +848,7 @@ int LoadImagesAndComputeSUV( parameters & list, T )
   typedef short PixelValueType;
   typedef itk::Image< PixelValueType, 3 > VolumeType;
   typedef itk::ImageSeriesReader< VolumeType > VolumeReaderType;
-  typedef itk::Image< PixelValueType, 2 > SliceType;
-  typedef itk::ImageFileReader< SliceType > SliceReaderType;
-  typedef itk::GDCMImageIO ImageIOType;
   typedef itk::GDCMSeriesFileNames InputNamesGeneratorType;
-  typedef itk::VectorImage< PixelValueType, 3 > NRRDImageType;
 
   if ( !list.PETDICOMPath.compare(""))
     {
@@ -1367,7 +1348,7 @@ int LoadImagesAndComputeSUV( parameters & list, T )
 
   // --- find the max and min label in mask
   vtkImageAccumulate *stataccum = vtkImageAccumulate::New();
-  stataccum->SetInput( voiVolume );
+  stataccum->SetInputConnection( voiVolumeConnection );
   stataccum->Update();
   int lo = static_cast<int>(stataccum->GetMin()[0]);
   int hi = static_cast<int>(stataccum->GetMax()[0]);
@@ -1399,7 +1380,7 @@ int LoadImagesAndComputeSUV( parameters & list, T )
 
     // create the binary volume of the label
     vtkImageThreshold *thresholder = vtkImageThreshold::New();
-    thresholder->SetInput(voiVolume);
+    thresholder->SetInputConnection(voiVolumeConnection);
     thresholder->SetInValue(1);
     thresholder->SetOutValue(0);
     thresholder->ReplaceOutOn();
@@ -1409,12 +1390,12 @@ int LoadImagesAndComputeSUV( parameters & list, T )
 
     // use vtk's statistics class with the binary labelmap as a stencil
     vtkImageToImageStencil *stencil = vtkImageToImageStencil::New();
-    stencil->SetInput(thresholder->GetOutput() );
+    stencil->SetInputConnection(thresholder->GetOutputPort() );
     stencil->ThresholdBetween(1, 1);
 
     vtkImageAccumulate *labelstat = vtkImageAccumulate::New();
-    labelstat->SetInput(petVolume);
-    labelstat->SetStencil(stencil->GetOutput() );
+    labelstat->SetInputConnection(petVolumeConnection);
+    labelstat->SetInputConnection(1, stencil->GetOutputPort() ); // == SetStencilData()
     labelstat->Update();
 
     stencil->Delete();
@@ -1513,11 +1494,18 @@ int LoadImagesAndComputeSUV( parameters & list, T )
           }
         else
           {
+          ss.str("");
+          ofile.seekp(0,ios::end);
+          long pos = ofile.tellp();
+          if (pos == 0)
+            {
+            ss << "patientID,studyDate,dose,labelID,suvmin,suvmax,suvmean,labelName" << std::endl;
+            }
           // --- for each value..
           // --- format looks like:
           // patientID, studyDate, dose, labelID, suvmin, suvmax, suvmean, labelName
           // ...
-          ss.str("");
+
           ss << list.patientName << ", " << list.studyDate << ", " << list.injectedDose  << ", "  << i << ", " << suvmin << ", " << suvmax
              << ", " << suvmean << ", " << labelName.c_str() << std::endl;
           ofile << ss.str();

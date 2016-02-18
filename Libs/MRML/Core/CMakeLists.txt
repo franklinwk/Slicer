@@ -4,42 +4,9 @@ project(MRMLCore)
 cmake_minimum_required(VERSION 2.8.4)
 #-----------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
-# See http://cmake.org/cmake/help/cmake-2-8-docs.html#section_Policies for details
-#-----------------------------------------------------------------------------
-if(POLICY CMP0017)
-  cmake_policy(SET CMP0017 OLD)
-endif()
-
-find_package(VTK REQUIRED)
-include(${VTK_USE_FILE})
-
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  set(${CMAKE_PROJECT_NAME}_ITK_COMPONENTS
-    ITKCommon
-    ITKIOImageBase
-    ITKIOSpatialObjects
-    ITKIOTransformBase
-    ITKTransform
-    )
-  find_package(ITK COMPONENTS ${${CMAKE_PROJECT_NAME}_ITK_COMPONENTS})
-else()
-  find_package(ITK REQUIRED)
-endif()
-if(${ITK_VERSION_MAJOR} GREATER 3)
-  set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
-  list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
-  list(APPEND ITK_INCLUDE_DIRS ${ITKFactoryRegistration_INCLUDE_DIRS})
-endif()
-include(${ITK_USE_FILE})
-
-option(MRML_USE_vtkTeem "Build MRML with vtkTeem support." ON)
-mark_as_advanced(MRML_USE_vtkTeem)
-if(MRML_USE_vtkTeem)
-  find_package(Teem REQUIRED)
-  include(${Teem_USE_FILE})
-endif()
-
+# --------------------------------------------------------------------------
+# Options
+# --------------------------------------------------------------------------
 if(NOT DEFINED BUILD_SHARED_LIBS)
   option(BUILD_SHARED_LIBS "Build with shared libraries." ON)
 endif()
@@ -55,19 +22,57 @@ endif()
 set(MRML_SUPPORT_VERSION 0x030000 CACHE STRING "MRML scene version to support " )
 mark_as_advanced(MRML_SUPPORT_VERSION)
 
+option(MRML_USE_vtkTeem "Build MRML with vtkTeem support." ON)
+mark_as_advanced(MRML_USE_vtkTeem)
+
+# --------------------------------------------------------------------------
+# Dependencies
+# --------------------------------------------------------------------------
+
+#
+# VTK
+#
+#find_package(VTK REQUIRED)
+#include(${VTK_USE_FILE})
+
+#
+# ITK
+#
+set(${PROJECT_NAME}_ITK_COMPONENTS
+  ITKCommon
+  ITKIOImageBase
+  ITKIOSpatialObjects
+  ITKIOTransformBase
+  ITKTransform
+  )
+find_package(ITK 4.6 COMPONENTS ${${PROJECT_NAME}_ITK_COMPONENTS} REQUIRED)
+set(ITK_NO_IO_FACTORY_REGISTER_MANAGER 1) # See Libs/ITKFactoryRegistration/CMakeLists.txt
+list(APPEND ITK_LIBRARIES ITKFactoryRegistration)
+list(APPEND ITK_INCLUDE_DIRS ${ITKFactoryRegistration_INCLUDE_DIRS})
+include(${ITK_USE_FILE})
+
+#
+# vtkTeem
+#
+if(MRML_USE_vtkTeem)
+  find_package(Teem REQUIRED)
+  include(${Teem_USE_FILE})
+endif()
+
 # --------------------------------------------------------------------------
 # Include dirs
 # --------------------------------------------------------------------------
 set(include_dirs
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
+  ${vtkAddon_INCLUDE_DIRS}
   ${vtkITK_INCLUDE_DIRS}
   ${FreeSurfer_INCLUDE_DIRS}
   )
 if(MRML_USE_vtkTeem)
   list(APPEND include_dirs ${vtkTeem_INCLUDE_DIRS})
 endif()
-include_directories(${include_dirs})
+include_directories(BEFORE ${include_dirs})
 
 # --------------------------------------------------------------------------
 # Configure headers
@@ -108,7 +113,7 @@ set(MRMLCore_SRCS
   vtkMRMLColors.cxx
   vtkMRMLColorTableNode.cxx
   vtkMRMLColorTableStorageNode.cxx
-  vtkMRMLCoreTestingMacros.cxx
+  vtkMRMLCoreTestingUtilities.cxx
   vtkMRMLCrosshairNode.cxx
   vtkMRMLDiffusionTensorDisplayPropertiesNode.cxx
   vtkMRMLDiffusionWeightedVolumeDisplayNode.cxx
@@ -126,7 +131,9 @@ set(MRMLCore_SRCS
   vtkMRMLDisplayableHierarchyNode.cxx
   vtkMRMLInteractionNode.cxx
   vtkMRMLLabelMapVolumeDisplayNode.cxx
+  vtkMRMLLabelMapVolumeNode.cxx
   vtkMRMLLinearTransformNode.cxx
+  vtkMRMLMarkupsStorageNode.cxx
   vtkMRMLModelDisplayNode.cxx
   vtkMRMLModelHierarchyNode.cxx
   vtkMRMLModelNode.cxx
@@ -134,6 +141,7 @@ set(MRMLCore_SRCS
   vtkMRMLNode.cxx
   vtkMRMLParser.cxx
   vtkMRMLProceduralColorNode.cxx
+  vtkMRMLProceduralColorStorageNode.cxx
   vtkMRMLROIListNode.cxx
   vtkMRMLROINode.cxx
   vtkMRMLScalarVolumeDisplayNode.cxx
@@ -149,8 +157,15 @@ set(MRMLCore_SRCS
   vtkMRMLSnapshotClipNode.cxx
   vtkMRMLStorableNode.cxx
   vtkMRMLStorageNode.cxx
+  vtkMRMLSubjectHierarchyConstants.h
+  vtkMRMLSubjectHierarchyNode.cxx
+  vtkMRMLSubjectHierarchyNode.h
+  vtkMRMLTableNode.cxx
+  vtkMRMLTableStorageNode.cxx
+  vtkMRMLTableViewNode.cxx
   vtkMRMLTransformNode.cxx
   vtkMRMLTransformStorageNode.cxx
+  vtkMRMLTransformDisplayNode.cxx
   vtkMRMLTransformableNode.cxx
   vtkMRMLUnitNode.cxx
   vtkMRMLUnstructuredGridDisplayNode.cxx
@@ -162,7 +177,6 @@ set(MRMLCore_SRCS
   vtkMRMLVolumeDisplayNode.cxx
   vtkMRMLGlyphableVolumeDisplayNode.cxx
   vtkMRMLGlyphableVolumeSliceDisplayNode.cxx
-  vtkMRMLGlyphableVolumeDisplayPropertiesNode.cxx
   vtkMRMLVolumeHeaderlessStorageNode.cxx
   vtkMRMLVolumeNode.cxx
   vtkObservation.cxx
@@ -174,7 +188,6 @@ set(MRMLCore_SRCS
   vtkDataTransfer.cxx
   vtkMRMLBSplineTransformNode.cxx
   vtkMRMLGridTransformNode.cxx
-  vtkMRMLNonlinearTransformNode.cxx
   vtkPermissionPrompter.cxx
   vtkURIHandler.cxx
   vtkTagTableCollection.cxx
@@ -200,6 +213,11 @@ if(MRML_USE_vtkTeem)
     vtkMRMLVectorVolumeNode.cxx
     )
 endif()
+
+set_source_files_properties(
+  vtkMRMLCoreTestingUtilities.cxx
+  WRAP_EXCLUDE
+  )
 
 # Abstract/pure virtual classes
 
@@ -228,21 +246,12 @@ set(srcs ${MRMLCore_SRCS} ${MRMLCore_SRCS_HEADERS})
 set(lib_name ${PROJECT_NAME})
 add_library(${lib_name} ${srcs})
 
-
-set(VTK_LIBRARIES
-  #vtkCommon # Provided by vtkITK, FreeSurfer
-  #vtkFiltering # Provided by vtkITK, FreeSurfer
-  vtkGraphics
-  vtkHybrid
-  vtkInfovis
-  #vtkIO # Provided by FreeSurfer
-  #vtkImaging # Provided by vtkITK
-  )
-
 set(libs
+  vtkAddon
   vtkITK
   ${ITK_LIBRARIES}
   ${VTK_LIBRARIES}
+  vtkIOInfovis
   FreeSurfer
   )
 if(MRML_USE_vtkTeem)
@@ -253,6 +262,16 @@ target_link_libraries(${lib_name} ${libs})
 # Apply user-defined properties to the library target.
 if(Slicer_LIBRARY_PROPERTIES)
   set_target_properties(${lib_name} PROPERTIES ${Slicer_LIBRARY_PROPERTIES})
+endif()
+
+# --------------------------------------------------------------------------
+# Folder
+# --------------------------------------------------------------------------
+if(NOT DEFINED ${PROJECT_NAME}_FOLDER)
+  set(${PROJECT_NAME}_FOLDER ${PROJECT_NAME})
+endif()
+if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+  set_target_properties(${lib_name} PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
 endif()
 
 # --------------------------------------------------------------------------
@@ -291,6 +310,11 @@ if(VTK_WRAP_PYTHON)
     )
   # Export target
   export(TARGETS ${lib_name}Python ${lib_name}PythonD APPEND FILE ${${PROJECT_NAME}_EXPORT_FILE})
+  # Folder
+  if(NOT "${${PROJECT_NAME}_FOLDER}" STREQUAL "")
+    set_target_properties(${lib_name}Python PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+    set_target_properties(${lib_name}PythonD PROPERTIES FOLDER ${${PROJECT_NAME}_FOLDER})
+  endif()
 endif()
 
 # --------------------------------------------------------------------------
@@ -345,5 +369,5 @@ endif()
 # --------------------------------------------------------------------------
 # Set INCLUDE_DIRS variable
 # --------------------------------------------------------------------------
-set(${PROJECT_NAME}_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}
+set(${PROJECT_NAME}_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${vtkAddon_INCLUDE_DIRS}
   CACHE INTERNAL "${PROJECT_NAME} include dirs" FORCE)

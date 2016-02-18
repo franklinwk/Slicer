@@ -113,7 +113,7 @@ QString qSlicerFileNameItemDelegate::fixupFileName(const QString& fileName, cons
       }
     }
 
-  QString stippedFileName = fixup;
+  QString strippedFileName = fixup;
   if(mrmlScene)
     {
     vtkObject * object = mrmlScene;
@@ -122,10 +122,10 @@ QString qSlicerFileNameItemDelegate::fixupFileName(const QString& fileName, cons
       object = mrmlScene->GetNodeByID(nodeID.toLatin1());
       }
     Q_ASSERT(object);
-    stippedFileName = qSlicerSaveDataDialogPrivate::stripKnownExtension(fixup, object);
-    stippedFileName += extension;
+    strippedFileName = qSlicerSaveDataDialogPrivate::stripKnownExtension(fixup, object);
+    strippedFileName += extension;
     }
-  return stippedFileName;
+  return strippedFileName;
 }
 
 //-----------------------------------------------------------------------------
@@ -300,6 +300,9 @@ void qSlicerSaveDataDialogPrivate::populateItems()
   // MRML scene the first item of the list so we don't do restore the sorting.
   // this->FileWidget->setSortingEnabled(oldSortingEnabled);
 
+  // Enable/disable nodes depending on the scene file format
+  this->onSceneFormatChanged();
+
   this->updateSize();
 }
 
@@ -322,7 +325,7 @@ void qSlicerSaveDataDialogPrivate::populateScene()
     {
     sceneFileInfo = QFileInfo( QDir(this->MRMLScene->GetRootDirectory()),
                                QDate::currentDate().toString(
-                                 "yyyy-MM-dd") + "-Scene");
+                                 "yyyy-MM-dd") + "-Scene.mrml");
     }
 
   // Scene Name
@@ -344,7 +347,7 @@ void qSlicerSaveDataDialogPrivate::populateScene()
 
   qSlicerCoreIOManager* coreIOManager =
     qSlicerCoreApplication::application()->coreIOManager();
-  
+
   // Scene Format
   QComboBox* sceneComboBoxWidget = new QComboBox(this->FileWidget);
   int currentFormat = -1;
@@ -374,7 +377,8 @@ void qSlicerSaveDataDialogPrivate::populateScene()
 
   // Scene Directory
   ctkDirectoryButton* sceneDirectoryButton =
-      this->createFileDirectoryWidget(QFileInfo(this->MRMLScene->GetRootDirectory()));
+      this->createFileDirectoryWidget(sceneFileInfo);
+
   this->FileWidget->setCellWidget(row, FileDirectoryColumn, sceneDirectoryButton);
 
   // Scene Selected
@@ -483,13 +487,22 @@ void qSlicerSaveDataDialogPrivate::populateNode(vtkMRMLNode* node)
 //-----------------------------------------------------------------------------
 QFileInfo qSlicerSaveDataDialogPrivate::nodeFileInfo(vtkMRMLStorableNode* node)
 {
+  // Make sure series number is not one digit (names like "1: something" confuse save dialog, see http://www.na-mic.org/Bug/view.php?id=3991)
+  // TODO: This is a workaround, remove if good fix found
+  QString safeNodeName(node->GetName());
+  if (safeNodeName.length() > 1 &&
+      safeNodeName.at(0).isNumber() && safeNodeName.at(1) == QChar(':'))
+    {
+    safeNodeName.insert(0, tr("0"));
+    }
+
   vtkMRMLStorageNode* snode = node->GetStorageNode();
   if (snode == 0)
     {
     vtkMRMLStorageNode* storageNode = node->CreateDefaultStorageNode();
     if (storageNode == 0)
       {
-      qDebug() << "nodeFileInfo: unable to create a new default storage node for node " << node->GetID();
+      // node can be stored in the scene
       return QFileInfo();
       }
 
@@ -505,7 +518,14 @@ QFileInfo qSlicerSaveDataDialogPrivate::nodeFileInfo(vtkMRMLStorableNode* node)
     if (snode->GetFileName() && node->GetName())
       {
       QFileInfo existingInfo(snode->GetFileName());
-      QFileInfo newInfo(existingInfo.absoluteDir(), QString(node->GetName() + QString(".") + existingInfo.completeSuffix()));
+      qSlicerCoreIOManager* coreIOManager =
+           qSlicerCoreApplication::application()->coreIOManager();
+      QString suffix = coreIOManager->completeSlicerWritableFileNameSuffix(existingInfo.fileName());
+      if (!suffix.startsWith(QString(".")))
+        {
+        suffix = QString(".") + suffix;
+        }
+      QFileInfo newInfo(existingInfo.absoluteDir(), QString(safeNodeName + suffix));
       // Only reset the file name if the user has set the name explicitly (that is,
       // if the name isn't the default created by qSlicerVolumesIOOptionsWidget::setFileNames
       // TODO: this logic relies on the GUI so we should consider moving it into MRML proper
@@ -524,8 +544,9 @@ QFileInfo qSlicerSaveDataDialogPrivate::nodeFileInfo(vtkMRMLStorableNode* node)
       {
       fileExtension = QString(".") + fileExtension;
       }
+
     QFileInfo fileName(QDir(this->DirectoryButton->directory()),
-                       QString(node->GetName()) + fileExtension);
+                       safeNodeName + fileExtension);
     snode->SetFileName(fileName.absoluteFilePath().toLatin1());
     }
 
@@ -618,7 +639,11 @@ QWidget* qSlicerSaveDataDialogPrivate::createFileFormatsWidget(vtkMRMLStorableNo
   qSlicerCoreIOManager* coreIOManager =
     qSlicerCoreApplication::application()->coreIOManager();
   int currentFormat = -1;
-  QString currentExtension = QString(".") + fileInfo.suffix();
+  QString currentExtension = coreIOManager->completeSlicerWritableFileNameSuffix(fileInfo.fileName());
+  if (!currentExtension.startsWith(QString(".")))
+    {
+    currentExtension = currentExtension + QString(".");
+    }
   foreach(QString nameFilter, coreIOManager->fileWriterExtensions(node))
     {
     QString extension = QString::fromStdString(
@@ -717,6 +742,12 @@ QString qSlicerSaveDataDialogPrivate::stripKnownExtension(const QString& fileNam
   if (!knownExtension.isEmpty())
     {
     strippedFileName.chop(knownExtension.length());
+    // check that the extension wasn't doubled by having the file name be
+    // constructed from a node name that included the extension
+    if (strippedFileName.endsWith(knownExtension))
+      {
+      return Self::stripKnownExtension(strippedFileName, object);
+      }
     return strippedFileName;
     }
   return strippedFileName;
@@ -976,7 +1007,7 @@ bool qSlicerSaveDataDialogPrivate::mustSceneBeSaved()const
     {
     return false;
     }
-  QTableWidgetItem* selectItem = 
+  QTableWidgetItem* selectItem =
     this->FileWidget->item(found[0].row(), SelectColumn);
 
   return selectItem->checkState() == Qt::Checked;
@@ -1023,7 +1054,7 @@ bool qSlicerSaveDataDialogPrivate::prepareForSaving()
   QFileInfo file = this->sceneFile();
   if (file.exists() && this->mustSceneBeSaved())
     {
-    QMessageBox::StandardButton answer = 
+    QMessageBox::StandardButton answer =
       QMessageBox::question(this, "Saving scene", "Scene file \""
                             + file.absoluteFilePath() +"\" already exists. "
                             "Do you want to replace it ?",
@@ -1068,11 +1099,14 @@ bool qSlicerSaveDataDialogPrivate::saveScene()
   properties["fileName"] = file.absoluteFilePath();
 
   // create a screenShot of the full layout
-  QWidget* widget = qSlicerApplication::application()->layoutManager()->viewport();
-  this->hide();  // don't block the screenshot
-  QImage screenShot = ctk::grabVTKWidget(widget);
-  this->show();
-  properties["screenShot"] = screenShot;
+  if (qSlicerApplication::application()->layoutManager())
+    {
+    QWidget* widget = qSlicerApplication::application()->layoutManager()->viewport();
+    this->hide();  // don't block the screenshot
+    QImage screenShot = ctk::grabVTKWidget(widget);
+    this->show();
+    properties["screenShot"] = screenShot;
+    }
 
   qSlicerIOOptions* options = this->options(this->findSceneRow());
   if (options)
@@ -1086,6 +1120,18 @@ bool qSlicerSaveDataDialogPrivate::saveScene()
   if (res)
     {
     this->LastMRMLSceneFileFormat = this->sceneFileFormat();
+    }
+  else
+    {
+    QMessageBox::StandardButton answer =
+      QMessageBox::question(this, tr("Saving scene..."),
+                            tr("Cannot write scene file: %1.\n"
+                               "Do you want to ignore this error and close saving?").arg(file.absoluteFilePath()),
+                            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (answer == QMessageBox::Yes)
+      {
+      res = true;
+      }
     }
 
   return res;
@@ -1136,10 +1182,21 @@ void qSlicerSaveDataDialogPrivate::saveSceneAsDataBundle()
   QComboBox* box = qobject_cast<QComboBox*>(
     this->FileWidget->cellWidget(sceneRow, FileFormatColumn));
   int mrbIndex = box->findText("mrb", Qt::MatchContains);
-  // Select scene data bundle entry
+  int mrmlIndex = box->findText("mrml", Qt::MatchContains);
+  // Toggle between scene data bundle entry and mrml entry
   if (mrbIndex != -1)
     {
-    box->setCurrentIndex(mrbIndex);
+    if (box->currentIndex() != mrbIndex)
+      {
+      box->setCurrentIndex(mrbIndex);
+      }
+    else
+      {
+      if (mrmlIndex != -1)
+        {
+        box->setCurrentIndex(mrmlIndex);
+        }
+      }
     }
 }
 

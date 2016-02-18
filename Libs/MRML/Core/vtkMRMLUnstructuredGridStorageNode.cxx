@@ -12,7 +12,7 @@ Version:   $Revision: 1.2 $
 
 =========================================================================auto=*/
 
-#include "vtkMRMLUnstructuredGridNode.h" 
+#include "vtkMRMLUnstructuredGridNode.h"
 #include "vtkMRMLUnstructuredGridStorageNode.h"
 #include "vtkMRMLScene.h"
 
@@ -21,6 +21,7 @@ Version:   $Revision: 1.2 $
 #include "vtkUnstructuredGrid.h"
 #include "vtkUnstructuredGridReader.h"
 #include "vtkUnstructuredGridWriter.h"
+#include <vtkVersion.h>
 
 #include "itksys/SystemTools.hxx"
 
@@ -47,7 +48,7 @@ int vtkMRMLUnstructuredGridStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
   vtkMRMLUnstructuredGridNode *modelNode = vtkMRMLUnstructuredGridNode::SafeDownCast (refNode);
 
   std::string fullName = this->GetFullNameFromFileName();
-  if (fullName == std::string("")) 
+  if (fullName == std::string(""))
     {
     vtkErrorMacro("ReadData: File name not specified");
     return result;
@@ -65,7 +66,7 @@ int vtkMRMLUnstructuredGridStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
 
   try
     {
-    if (extension == std::string(".vtk")) 
+    if (extension == std::string(".vtk"))
       {
       vtkUnstructuredGridReader *reader = vtkUnstructuredGridReader::New();
       reader->SetFileName(fullName.c_str());
@@ -90,7 +91,7 @@ int vtkMRMLUnstructuredGridStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
     {
     }
 
-  if (modelNode->GetUnstructuredGrid() != NULL) 
+  if (modelNode->GetUnstructuredGrid() != NULL)
     {
     //modelNode->GetUnstructuredGrid()->Modified();
     }
@@ -102,9 +103,9 @@ int vtkMRMLUnstructuredGridStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
 int vtkMRMLUnstructuredGridStorageNode::WriteDataInternal(vtkMRMLNode *refNode)
 {
   vtkMRMLUnstructuredGridNode *modelNode = vtkMRMLUnstructuredGridNode::SafeDownCast(refNode);
-  
+
   std::string fullName = this->GetFullNameFromFileName();
-  if (fullName == std::string("")) 
+  if (fullName == std::string(""))
     {
     vtkErrorMacro("vtkMRMLModelNode: File name not specified");
     return 0;
@@ -117,7 +118,7 @@ int vtkMRMLUnstructuredGridStorageNode::WriteDataInternal(vtkMRMLNode *refNode)
     {
     vtkUnstructuredGridWriter *writer = vtkUnstructuredGridWriter::New();
     writer->SetFileName(fullName.c_str());
-    writer->SetInput( modelNode->GetUnstructuredGrid() );
+    writer->SetInputData( modelNode->GetUnstructuredGrid() );
     try
       {
       writer->Write();
@@ -126,7 +127,7 @@ int vtkMRMLUnstructuredGridStorageNode::WriteDataInternal(vtkMRMLNode *refNode)
       {
       result = 0;
       }
-    writer->Delete();    
+    writer->Delete();
     }
   else
     {
@@ -138,7 +139,7 @@ int vtkMRMLUnstructuredGridStorageNode::WriteDataInternal(vtkMRMLNode *refNode)
     {
     Superclass::StageWriteData(refNode);
     }
-  
+
   return result;
 }
 

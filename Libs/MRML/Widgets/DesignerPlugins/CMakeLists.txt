@@ -37,6 +37,8 @@ set(${KIT}_SRCS
   qMRMLDisplayNodeWidgetPlugin.h
   qMRMLEventBrokerWidgetPlugin.cxx
   qMRMLEventBrokerWidgetPlugin.h
+  qMRMLExpandingWebViewPlugin.cxx
+  qMRMLExpandingWebViewPlugin.h
   qMRMLLabelComboBoxPlugin.cxx
   qMRMLLabelComboBoxPlugin.h
   qMRMLLayoutWidgetPlugin.cxx
@@ -51,6 +53,10 @@ set(${KIT}_SRCS
   qMRMLModelInfoWidgetPlugin.h
   qMRMLNavigationViewPlugin.cxx
   qMRMLNavigationViewPlugin.h
+  qMRMLNodeAttributeTableViewPlugin.cxx
+  qMRMLNodeAttributeTableViewPlugin.h
+  qMRMLNodeAttributeTableWidgetPlugin.cxx
+  qMRMLNodeAttributeTableWidgetPlugin.h
   qMRMLNodeComboBoxPlugin.cxx
   qMRMLNodeComboBoxPlugin.h
   qMRMLRangeWidgetPlugin.cxx
@@ -102,6 +108,7 @@ set(${KIT}_MOC_SRCS
   qMRMLDisplayNodeViewComboBoxPlugin.h
   qMRMLDisplayNodeWidgetPlugin.h
   qMRMLEventBrokerWidgetPlugin.h
+  qMRMLExpandingWebViewPlugin.h
   qMRMLLabelComboBoxPlugin.h
   qMRMLLayoutWidgetPlugin.h
   qMRMLLinearTransformSliderPlugin.h
@@ -109,6 +116,8 @@ set(${KIT}_MOC_SRCS
   qMRMLMatrixWidgetPlugin.h
   qMRMLModelInfoWidgetPlugin.h
   qMRMLNavigationViewPlugin.h
+  qMRMLNodeAttributeTableViewPlugin.h
+  qMRMLNodeAttributeTableWidgetPlugin.h
   qMRMLNodeComboBoxPlugin.h
   qMRMLRangeWidgetPlugin.h
   qMRMLROIWidgetPlugin.h
@@ -135,6 +144,7 @@ set(${KIT}_TARGET_LIBRARIES
 ctkMacroBuildQtDesignerPlugin(
   NAME ${PROJECT_NAME}
   EXPORT_DIRECTIVE ${${KIT}_EXPORT}
+  FOLDER "${${KIT}_FOLDER}"
   SRCS ${${KIT}_SRCS}
   MOC_SRCS ${${KIT}_MOC_SRCS}
   TARGET_LIBRARIES ${${KIT}_TARGET_LIBRARIES}

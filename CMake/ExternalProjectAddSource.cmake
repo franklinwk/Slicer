@@ -41,14 +41,15 @@
 #!     )
 #!     [PROJECTS <projectname> [<projectname> [...]]]
 #!     [LABELS <label1> [<label2> [...]]]
+#!     [VARS <name1>:<type1>=<value1> [<name2>:<type2>=<value2> [...]]]
 #!   )
 #!
 function(ExternalProject_Add_Source projectname)
   set(options)
-  set(_ep_one_args BINARY_DIR DOWNLOAD_DIR URL URL_MD5 GIT_REPOSITORY GIT_TAG SVN_REPOSITORY SVN_USERNAME SVN_PASSWORD SVN_TRUST_CERT)
+  set(_ep_one_args DOWNLOAD_DIR URL URL_MD5 GIT_REPOSITORY GIT_TAG SVN_REPOSITORY SVN_USERNAME SVN_PASSWORD SVN_TRUST_CERT)
   set(oneValueArgs ${_ep_one_args} SOURCE_DIR_VAR)
   set(_ep_multi_args SVN_REVISION)
-  set(multiValueArgs ${_ep_multi_args} LABELS PROJECTS)
+  set(multiValueArgs ${_ep_multi_args} LABELS PROJECTS VARS)
   cmake_parse_arguments(_ep "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   if(NOT _ep_SOURCE_DIR_VAR)
@@ -57,17 +58,13 @@ function(ExternalProject_Add_Source projectname)
 
   # Sanity checks
   if(DEFINED ${_ep_SOURCE_DIR_VAR} AND NOT EXISTS ${${_ep_SOURCE_DIR_VAR}})
-    message(FATAL_ERROR "${_ep_SOURCE_DIR_VAR} variable is defined but corresponds to non-existing directory")
+    message(FATAL_ERROR "${_ep_SOURCE_DIR_VAR} variable is defined but corresponds to nonexistent directory")
   endif()
 
   if(NOT DEFINED ${_ep_SOURCE_DIR_VAR})
 
     if(NOT ${_ep_SOURCE_DIR_VAR})
       set(${_ep_SOURCE_DIR_VAR} ${CMAKE_BINARY_DIR}/${projectname})
-    endif()
-
-    if(NOT _ep_BINARY_DIR)
-      set(_ep_BINARY_DIR CMakeFiles/${projectname}-build)
     endif()
 
     set(_ep_args_to_pass)
@@ -80,6 +77,7 @@ function(ExternalProject_Add_Source projectname)
     ExternalProject_Add(${projectname}
       ${_ep_args_to_pass}
       SOURCE_DIR ${${_ep_SOURCE_DIR_VAR}}
+      BUILD_IN_SOURCE 1
       CONFIGURE_COMMAND ""
       BUILD_COMMAND ""
       INSTALL_COMMAND ""
@@ -101,6 +99,26 @@ function(ExternalProject_Add_Source projectname)
   endif()
   mark_as_superbuild(VARS ${_ep_SOURCE_DIR_VAR}:PATH LABELS ${_ep_LABELS} PROJECTS ${_ep_PROJECTS})
 
+  foreach(_var ${_ep_VARS})
+    string(REPLACE "=" ";" _nametype_and_value ${_var})
+    list(LENGTH _nametype_and_value _nametype_and_value_value_length)
+    if(NOT _nametype_and_value_value_length EQUAL 2)
+      message(FATAL_ERROR "VARS variable expects item [${_var}] to be specified as [<name>:<type>=<value>]")
+    endif()
+    list(GET _nametype_and_value 0 _nametype)
+    list(GET _nametype_and_value 1 _value)
+    string(REPLACE ":" ";" _name_and_type ${_nametype})
+    list(LENGTH _name_and_type _name_and_type_length)
+    if(NOT _name_and_type_length EQUAL 2)
+      message(FATAL_ERROR "VARS variable expects item [${_var}] to be specified as [<name>:<type>=<value>]")
+    endif()
+    list(GET _name_and_type 0 _name)
+    list(GET _name_and_type 1 _type)
+    set(${_name} ${_value} CACHE ${_type} "Variable set by 'ExternalProject_Add_Source' based on VARS parameter." FORCE)
+    #message(STATUS "mark_as_superbuild - _name:${_name} - _type:${_type} - value:${${_name}} - _ep_PROJECTS:${_ep_PROJECTS}")
+    mark_as_superbuild(VARS ${_name}:${_type} PROJECTS ${_ep_PROJECTS})
+  endforeach()
+
 endfunction()
 
 
@@ -117,14 +135,28 @@ endfunction()
 #!       [OPTION_DEPENDS <option_depends>]
 #!       [OPTION_FORCE OFF]
 #!     ]
+#!     [LABELS REMOTE_MODULE]
+#!     [VARS <name1>:<type1>=<value1> [<name2>:<type2>=<value2> [...]]]
 #!   )
+#!
+#! If no <option_name> is specified or if the option is enabled, the variable "Foo_SOURCE_DIR" set
+#! by default to '${CMAKE_BINARY_DIR}/${projectname}' will be passed to Slicer inner build.
+#!
+#! OPTION_NAME If specified, it adds an advanced option allowing to easily toggle the inclusion of the
+#!             associated remote module. That option will be passed to the Slicer inner build.
+#!
+#! VARS is an expected list of variables specified as <varname>:<vartype>=<varvalue> to pass to <projectname>
+#!
+#! LABELS By associating the "REMOTE_MODULE" label, the corresponding source directory will be added
+#!        automatically using the call 'add_directory'.
+#!        This happen in the Slicer/Modules/Remote/CMakeLists.txt file.
 #!
 macro(Slicer_Remote_Add projectname)
   set(options)
   set(_add_source_args
-    BINARY_DIR DOWNLOAD_DIR URL URL_MD5 GIT_REPOSITORY GIT_TAG SVN_REPOSITORY SVN_USERNAME SVN_PASSWORD SVN_TRUST_CERT)
+    DOWNLOAD_DIR URL URL_MD5 GIT_REPOSITORY GIT_TAG SVN_REPOSITORY SVN_USERNAME SVN_PASSWORD SVN_TRUST_CERT)
   set(oneValueArgs OPTION_NAME OPTION_DEFAULT OPTION_FORCE SOURCE_DIR_VAR ${_add_source_args})
-  set(_add_source_multi_args SVN_REVISION LABELS PROJECTS)
+  set(_add_source_multi_args SVN_REVISION LABELS PROJECTS VARS)
   set(multiValueArgs OPTION_DEPENDS ${_add_source_multi_args})
   cmake_parse_arguments(_ep "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 

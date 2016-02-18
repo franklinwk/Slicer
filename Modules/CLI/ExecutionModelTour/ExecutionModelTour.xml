@@ -4,7 +4,7 @@
   <title>Execution Model Tour</title>
   <description><![CDATA[Shows one of each type of parameter.]]></description>
   <version>0.1.0.$Revision$(alpha)</version>
-  <documentation-url>http://wiki.slicer.org/slicerWiki/index.php/Documentation/4.3/Modules/ExecutionModelTour</documentation-url>
+  <documentation-url>http://wiki.slicer.org/slicerWiki/index.php/Documentation/Nightly/Modules/ExecutionModelTour</documentation-url>
   <license/>
   <contributor>Daniel Blezek (GE), Bill Lorensen (GE)</contributor>
   <acknowledgements><![CDATA[This work is part of the National Alliance for Medical Image Computing (NAMIC), funded by the National Institutes of Health through the NIH Roadmap for Medical Research, Grant U54 EB005149.]]></acknowledgements>
@@ -120,7 +120,7 @@
       <label>Input image</label>
       <channel>input</channel>
     </image>
-    <image>
+    <image reference="image1">
       <longflag>image2</longflag>
       <description><![CDATA[An output image]]></description>
       <label>Output image</label>
@@ -145,6 +145,20 @@
       <description><![CDATA[Lists of points in the CLI correspond to slicer fiducial lists]]></description>
       <default>0,0,0</default>
     </point>
+    <pointfile fileExtensions=".fcsv" coordinateSystem="lps">
+      <name>seedsFile</name>
+      <description><![CDATA[Test file of input fiducials, compared to seeds]]></description>
+      <label>Seeds file</label>
+      <longflag>seedsFile</longflag>
+      <channel>input</channel>
+    </pointfile>
+    <pointfile fileExtensions=".fcsv" coordinateSystem="lps">
+      <name>seedsOutFile</name>
+      <label>Output seeds file</label>
+      <description><![CDATA[Output file to read back in, compare to seeds with flipped settings on first fiducial]]></description>
+      <longflag>seedsOutFile</longflag>
+      <channel>output</channel>
+    </pointfile>
   </parameters>
   <parameters>
     <label>Index Parameters</label>
@@ -189,6 +203,23 @@
       <longflag>outputFA</longflag>
       <description><![CDATA[Array of processed (output) FA values]]></description>
     </measurement>
+  </parameters>
+  <parameters>
+    <label>Generic Tables</label>
+    <table>
+      <name>inputDT</name>
+      <channel>input</channel>
+      <label>Input Table</label>
+      <longflag>inputDT</longflag>
+      <description><![CDATA[Array of Table values to process]]></description>
+    </table>
+    <table>
+      <name>outputDT</name>
+      <channel>output</channel>
+      <label>Output Table</label>
+      <longflag>outputDT</longflag>
+      <description><![CDATA[Array of processed (output) Table values]]></description>
+    </table>
   </parameters>
   <parameters>
     <label>Simple return types</label>

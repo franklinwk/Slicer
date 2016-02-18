@@ -46,6 +46,8 @@ public:
   QString                                    Name;
   QString                                    Path;
   bool                                       Installed;
+  bool                                       BuiltIn;
+  bool                                       WidgetRepresentationCreationEnabled;
   qSlicerAbstractModuleRepresentation*       WidgetRepresentation;
   QList<qSlicerAbstractModuleRepresentation*> WidgetRepresentations;
   vtkSmartPointer<vtkMRMLScene>              MRMLScene;
@@ -61,16 +63,20 @@ qSlicerAbstractCoreModulePrivate::qSlicerAbstractCoreModulePrivate()
   this->Name = "NA";
   this->WidgetRepresentation = 0;
   this->Installed = false;
+  this->BuiltIn = false;
+  this->WidgetRepresentationCreationEnabled = true;
 }
 
 //-----------------------------------------------------------------------------
 qSlicerAbstractCoreModulePrivate::~qSlicerAbstractCoreModulePrivate()
 {
- // Delete the widget representations
-  while (!this->WidgetRepresentations.isEmpty())
+  // Delete the widget representation
+  if (this->WidgetRepresentation)
     {
-    delete this->WidgetRepresentations.first();
+    delete this->WidgetRepresentation;
     }
+  qDeleteAll(this->WidgetRepresentations.begin(), this->WidgetRepresentations.end());
+  this->WidgetRepresentations.clear();
 }
 
 //-----------------------------------------------------------------------------
@@ -190,7 +196,7 @@ CTK_GET_CPP(qSlicerAbstractCoreModule, vtkSlicerApplicationLogic*, appLogic, App
 //-----------------------------------------------------------------------------
 bool qSlicerAbstractCoreModule::isHidden()const
 {
-  return false;
+  return this->isWidgetRepresentationCreationEnabled() ? false : true;
 }
 
 //-----------------------------------------------------------------------------
@@ -206,6 +212,14 @@ CTK_SET_CPP(qSlicerAbstractCoreModule, const QString&, setPath, Path);
 //-----------------------------------------------------------------------------
 CTK_GET_CPP(qSlicerAbstractCoreModule, bool, isInstalled, Installed);
 CTK_SET_CPP(qSlicerAbstractCoreModule, bool, setInstalled, Installed);
+
+//-----------------------------------------------------------------------------
+CTK_GET_CPP(qSlicerAbstractCoreModule, bool, isBuiltIn, BuiltIn);
+CTK_SET_CPP(qSlicerAbstractCoreModule, bool, setBuiltIn, BuiltIn);
+
+//-----------------------------------------------------------------------------
+CTK_GET_CPP(qSlicerAbstractCoreModule, bool, isWidgetRepresentationCreationEnabled, WidgetRepresentationCreationEnabled);
+CTK_SET_CPP(qSlicerAbstractCoreModule, bool, setWidgetRepresentationCreationEnabled, WidgetRepresentationCreationEnabled);
 
 //-----------------------------------------------------------------------------
 qSlicerAbstractModuleRepresentation* qSlicerAbstractCoreModule::widgetRepresentation()
@@ -224,6 +238,11 @@ qSlicerAbstractModuleRepresentation* qSlicerAbstractCoreModule::widgetRepresenta
 qSlicerAbstractModuleRepresentation* qSlicerAbstractCoreModule::createNewWidgetRepresentation()
 {
   Q_D(qSlicerAbstractCoreModule);
+
+  if (!this->isWidgetRepresentationCreationEnabled())
+    {
+    return 0;
+    }
 
   // Since 'logic()' should have been called in 'initialize(), let's make
   // sure the 'logic()' method call is consistent and won't create a
@@ -288,6 +307,8 @@ void qSlicerAbstractCoreModule::representationDeleted(qSlicerAbstractModuleRepre
 {
   Q_D(qSlicerAbstractCoreModule);
 
+  // Just remove the list entry, the object storage has already been
+  // deleted by caller.
   if (d->WidgetRepresentation == representation)
     {
     d->WidgetRepresentation = 0;

@@ -1,24 +1,29 @@
 import os
-from __main__ import vtk
+import vtk
 import vtkITK
-from __main__ import ctk
-from __main__ import qt
-from __main__ import slicer
-from EditOptions import EditOptions
-from EditorLib import EditorLib
+import ctk
+import qt
+import slicer
+from EditOptions import HelpButton
 import LabelEffect
 
+__all__ = [
+  'LevelTracingEffectOptions',
+  'LevelTracingEffectTool',
+  'LevelTracingEffectLogic',
+  'LevelTracingEffect'
+  ]
 
 #########################################################
 #
-# 
+#
 comment = """
 
   LevelTracingEffect is a subclass of LabelEffect
   that implements the interactive paintbrush tool
   in the slicer editor
 
-# TODO : 
+# TODO :
 """
 #
 #########################################################
@@ -40,7 +45,7 @@ class LevelTracingEffectOptions(LabelEffect.LabelEffectOptions):
   def create(self):
     super(LevelTracingEffectOptions,self).create()
 
-    EditorLib.HelpButton(self.frame, "Use this tool to track around similar intensity levels.\n\nAs you move the mouse, the current background voxel is used to find a closed path that follows the same intensity value back to the starting point within the current slice.  Pressing the left mouse button fills the the path according to the current labeling rules.")
+    HelpButton(self.frame, "Use this tool to track around similar intensity levels.\n\nAs you move the mouse, the current background voxel is used to find a closed path that follows the same intensity value back to the starting point within the current slice.  Pressing the left mouse button fills the the path according to the current labeling rules.")
 
     # Add vertical spacer
     self.frame.layout().addStretch(1)
@@ -54,7 +59,7 @@ class LevelTracingEffectOptions(LabelEffect.LabelEffectOptions):
 
   # note: this method needs to be implemented exactly as-is
   # in each leaf subclass so that "self" in the observer
-  # is of the correct type 
+  # is of the correct type
   def updateParameterNode(self, caller, event):
     node = self.editUtil.getParameterNode()
     if node != self.parameterNode:
@@ -80,7 +85,7 @@ class LevelTracingEffectOptions(LabelEffect.LabelEffectOptions):
 #
 # LevelTracingEffectTool
 #
- 
+
 class LevelTracingEffectTool(LabelEffect.LabelEffectTool):
   """
   One instance of this will be created per-view when the effect
@@ -93,7 +98,7 @@ class LevelTracingEffectTool(LabelEffect.LabelEffectTool):
 
   def __init__(self, sliceWidget):
     super(LevelTracingEffectTool,self).__init__(sliceWidget)
-    
+
     # create a logic instance to do the non-gui work
     self.logic = LevelTracingEffectLogic(self.sliceWidget.sliceLogic())
 
@@ -106,14 +111,14 @@ class LevelTracingEffectTool(LabelEffect.LabelEffectTool):
     self.polyData = vtk.vtkPolyData()
 
     self.tracingFilter = vtkITK.vtkITKLevelTracingImageFilter()
-    self.ijkToXY = vtk.vtkTransform()
+    self.ijkToXY = vtk.vtkGeneralTransform()
 
     self.mapper = vtk.vtkPolyDataMapper2D()
     self.actor = vtk.vtkActor2D()
     property_ = self.actor.GetProperty()
     property_.SetColor( 107/255., 190/255., 99/255. )
     property_.SetLineWidth( 1 )
-    self.mapper.SetInput(self.polyData)
+    self.mapper.SetInputData(self.polyData)
     self.actor.SetMapper(self.mapper)
     property_ = self.actor.GetProperty()
     property_.SetColor(1,1,0)
@@ -165,7 +170,7 @@ class LevelTracingEffectTool(LabelEffect.LabelEffectTool):
       # so only accept the point if it is inside the image and is at least one pixel away from the edge
       if ijk[index] < 1 or ijk[index] >= dimensions[index]-1:
         return
-    self.tracingFilter.SetInput( self.editUtil.getBackgroundImage() )
+    self.tracingFilter.SetInputData( self.editUtil.getBackgroundImage() )
     self.tracingFilter.SetSeed( ijk )
 
     # select the plane corresponding to current slice orientation
@@ -182,8 +187,7 @@ class LevelTracingEffectTool(LabelEffect.LabelEffectTool):
     polyData = self.tracingFilter.GetOutput()
 
     backgroundLayer = self.logic.sliceLogic.GetBackgroundLayer()
-    xyToIJK = backgroundLayer.GetXYToIJKTransform().GetMatrix()
-    self.ijkToXY.SetMatrix( xyToIJK )
+    self.ijkToXY.DeepCopy( backgroundLayer.GetXYToIJKTransform() )
     self.ijkToXY.Inverse()
     self.ijkToXY.TransformPoints( polyData.GetPoints(), self.xyPoints )
 
@@ -200,13 +204,13 @@ class LevelTracingEffectTool(LabelEffect.LabelEffectTool):
 #
 # LevelTracingEffectLogic
 #
- 
+
 class LevelTracingEffectLogic(LabelEffect.LabelEffectLogic):
   """
   This class contains helper methods for a given effect
   type.  It can be instanced as needed by an LevelTracingEffectTool
   or LevelTracingEffectOptions instance in order to compute intermediate
-  results (say, for user feedback) or to implement the final 
+  results (say, for user feedback) or to implement the final
   segmentation editing operation.  This class is split
   from the LevelTracingEffectTool so that the operations can be used
   by other code without the need for a view context.
@@ -217,7 +221,7 @@ class LevelTracingEffectLogic(LabelEffect.LabelEffectLogic):
 
 
 #
-# The LevelTracingEffect class definition 
+# The LevelTracingEffect class definition
 #
 
 class LevelTracingEffect(LabelEffect.LabelEffect):

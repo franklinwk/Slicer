@@ -31,6 +31,7 @@
 
 #include <string>
 #include <map>
+#include <iostream>
 
 #include "vtkTeemConfigure.h"
 #include "vtkMedicalImageReader2.h"
@@ -40,6 +41,7 @@
 
 #include <vtkMatrix4x4.h>
 #include <vtkPointData.h>
+#include <vtkVersion.h>
 
 #include "teem/nrrd.h"
 
@@ -53,28 +55,28 @@ class VTK_Teem_EXPORT vtkNRRDReader : public vtkMedicalImageReader2
 public:
   static vtkNRRDReader *New();
 
-  vtkTypeRevisionMacro(vtkNRRDReader,vtkMedicalImageReader2);
+  vtkTypeMacro(vtkNRRDReader,vtkMedicalImageReader2);
 
-  /// 
+  ///
   /// Returns a IJK to RAS transformation matrix
   vtkMatrix4x4* GetRasToIjkMatrix();
 
-  /// 
+  ///
   /// Returns the measurement frame matrix used for tensor valued data.
   vtkMatrix4x4* GetMeasurementFrameMatrix();
 
-  /// 
+  ///
   /// Get a space separated list of all keys in the header
   /// the string is allocated and deleted in this object.  This method
   /// does not support spaces in key names.
   char* GetHeaderKeys();
 
-  /// 
+  ///
   /// Get a list of keys in the header. Preferred method to use as it
   /// supports spaces in key names.
   std::vector<std::string> GetHeaderKeysVector();
 
-  /// 
+  ///
   /// Get a value given a key in the header
   const char* GetHeaderValue(const char *key);
 
@@ -83,14 +85,14 @@ public:
   ///  is the given file name a NRRD file?
   virtual int CanReadFile(const char* filename);
 
-  /// 
+  ///
   /// Valid extentsions
   virtual const char* GetFileExtensions()
     {
       return ".nhdr .nrrd";
     }
 
-  ///  
+  ///
   /// A descriptive name for this format
   virtual const char* GetDescriptiveName()
     {
@@ -103,32 +105,32 @@ public:
   /// parsing the complete header information.
   vtkGetMacro(ReadStatus,int);
 
-  /// 
+  ///
   /// Point data field type
   vtkSetMacro(PointDataType,int);
   vtkGetMacro(PointDataType,int);
-  
-  /// 
+
+  ///
   /// Set the data type: int, float....
   vtkSetMacro(DataType,int);
   vtkGetMacro(DataType,int);
-  
-  /// 
+
+  ///
   //Number of components
   vtkSetMacro(NumberOfComponents,int);
   vtkGetMacro(NumberOfComponents,int);
-  
 
-  /// 
+
+  ///
   /// Use image origin from the file
-  void SetUseNativeOriginOn() 
+  void SetUseNativeOriginOn()
   {
     UseNativeOrigin = true;
   }
 
-  /// 
+  ///
   /// Use image center as origin
-  void SetUseNativeOriginOff() 
+  void SetUseNativeOriginOff()
   {
     UseNativeOrigin = false;
   }
@@ -217,16 +219,15 @@ public:
       break;
     }
   }
-
-vtkImageData * AllocateOutputData(vtkDataObject *out);
-virtual void AllocateOutputData(vtkImageData *out, int *uExtent)
-  { Superclass::AllocateOutputData(out, uExtent); }
-void AllocatePointData(vtkImageData *out);
+virtual vtkImageData * AllocateOutputData(vtkDataObject *out, vtkInformation* outInfo);
+virtual void AllocateOutputData(vtkImageData *out, vtkInformation* outInfo, int *uExtent)
+    { Superclass::AllocateOutputData(out, outInfo, uExtent); }
+void AllocatePointData(vtkImageData *out, vtkInformation* outInfo);
 
 protected:
   vtkNRRDReader();
   ~vtkNRRDReader();
-                         
+
   vtkMatrix4x4* RasToIjkMatrix;
   vtkMatrix4x4* MeasurementFrameMatrix;
   vtkMatrix4x4* NRRDWorldToRasMatrix;
@@ -237,7 +238,7 @@ protected:
   Nrrd *nrrd;
 
   int ReadStatus;
-  
+
   int PointDataType;
   int DataType;
   int NumberOfComponents;
@@ -246,7 +247,7 @@ protected:
   std::map <std::string, std::string> HeaderKeyValue;
 
   virtual void ExecuteInformation();
-  virtual void ExecuteData(vtkDataObject *out);
+  virtual void ExecuteDataWithInformation(vtkDataObject *output, vtkInformation* outInfo);
 
   int tenSpaceDirectionReduce(Nrrd *nout, const Nrrd *nin, double SD[9]);
 

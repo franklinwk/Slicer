@@ -1,13 +1,16 @@
 import slicer
-from __main__ import qt
-from __main__ import ctk
-from __main__ import vtk
-from __main__ import getNodes
-import EditUtil
+import qt
+import ctk
+import vtk
+from slicer.util import getNodes
+from EditUtil import EditUtil
+from slicer.util import VTKObservationMixin
+
+__all__ = ['HelpButton', 'EditOptions']
 
 #########################################################
 #
-# 
+#
 comment = """
 In this file:
 
@@ -17,7 +20,7 @@ In this file:
   Each effect interface is created when the corresponding
   editor effect is active on the slice views.  The main
   (only) responsibility of these GUIs is to set parameters
-  on the mrml node that influence the behavior of the 
+  on the mrml node that influence the behavior of the
   editor effects.
 
 """
@@ -29,7 +32,7 @@ In this file:
 #########################################################
 
 class HelpButton(object):
-  """ 
+  """
   Puts a button on the interface that pops up a message
   dialog for help when pressed
   """
@@ -52,7 +55,7 @@ class HelpButton(object):
 #########################################################
 # Options
 #########################################################
-class EditOptions(object):
+class EditOptions(VTKObservationMixin):
   """ This EditOptions is a parent class for all the GUI options
   for editor effects.  These are small custom interfaces
   that it in the toolOptionsFrame of the Editor interface.
@@ -60,13 +63,13 @@ class EditOptions(object):
   """
 
   def __init__(self, parent=None):
+    VTKObservationMixin.__init__(self)
     self.parent = parent
     self.updatingGUI = False
-    self.observerTags = []
     self.widgets = []
     self.parameterNode = None
     self.parameterNodeTag = None
-    self.editUtil = EditUtil.EditUtil()
+    self.editUtil = EditUtil() # Kept for backward compatibility
     self.tools = []
 
     # connections is a list of widget/signal/slot tripples
@@ -83,19 +86,16 @@ class EditOptions(object):
     # 2) set the defaults (will only set them if they are not
     # already set)
     self.updateParameterNode(self.parameterNode, vtk.vtkCommand.ModifiedEvent)
-    self.setMRMLDefaults()
 
     # TODO: change this to look for specfic events (added, removed...)
     # but this requires being able to access events by number from wrapped code
-    tag = slicer.mrmlScene.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updateParameterNode)
-    self.observerTags.append( (slicer.mrmlScene, tag) )
+    self.addObserver(slicer.mrmlScene, vtk.vtkCommand.ModifiedEvent, self.updateParameterNode)
 
   def __del__(self):
     self.destroy()
     if self.parameterNode:
       self.parameterNode.RemoveObserver(self.parameterNodeTag)
-    for tagpair in self.observerTags:
-      tagpair[0].RemoveObserver(tagpair[1])
+    self.removeObservers()
 
   def connectWidgets(self):
     if self.connectionsConnected: return
@@ -109,7 +109,11 @@ class EditOptions(object):
   def disconnectWidgets(self):
     if not self.connectionsConnected: return
     for widget,signal,slot in self.connections:
-      success = widget.disconnect(signal,slot)
+      try:
+        success = widget.disconnect(signal,slot)
+      except ValueError:
+        # handle "Trying to call 'disconnect' on a destroyed QComboBox object" case
+        success = False
       if not success:
         print("Could not disconnect {signal} to {slot} for {widget}".format(
           signal = signal, slot = slot, widget = widget))
@@ -166,13 +170,13 @@ class EditOptions(object):
     success = False
     lo = -1
     hi = -1
-    backgroundVolume = self.editUtil.getBackgroundVolume()
+    backgroundVolume = EditUtil.getBackgroundVolume()
     if backgroundVolume:
       backgroundImage = backgroundVolume.GetImageData()
       if backgroundImage:
         lo, hi = backgroundImage.GetScalarRange()
         success = True
-    return success, lo, hi    
+    return success, lo, hi
 
   def setRangeWidgetToBackgroundRange(self, rangeWidget):
     """Set the range widget based on current backgroun

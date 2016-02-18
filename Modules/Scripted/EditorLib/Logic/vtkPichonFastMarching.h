@@ -14,7 +14,8 @@
 
 // VTK includes
 #include <vtkImageData.h>
-#include <vtkImageToImageFilter.h>
+#include <vtkImageAlgorithm.h>
+#include <vtkVersion.h>
 
 // STD includes
 #include <vector>
@@ -28,7 +29,7 @@
 ///////////////////////////////////////////////////////////////////////
 
 /// pretty big
-#define INF 1e20 
+#define INF 1e20
 
 /// outside margin
 #define BAND_OUT 3
@@ -57,13 +58,14 @@ typedef std::vector<int> VecInt;
 
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
-class VTK_SLICER_EDITORLIB_MODULE_LOGIC_EXPORT vtkPichonFastMarching : public vtkImageToImageFilter
+class VTK_SLICER_EDITORLIB_MODULE_LOGIC_EXPORT vtkPichonFastMarching
+  : public vtkImageAlgorithm
 {
 public:
   static vtkPichonFastMarching *New();
-  vtkTypeRevisionMacro(vtkPichonFastMarching,vtkImageToImageFilter);
+  vtkTypeMacro(vtkPichonFastMarching,vtkImageAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
-  
+
   void vtkErrorWrapper( const char* s)
     {
       vtkErrorMacro( << s );
@@ -103,19 +105,19 @@ public:
 protected:
   vtkPichonFastMarching();
   ~vtkPichonFastMarching();
-  
-  void ExecuteData(vtkDataObject *);
+
+  void ExecuteDataWithInformation(vtkDataObject *, vtkInformation *);
 
 
   friend void vtkPichonFastMarchingExecute(vtkPichonFastMarching *self,
                      vtkImageData *inData, short *inPtr,
-                     vtkImageData *outData, short *outPtr, 
+                     vtkImageData *outData, short *outPtr,
                      int outExt[6]);
-                     
+
 private:
   //pb wrap  vtkPichonFastMarching()(const vtkPichonFastMarching&);
   //pb wrap  void operator=(const vtkPichonFastMarching&);
-  
+
   bool somethingReallyWrong;
 
   double powerSpeed;
@@ -126,7 +128,7 @@ private:
   int tmpNeighborhood[125]; /// allocate it here so that we do not have to
   /// allocate it over and over in getMedianInhomo
 
-  float dx; 
+  float dx;
   float dy;
   float dz;
 
@@ -138,7 +140,7 @@ private:
   bool firstCall;
 
   FMnode *node;  /// arrival time and status for all voxels
-  int *inhomo; /// inhomogeneity 
+  int *inhomo; /// inhomogeneity
   int *median; /// medican intensity
 
   short* outdata; /// output
@@ -173,7 +175,7 @@ private:
 
   int label;
   int depth;
-  
+
   int nPointsEvolution;
   int nPointsBeforeLeakEvolution;
   int nEvolutions;
@@ -207,12 +209,12 @@ private:
   int shiftNeighbor(int n);
   double distanceNeighbor(int n);
   float computeT(int index );
-  
+
   void setSeed(int index );
 
   void collectInfoSeed(int index );
   void collectInfoAll( void );
-  
+
   float speed(int index );
 
   bool minHeapIsSorted( void );

@@ -37,6 +37,9 @@
 #include <QList>
 class QAction;
 
+// VTK includes
+#include <vtkWeakPointer.h>
+
 // CTK includes
 #include <ctkPimpl.h>
 
@@ -59,7 +62,7 @@ class vtkMRMLCommandLineModuleNode;
 class vtkSlicerCLIModuleLogic;
 
 //-----------------------------------------------------------------------------
-class qSlicerCLIModuleUIHelper; 
+class qSlicerCLIModuleUIHelper;
 
 //-----------------------------------------------------------------------------
 class qSlicerCLIModuleWidgetPrivate: public QObject,
@@ -72,14 +75,14 @@ protected:
 public:
   typedef qSlicerCLIModuleWidgetPrivate Self;
   qSlicerCLIModuleWidgetPrivate(qSlicerCLIModuleWidget& object);
-  
-  /// 
+
+  ///
   /// Convenient function to cast vtkSlicerLogic into vtkSlicerCLIModuleLogic
   vtkSlicerCLIModuleLogic* logic()const;
 
-  /// 
+  ///
   /// Convenient function to cast vtkMRMLNode into vtkMRMLCommandLineModuleNode
-  vtkMRMLCommandLineModuleNode* commandLineModuleNode()const; 
+  vtkMRMLCommandLineModuleNode* commandLineModuleNode()const;
 
   /// Convenient method to cast qSlicerAbstractModule into qSlicerCLIModule
   qSlicerCLIModule * module()const;
@@ -92,17 +95,17 @@ public:
   typedef std::vector<ModuleParameter>::iterator       ParameterIterator;
 
 
-  /// 
+  ///
   /// Calling this method will loop trough the structure resulting
   /// from the XML parsing and generate the corresponding UI.
   virtual void setupUi(qSlicerWidget* widget);
 
-  /// 
+  ///
   void addParameterGroups();
   void addParameterGroup(QBoxLayout* layout,
                          const ModuleParameterGroup& parameterGroup);
 
-  /// 
+  ///
   void addParameters(QFormLayout* layout, const ModuleParameterGroup& parameterGroup);
   void addParameter(QFormLayout* layout, const ModuleParameter& moduleParameter);
 
@@ -116,9 +119,9 @@ public slots:
   void onValueChanged(const QString& name, const QVariant& type);
 
 public:
-  qSlicerCLIModuleUIHelper* CLIModuleUIHelper; 
-  
-  vtkMRMLCommandLineModuleNode* CommandLineModuleNode;
+  qSlicerCLIModuleUIHelper* CLIModuleUIHelper;
+
+  vtkWeakPointer<vtkMRMLCommandLineModuleNode> CommandLineModuleNode;
   QAction* AutoRunWhenParameterChanged;
   QAction* AutoRunWhenInputModified;
   QAction* AutoRunOnOtherInputEvents;

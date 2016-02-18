@@ -16,6 +16,8 @@
 #ifndef __vtkImageLabelCombine_h
 #define __vtkImageLabelCombine_h
 
+#include <vtkVersion.h>
+
 #include "vtkTeemConfigure.h"
 
 #include "vtkThreadedImageAlgorithm.h"
@@ -29,33 +31,39 @@ class VTK_Teem_EXPORT vtkImageLabelCombine : public vtkThreadedImageAlgorithm
 {
 public:
   static vtkImageLabelCombine *New();
-  vtkTypeRevisionMacro(vtkImageLabelCombine,vtkThreadedImageAlgorithm);
+  vtkTypeMacro(vtkImageLabelCombine,vtkThreadedImageAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
 
-  /// 
+  ///
   /// Set/Get the Operation to perform.
   vtkSetMacro(OverwriteInput,int);
   vtkGetMacro(OverwriteInput,int);
 
-  /// 
+  ///
   /// Set the two inputs to this filter
-  virtual void SetInput1(vtkDataObject *in) { this->SetInput(0,in); }
-  virtual void SetInput2(vtkDataObject *in) { this->SetInput(1,in); }
+  virtual void SetInput1(vtkDataObject *in)
+  {
+      this->SetInputData(0,in);
+  }
+  virtual void SetInput2(vtkDataObject *in)
+  {
+      this->SetInputData(1,in);
+  }
 
 protected:
   vtkImageLabelCombine();
   ~vtkImageLabelCombine() {};
 
   int OverwriteInput;
-  
-  virtual int RequestInformation (vtkInformation *, 
+
+  virtual int RequestInformation (vtkInformation *,
                                   vtkInformationVector **,
                                   vtkInformationVector *);
-  
-  virtual void ThreadedRequestData(vtkInformation *request, 
-                                   vtkInformationVector **inputVector, 
+
+  virtual void ThreadedRequestData(vtkInformation *request,
+                                   vtkInformationVector **inputVector,
                                    vtkInformationVector *outputVector,
-                                   vtkImageData ***inData, 
+                                   vtkImageData ***inData,
                                    vtkImageData **outData,
                                    int extent[6], int threadId);
 

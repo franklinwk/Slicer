@@ -29,6 +29,7 @@
 #include <vtkMRMLSliceNode.h>
 #include <vtkMRMLSliceLogic.h>
 #include <vtkMRMLVolumeNode.h>
+#include <vtkMRMLViewNode.h>
 
 // VTK includes
 #include <vtkActor.h>
@@ -54,7 +55,6 @@
 
 //---------------------------------------------------------------------------
 vtkStandardNewMacro(vtkMRMLThreeDReformatDisplayableManager);
-vtkCxxRevisionMacro(vtkMRMLThreeDReformatDisplayableManager, "$Revision: 13525 $");
 
 //---------------------------------------------------------------------------
 class vtkMRMLThreeDReformatDisplayableManager::vtkInternal
@@ -332,8 +332,12 @@ void vtkMRMLThreeDReformatDisplayableManager::vtkInternal
                  sliceToRAS->GetElement(2,3));
 
   // Update the widget itself if necessary
-  if ((!planeWidget->GetEnabled() && sliceNode->GetWidgetVisible()) ||
-     (planeWidget->GetEnabled() && !sliceNode->GetWidgetVisible()) ||
+  bool visible =
+    sliceNode->IsDisplayableInThreeDView(this->External->GetMRMLViewNode()->GetID())
+    && sliceNode->GetWidgetVisible();
+
+  if ((!planeWidget->GetEnabled() && visible) ||
+     (planeWidget->GetEnabled() && !visible) ||
      (!rep->GetLockNormalToCamera() && sliceNode->GetWidgetNormalLockedToCamera()) ||
      (rep->GetLockNormalToCamera() && !sliceNode->GetWidgetNormalLockedToCamera()))
     {

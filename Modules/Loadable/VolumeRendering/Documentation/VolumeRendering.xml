@@ -3,8 +3,7 @@
   <category>Core</category>
   <title>Volume Rendering</title>
   <description><![CDATA[This module provides interactive visualization of 3D image data.]]></description>
-  <version>4.3</version>
-  <documentation-url>http://wiki.slicer.org/slicerWiki/index.php/Documentation/4.3/Modules/VolumeRendering</documentation-url>
+  <documentation-url>http://wiki.slicer.org/slicerWiki/index.php/Documentation/Nightly/Modules/VolumeRendering</documentation-url>
   <license>slicer4</license>
   <contributor>Julien Finet (Kitware), Alex Yarmarkovich (Isomics), Yanling Liu (SAIC-Frederick, NCI-Frederick), Andreas Freudling (SPL, BWH), Ron Kikinis(SPL, BWH)</contributor>
   <acknowledgements><![CDATA[This work is part of the National Alliance for Medical Image Computing (NAMIC), funded by the National Institutes of Health through the NIH Roadmap for Medical Research, Grant U54 EB005149. Some of the transfer functions were contributed by Kitware Inc. (VolView)]]></acknowledgements>
@@ -49,7 +48,7 @@
     </parameter>
     <parameter>
       <label>Rendering</label>
-      <description><![CDATA[Select a volume rendering method. A default method can be set in the application settings Volume Rendering panel.***"VTK CPU Ray Casting": Available on all platforms, the volume rendering is enterily realized on the CPU (default)***"VTK GPU Ray Casting": Available on all platforms except on Mac with an NVidia graphic card, fastest method to volume render***"VTK OpenGL 3D Texture Mapping": Available on all platforms, use the GPU but it is not ray casting***"NCI GPU Ray Casting": Available on all platforms, ray caster on the GPU, doesn't support compositing.]]></description>
+      <description><![CDATA[Select a volume rendering method. A default method can be set in the application settings Volume Rendering panel.  VTK CPU Ray Casting: Available on all platforms, the volume rendering is enterily realized on the CPU (default).  VTK GPU Ray Casting: Available on all platforms with compatible graphic cards (it impossible for us to test all combinations). GPU is faster typically, but may not have the same quality on all cards.]]></description>
     </parameter>
   </parameters>
   <parameters>

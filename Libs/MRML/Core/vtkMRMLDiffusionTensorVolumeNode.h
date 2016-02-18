@@ -42,12 +42,15 @@ class VTK_MRML_EXPORT vtkMRMLDiffusionTensorVolumeNode : public vtkMRMLDiffusion
 
   /// Associated volume display MRML node
   virtual void SetAndObserveDisplayNodeID(const char *DisplayNodeID);
- 
+
   /// Associated display MRML node
   virtual vtkMRMLDiffusionTensorVolumeDisplayNode* GetDiffusionTensorVolumeDisplayNode();
 
   /// Create default storage node or NULL if does not have one
   virtual vtkMRMLStorageNode* CreateDefaultStorageNode();
+
+  /// Create and observe default display node
+  virtual void CreateDefaultDisplayNodes();
 
 protected:
   vtkMRMLDiffusionTensorVolumeNode();

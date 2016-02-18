@@ -10,7 +10,7 @@ int vtkMRMLAnnotationAngleNodeTest1(int , char * [] )
 {
 
   // ======================
-  // Basic Setup 
+  // Basic Setup
   // ======================
 
   vtkSmartPointer< vtkMRMLAnnotationAngleNode > node2 = vtkSmartPointer< vtkMRMLAnnotationAngleNode >::New();
@@ -19,10 +19,9 @@ int vtkMRMLAnnotationAngleNodeTest1(int , char * [] )
 
   {
 
-    vtkSmartPointer< vtkMRMLAnnotationAngleNode > node1 = vtkSmartPointer< vtkMRMLAnnotationAngleNode >::New();  
+    vtkSmartPointer< vtkMRMLAnnotationAngleNode > node1 = vtkSmartPointer< vtkMRMLAnnotationAngleNode >::New();
     // node1->Initialize(mrmlScene);
-
-    EXERCISE_BASIC_OBJECT_METHODS( node1 );
+    EXERCISE_ALL_BASIC_MRML_METHODS(node1);
 
     node1->UpdateReferences();
     node2->Copy( node1 );
@@ -40,17 +39,17 @@ int vtkMRMLAnnotationAngleNodeTest1(int , char * [] )
   storNode->Delete();
 
   std::cout << "Passed StorageNode" << std::endl;
-  
+
   // ======================
   // Modify Properties
   // ======================
-  node2->Reset();
+  node2->Reset(NULL);
   node2->StartModify();
   // node2->Initialize(mrmlScene);
 
 
   node2->SetName("AnnotationAngleNodeTest") ;
-  
+
   std::string nodeTagName = node2->GetNodeTagName();
   std::cout << "Node Tag Name = " << nodeTagName << std::endl;
 
@@ -67,7 +66,7 @@ int vtkMRMLAnnotationAngleNodeTest1(int , char * [] )
     node2->SetPositionCenter(ctp);
   }
 
- 
+
   int vis = 1;
   node2->SetRay1Visibility(vis);
 
@@ -76,7 +75,7 @@ int vtkMRMLAnnotationAngleNodeTest1(int , char * [] )
 
   if (ctrlPointID[0]!= 1 || (ctrlPointID[1] != 2) || (ctrlPointID[2] != 3) ||  node2->GetRay1Visibility() != vis)
     {
-      std::cerr << "Error in Array Attributes: "  << ctrlPointID[0] << "!=1, " << ctrlPointID[1]<< "!=2" << ctrlPointID[2]<< "!=3, " 
+      std::cerr << "Error in Array Attributes: "  << ctrlPointID[0] << "!=1, " << ctrlPointID[1]<< "!=2" << ctrlPointID[2]<< "!=3, "
         << node2->GetRay1Visibility() <<"!="<< vis << std::endl;
       return EXIT_FAILURE;
     }
@@ -90,38 +89,38 @@ int vtkMRMLAnnotationAngleNodeTest1(int , char * [] )
   node2->Modified();
 
   // ======================
-  // Test WriteXML and ReadXML 
+  // Test WriteXML and ReadXML
   // ======================
 
   mrmlScene->SetURL("AnnotationAngleNodeTest.mrml");
   mrmlScene->Commit();
 
-  // Now Read in File to see if ReadXML works - it first disconnects from node2 ! 
+  // Now Read in File to see if ReadXML works - it first disconnects from node2 !
   mrmlScene->Connect();
   vtkIndent ij;
 
-  if (mrmlScene->GetNumberOfNodesByClass("vtkMRMLAnnotationAngleNode") != 1) 
+  if (mrmlScene->GetNumberOfNodesByClass("vtkMRMLAnnotationAngleNode") != 1)
     {
         std::cerr << "Error in ReadXML() or WriteXML() - Did not create a class called vtkMRMLAnnotationAngleNode" << std::endl;
     return EXIT_FAILURE;
     }
 
   vtkMRMLAnnotationAngleNode *node3 = dynamic_cast < vtkMRMLAnnotationAngleNode *> (mrmlScene->GetNthNodeByClass(0,"vtkMRMLAnnotationAngleNode"));
-  if (!node3) 
+  if (!node3)
       {
     std::cerr << "Error in ReadXML() or WriteXML(): could not find vtkMRMLAnnotationAngleNode" << std::endl;
     return EXIT_FAILURE;
       }
 
   std::stringstream initialAnnotation, afterAnnotation;
-  
+
 
   // node2->PrintSelf(cout,ind);
 
   node2->PrintAnnotationInfo(initialAnnotation,ind);
 
   node3->PrintAnnotationInfo(afterAnnotation,ind);
-  if (initialAnnotation.str().compare(afterAnnotation.str())) 
+  if (initialAnnotation.str().compare(afterAnnotation.str()))
   {
     std::cerr << "Error in ReadXML() or WriteXML()" << std::endl;
     std::cerr << "Before:" << std::endl << initialAnnotation.str() <<std::endl;
@@ -131,7 +130,7 @@ int vtkMRMLAnnotationAngleNodeTest1(int , char * [] )
   cout << "Passed XML" << endl;
 
   return EXIT_SUCCESS;
-  
+
 }
 
 

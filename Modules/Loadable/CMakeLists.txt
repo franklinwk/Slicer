@@ -6,6 +6,7 @@ set(qtmodules
   Cameras
   Units
   Colors
+  SubjectHierarchy
   Transforms
   Annotations
   Data
@@ -18,6 +19,7 @@ set(qtmodules
   #FiberBundles
   SceneViews
   SlicerWelcome
+  Tables
   Reformat
   ViewControllers
   Volumes
@@ -26,12 +28,6 @@ set(qtmodules
 if(Slicer_BUILD_CLI_SUPPORT)
   list(APPEND qtmodules
     CropVolume
-    )
-endif()
-if(Slicer_BUILD_DIFFUSION_SUPPORT)
-  list(APPEND qtmodules
-    TractographyDisplay
-    TractographyInteractiveSeeding # tractography depends of Volumes
     )
 endif()
 

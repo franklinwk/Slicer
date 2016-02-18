@@ -103,7 +103,7 @@ protected:
   {
   }
 
-  void PrintSelf(std::ostream& os, Indent indent) const;
+  void PrintSelf(std::ostream& os, Indent indent) const ITK_OVERRIDE;
 
   /** DifferenceImageFilter can be implemented as a multithreaded
    * filter.  Therefore, this implementation provides a
@@ -116,16 +116,11 @@ protected:
    *
    * \sa ImageToImageFilter::ThreadedGenerateData(),
    *     ImageToImageFilter::GenerateData()  */
-#if ITK_VERSION_MAJOR < 4
-  void ThreadedGenerateData(const OutputImageRegionType& threadRegion, int threadId);
+  void ThreadedGenerateData(const OutputImageRegionType& threadRegion, ThreadIdType threadId) ITK_OVERRIDE;
 
-#else
-  void ThreadedGenerateData(const OutputImageRegionType& threadRegion, ThreadIdType threadId);
+  void BeforeThreadedGenerateData() ITK_OVERRIDE;
 
-#endif
-  void BeforeThreadedGenerateData();
-
-  void AfterThreadedGenerateData();
+  void AfterThreadedGenerateData() ITK_OVERRIDE;
 
   InputPixelType ApplyMeasurementFrameToTensor( InputPixelType tensor, const MatrixType & measurementFrame );
 

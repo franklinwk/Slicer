@@ -1,6 +1,6 @@
 /*=auto=========================================================================
 
-  Portions (c) Copyright 2005 Brigham and Women's Hospital (BWH) 
+  Portions (c) Copyright 2005 Brigham and Women's Hospital (BWH)
   All Rights Reserved.
 
   See COPYRIGHT.txt
@@ -14,11 +14,13 @@
 #include "vtkMRMLCoreTestingMacros.h"
 #include "vtkMRMLDisplayableNode.h"
 #include "vtkMRMLDisplayNode.h"
+#include "vtkMRMLModelStorageNode.h"
 #include "vtkMRMLScene.h"
 
 // VTK includes
 #include <vtkCollection.h>
 #include <vtkNew.h>
+#include <vtkObjectFactory.h>
 #include <vtkSmartPointer.h>
 
 //----------------------------------------------------------------------------
@@ -26,9 +28,9 @@ class vtkMRMLDisplayableNodeTestHelper1 : public vtkMRMLDisplayableNode
 {
 public:
   // Provide a concrete New.
-  static vtkMRMLDisplayableNodeTestHelper1 *New(){return new vtkMRMLDisplayableNodeTestHelper1;};
+  static vtkMRMLDisplayableNodeTestHelper1 *New();
 
-  vtkTypeMacro( vtkMRMLDisplayableNodeTestHelper1, vtkMRMLDisplayableNode);
+  vtkTypeMacro(vtkMRMLDisplayableNodeTestHelper1, vtkMRMLDisplayableNode);
 
   // Return the raw list of display nodes. Elements can be 0 even if the node
   // associated to the node ID exists in the scene.
@@ -44,32 +46,41 @@ public:
     }
   virtual vtkMRMLNode* CreateNodeInstance()
     {
-    return new vtkMRMLDisplayableNodeTestHelper1;
+    return vtkMRMLDisplayableNodeTestHelper1::New();
     }
   virtual const char* GetNodeTagName()
     {
     return "vtkMRMLDisplayableNodeTestHelper1";
     }
+
+  virtual vtkMRMLStorageNode* CreateDefaultStorageNode()
+    {
+    // just some random storage node to pass the storage node test of basic MRML node tests
+    return vtkMRMLStorageNode::SafeDownCast(vtkMRMLModelStorageNode::New());
+    }
 };
+vtkStandardNewMacro(vtkMRMLDisplayableNodeTestHelper1);
 
 //----------------------------------------------------------------------------
 class vtkMRMLDisplayNodeTestHelper : public vtkMRMLDisplayNode
 {
 public:
   // Provide a concrete New.
-  static vtkMRMLDisplayNodeTestHelper *New(){return new vtkMRMLDisplayNodeTestHelper;};
+  static vtkMRMLDisplayNodeTestHelper *New();
 
-  vtkTypeMacro( vtkMRMLDisplayNodeTestHelper, vtkMRMLDisplayNode);
+  vtkTypeMacro(vtkMRMLDisplayNodeTestHelper, vtkMRMLDisplayNode);
 
   virtual vtkMRMLNode* CreateNodeInstance()
     {
-    return new vtkMRMLDisplayNodeTestHelper;
+    return vtkMRMLDisplayNodeTestHelper::New();
     }
   virtual const char* GetNodeTagName()
     {
     return "vtkMRMLDisplayNodeTestHelper";
     }
+
 };
+vtkStandardNewMacro(vtkMRMLDisplayNodeTestHelper);
 
 bool TestAddDisplayNodeID();
 bool TestAddDisplayNodeIDWithNoScene();
@@ -85,10 +96,7 @@ bool TestReferences();
 int vtkMRMLDisplayableNodeTest1(int , char * [] )
 {
   vtkNew<vtkMRMLDisplayableNodeTestHelper1> node1;
-
-  EXERCISE_BASIC_OBJECT_METHODS( node1.GetPointer() );
-
-  EXERCISE_BASIC_MRML_METHODS(vtkMRMLDisplayableNodeTestHelper1, node1.GetPointer());
+  EXERCISE_ALL_BASIC_MRML_METHODS(node1.GetPointer());
 
   bool res = true;
   res = TestAddDisplayNodeID() && res;
@@ -299,7 +307,7 @@ bool TestAddDisplayNodeIDEventsWithNoScene()
   scene->AddNode(displayNode.GetPointer());
   displayableNode->SetAndObserveDisplayNodeID(displayNode->GetID());
 
-  vtkNew<vtkMRMLNodeCallback> callback;
+  vtkNew<vtkMRMLCoreTestingUtilities::vtkMRMLNodeCallback> callback;
   displayableNode->AddObserver(vtkCommand::AnyEvent, callback.GetPointer());
 
   scene->AddNode(displayableNode.GetPointer());
@@ -537,7 +545,7 @@ bool TestDisplayModifiedEvent()
   vtkNew<vtkMRMLDisplayNodeTestHelper> displayNode1;
   scene->AddNode(displayNode1.GetPointer());
 
-  vtkNew<vtkMRMLNodeCallback> spy;
+  vtkNew<vtkMRMLCoreTestingUtilities::vtkMRMLNodeCallback> spy;
   displayableNode->AddObserver(vtkCommand::AnyEvent, spy.GetPointer());
 
   displayableNode->SetAndObserveDisplayNodeID(displayNode1->GetID());

@@ -1,7 +1,7 @@
 import os
 import time
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
 
 #
 # MarkupsInCompareViewersSelfTest
@@ -113,46 +113,7 @@ class MarkupsInCompareViewersSelfTestWidget:
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
     """
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent().parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-
-    # delete the old widget instance
-    if hasattr(globals()['slicer'].modules, widgetName):
-      getattr(globals()['slicer'].modules, widgetName).cleanup()
-
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
-    setattr(globals()['slicer'].modules, widgetName, globals()[widgetName.lower()])
+    globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
 
   def onReloadAndTest(self,moduleName="MarkupsInCompareViewersSelfTest"):
     try:
@@ -163,8 +124,8 @@ class MarkupsInCompareViewersSelfTestWidget:
     except Exception, e:
       import traceback
       traceback.print_exc()
-      qt.QMessageBox.warning(slicer.util.mainWindow(),
-          "Reload and Test", 'Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace")
+      slicer.util.warningDisplay('Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace",
+                                 windowTitle="Reload and Test")
 
 
 #
@@ -231,7 +192,7 @@ class MarkupsInCompareViewersSelfTestLogic:
 
     # make it active
     selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-    if (selectionNode != None):
+    if (selectionNode is not None):
       selectionNode.SetReferenceActivePlaceNodeID(fidNode.GetID())
 
     # add some known points to it

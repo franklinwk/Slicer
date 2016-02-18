@@ -26,6 +26,7 @@
 #include "vtkMRMLLogicWin32Header.h"
 
 // MRML includes
+class vtkMRMLAbstractViewNode;
 class vtkMRMLLayoutNode;
 
 // VTK includes
@@ -73,8 +74,8 @@ class VTK_MRML_LOGIC_EXPORT vtkMRMLLayoutLogic : public vtkMRMLAbstractLogic
 public:
   /// The Usual vtk class functions
   static vtkMRMLLayoutLogic *New();
-  vtkTypeRevisionMacro(vtkMRMLLayoutLogic,vtkMRMLAbstractLogic);
-  void PrintSelf(ostream& os, vtkIndent indent);
+  vtkTypeMacro(vtkMRMLLayoutLogic,vtkMRMLAbstractLogic);
+  virtual void PrintSelf(ostream& os, vtkIndent indent);
 
   typedef std::map<std::string, std::string> ViewAttributes;
   typedef ViewAttributes ViewProperty;
@@ -106,6 +107,18 @@ public:
   /// Returns the unique layout node of the scene. The logic scan the scene at
   /// first and if it can't find a layout node, it creates one.
   vtkGetObjectMacro(LayoutNode, vtkMRMLLayoutNode);
+
+  /// Convenient function that creates and set a layout made of only 1 view.
+  /// \sa CreateMaximizedViewLayoutDescription(),
+  /// vtkMRMLLayoutNode::SetLayoutDescription(),
+  /// vtkMRMLLayoutNode::SlicerLayoutCustomView, vtkMRMLLayoutNode::SetViewArrangement
+  void MaximizeView(vtkMRMLAbstractViewNode* viewToMaximize);
+
+  /// Create a layout description that maximizes a view.
+  /// Note that the view node must be a singleton.
+  /// \sa MaximizeView()
+  void CreateMaximizedViewLayoutDescription(int layout,
+                                            vtkMRMLAbstractViewNode* viewToMaximize);
 
 protected:
   /// Logic constructor

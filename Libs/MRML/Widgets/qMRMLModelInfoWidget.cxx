@@ -34,6 +34,7 @@
 #include <vtkPointData.h>
 #include <vtkSmartPointer.h>
 #include <vtkTriangleFilter.h>
+#include <vtkVersion.h>
 
 //------------------------------------------------------------------------------
 class qMRMLModelInfoWidgetPrivate: public Ui_qMRMLModelInfoWidget
@@ -60,7 +61,7 @@ qMRMLModelInfoWidgetPrivate::qMRMLModelInfoWidgetPrivate(qMRMLModelInfoWidget& o
   this->TriangleFilter = vtkSmartPointer<vtkTriangleFilter>::New();
   this->TriangleFilter->SetPassLines(0);
   this->MassProperties = vtkSmartPointer<vtkMassProperties>::New();
-  this->MassProperties->SetInput( this->TriangleFilter->GetOutput() );
+  this->MassProperties->SetInputConnection( this->TriangleFilter->GetOutputPort() );
 }
 
 //------------------------------------------------------------------------------
@@ -120,7 +121,7 @@ void qMRMLModelInfoWidget::updateWidgetFromMRML()
   vtkPolyData *poly = d->MRMLModelNode ? d->MRMLModelNode->GetPolyData() : 0;
   if (poly)
     {
-    d->TriangleFilter->SetInput(poly);
+    d->TriangleFilter->SetInputData(poly);
     d->TriangleFilter->Update();
     if (d->TriangleFilter->GetOutput()->GetNumberOfCells() > 0)
       {

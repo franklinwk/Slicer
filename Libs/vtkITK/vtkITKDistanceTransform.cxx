@@ -21,7 +21,6 @@
 
 #include "itkSignedMaurerDistanceMapImageFilter.h"
 
-vtkCxxRevisionMacro(vtkITKDistanceTransform, "$Revision: 1900 $");
 vtkStandardNewMacro(vtkITKDistanceTransform);
 
 vtkITKDistanceTransform::vtkITKDistanceTransform()
@@ -68,7 +67,7 @@ void vtkITKDistanceTransformExecute(vtkITKDistanceTransform *self, vtkImageData*
 
 
   // Calculate the distance transform
-  typedef itk::Image<T,3> DistanceImageType;  
+  typedef itk::Image<T,3> DistanceImageType;
   typedef itk::SignedMaurerDistanceMapImageFilter<ImageType, DistanceImageType> DistanceType;
   typename DistanceType::Pointer dist = DistanceType::New();
 
@@ -90,7 +89,7 @@ void vtkITKDistanceTransformExecute(vtkITKDistanceTransform *self, vtkImageData*
 
 
 //
-// 
+//
 //
 void vtkITKDistanceTransform::SimpleExecute(vtkImageData *input, vtkImageData *output)
 {
@@ -140,7 +139,7 @@ void vtkITKDistanceTransform::SimpleExecute(vtkImageData *input, vtkImageData *o
       vtkTemplateMacroCase(VTK_UNSIGNED_CHAR, unsigned char, CALL);
       } //switch
     }
-  else 
+  else
     {
     vtkErrorMacro(<< "Can only calculate on scalar.");
     }

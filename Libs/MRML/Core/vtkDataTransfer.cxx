@@ -7,7 +7,6 @@
 
 
 vtkStandardNewMacro ( vtkDataTransfer );
-vtkCxxRevisionMacro ( vtkDataTransfer, "$Revision: 1.0 $" );
 vtkCxxSetObjectMacro( vtkDataTransfer, Handler, vtkURIHandler );
 
 //----------------------------------------------------------------------------
@@ -30,7 +29,7 @@ vtkDataTransfer::vtkDataTransfer()
 //----------------------------------------------------------------------------
 vtkDataTransfer::~vtkDataTransfer()
 {
-   
+
   this->SourceURI = NULL;
   this->DestinationURI = NULL;
   if ( this->Handler != NULL )

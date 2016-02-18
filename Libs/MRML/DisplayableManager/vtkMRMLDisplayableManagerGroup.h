@@ -40,12 +40,12 @@ class vtkRenderWindowInteractor;
 /// When the displayable managers in the group request the view to be
 /// refreshed, the group fires a vtkCommand::UpdateEvent event.
 /// This event can be observed and trigger a Render on the render window.
-class VTK_MRML_DISPLAYABLEMANAGER_EXPORT vtkMRMLDisplayableManagerGroup : public vtkObject 
+class VTK_MRML_DISPLAYABLEMANAGER_EXPORT vtkMRMLDisplayableManagerGroup : public vtkObject
 {
 public:
 
   static vtkMRMLDisplayableManagerGroup *New();
-  vtkTypeRevisionMacro(vtkMRMLDisplayableManagerGroup,vtkObject);
+  vtkTypeMacro(vtkMRMLDisplayableManagerGroup,vtkObject);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   /// Convenient method equivalent to call SetAndObserveDisplayableManagerFactory, SetRenderer,
@@ -125,7 +125,7 @@ protected:
   typedef vtkMRMLDisplayableManagerGroup Self;
   static void DoCallback(vtkObject* vtk_obj, unsigned long event,
                          void* client_data, void* call_data);
-  /// Trigger upon a DisplayableManager is either registered or unregisterer from
+  /// Trigger upon a DisplayableManager is either registered or unregistered from
   /// the associated factory
   void onDisplayableManagerFactoryRegisteredEvent(const char* displayableManagerName);
   void onDisplayableManagerFactoryUnRegisteredEvent(const char* displayableManagerName);

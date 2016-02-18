@@ -78,51 +78,55 @@ public:
   enum SlicerLayout
     {
       SlicerLayoutInitialView = 0,
-      SlicerLayoutDefaultView,
-      SlicerLayoutConventionalView,
-      SlicerLayoutFourUpView,
-      SlicerLayoutOneUp3DView,
-      SlicerLayoutOneUpSliceView,
-      SlicerLayoutOneUpRedSliceView,
-      SlicerLayoutOneUpYellowSliceView,
-      SlicerLayoutOneUpGreenSliceView,
-      SlicerLayoutTabbed3DView,
-      SlicerLayoutTabbedSliceView, // 10
-      SlicerLayoutLightboxView, // Remove?
-      SlicerLayoutCompareView,
-      SlicerLayoutSideBySideLightboxView, // Remove?
-      SlicerLayoutNone, // 14
-      SlicerLayoutDual3DView,
-      SlicerLayoutConventionalWidescreenView,
-      SlicerLayoutCompareWidescreenView,
-      SlicerLayoutSingleLightboxView, // Remove?
-      SlicerLayoutTriple3DEndoscopyView, // Up to here, all layouts are Slicer 3 compatible
-      SlicerLayout3DPlusLightboxView, // really used ?, Remove?
-      SlicerLayoutThreeOverThreeView,
-      SlicerLayoutFourOverFourView,
-      SlicerLayoutCompareGridView,
-      SlicerLayoutConventionalQuantitativeView,
-      SlicerLayoutFourUpQuantitativeView,
-      SlicerLayoutOneUpQuantitativeView,
-      SlicerLayoutTwoOverTwoView,
-      SlicerLayoutThreeOverThreeQuantitativeView,
-      SlicerLayoutSideBySideView,
-      SlicerLayoutFourByThreeSliceView,
-      SlicerLayoutFourByTwoSliceView,
-      SlicerLayoutFiveByTwoSliceView,
-      SlicerLayoutThreeByThreeSliceView,
+      SlicerLayoutDefaultView = 1,
+      SlicerLayoutConventionalView = 2,
+      SlicerLayoutFourUpView = 3,
+      SlicerLayoutOneUp3DView = 4,
+      SlicerLayoutOneUpSliceView = 5, // XXX Slicer 4.5 - Remove this value. Here only for backward compatibility.
+      SlicerLayoutOneUpRedSliceView = 6,
+      SlicerLayoutOneUpYellowSliceView = 7,
+      SlicerLayoutOneUpGreenSliceView = 8,
+      SlicerLayoutTabbed3DView = 9,
+      SlicerLayoutTabbedSliceView = 10,
+      SlicerLayoutLightboxView = 11, // XXX Slicer 4.5 - Remove this value. Here only for backward compatibility.
+      SlicerLayoutCompareView = 12,
+      SlicerLayoutSideBySideLightboxView = 13, // XXX Slicer 4.5 - Remove this value. Here only for backward compatibility.
+      SlicerLayoutNone = 14,
+      SlicerLayoutDual3DView = 15,
+      SlicerLayoutConventionalWidescreenView = 16,
+      SlicerLayoutCompareWidescreenView = 17,
+      SlicerLayoutSingleLightboxView = 18, // XXX Slicer 4.5 - Remove this value. Here only for backward compatibility.
+      SlicerLayoutTriple3DEndoscopyView = 19, // Up to here, all layouts are Slicer 3 compatible
+      SlicerLayout3DPlusLightboxView = 20, // XXX Slicer 4.5 - Remove this value. Here only for backward compatibility.
+      SlicerLayoutThreeOverThreeView = 21,
+      SlicerLayoutFourOverFourView = 22,
+      SlicerLayoutCompareGridView = 23,
+      SlicerLayoutConventionalQuantitativeView = 24,
+      SlicerLayoutFourUpQuantitativeView = 25,
+      SlicerLayoutOneUpQuantitativeView = 26,
+      SlicerLayoutTwoOverTwoView = 27,
+      SlicerLayoutThreeOverThreeQuantitativeView = 28,
+      SlicerLayoutSideBySideView = 29,
+      SlicerLayoutFourByThreeSliceView = 30,
+      SlicerLayoutFourByTwoSliceView = 31,
+      SlicerLayoutFiveByTwoSliceView = 32,
+      SlicerLayoutThreeByThreeSliceView = 33,
+      SlicerLayoutFourUpTableView = 34,
+      SlicerLayoutFinalView, // special value, must be placed after the last standard view (used for iterating through all the views)
+
+      SlicerLayoutMaximizedView = 98,
       SlicerLayoutCustomView = 99,
       SlicerLayoutUserView = 100
     };
 
   /// Adds a layout description with integer identifier
   /// "layout". Returns false without making any modifications if the
-  /// integer identifier "layout" is already in use.
+  /// integer identifier "layout" has already been added.
   bool AddLayoutDescription(int layout, const char* layoutDescription);
 
   /// Modifies a layout description for integer identifier
   /// "layout". Returns false without making any modifications if the
-  /// integer identifier "layout" is NOT already in use.
+  /// integer identifier "layout" has NOT already been added.
   bool SetLayoutDescription(int layout, const char* layoutDescription);
 
   /// Query whether a layout exists with a specified integer identifier

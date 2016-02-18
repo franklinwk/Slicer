@@ -212,8 +212,8 @@ public:
   /// Retrieve the sortFilterProxyModel used to filter/sort
   /// the nodes.
   /// The returned value can't be null.
-  qMRMLSortFilterProxyModel* sortFilterProxyModel()const;
-  qMRMLSceneModel* sceneModel()const;
+  Q_INVOKABLE qMRMLSortFilterProxyModel* sortFilterProxyModel()const;
+  Q_INVOKABLE qMRMLSceneModel* sceneModel()const;
 
   /// When true, the tree widget resize itself so that
   /// it's sizeHint is right for the visible indexes
@@ -288,6 +288,7 @@ public slots:
   /// returnPressed() signal.
   /// \sa scrollTo()
   void scrollToNext();
+
 signals:
   void currentNodeChanged(vtkMRMLNode* node);
   void currentNodeDeleted(const QModelIndex& index);
@@ -296,7 +297,11 @@ signals:
   void decorationClicked(const QModelIndex&);
 
 protected slots:
-  virtual void onCurrentRowChanged(const QModelIndex& index);
+  /// This slot is being triggered when the current node has changed.
+  /// \sa currentNodeChanged()
+  virtual void onSelectionChanged(const QItemSelection & selected,
+                                  const QItemSelection & deselected);
+
   void onNumberOfVisibleIndexChanged();
 
   void updateRootNode(vtkObject* modifiedRootNode);
@@ -310,6 +315,9 @@ protected slots:
   /// Expand the nodes previously saved by \a saveTreeExpandState()
   /// \sa saveTreeExpandState()
   void loadTreeExpandState();
+
+protected:
+  qMRMLTreeView(qMRMLTreeViewPrivate* pimpl, QWidget *parent=0);
 
 protected:
   QScopedPointer<qMRMLTreeViewPrivate> d_ptr;

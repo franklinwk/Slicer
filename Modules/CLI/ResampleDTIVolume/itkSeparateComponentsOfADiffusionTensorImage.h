@@ -52,19 +52,18 @@ public:
   typedef typename OutputImageType::RegionType          OutputImageRegionType;
 // typedef typename OutputTensorDataType::RealValueType TensorRealType ;
 
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(SeparateComponentsOfADiffusionTensorImage, ImageToImageFilter);
+
   itkNewMacro( Self );
 protected:
   SeparateComponentsOfADiffusionTensorImage();
-#if ITK_VERSION_MAJOR < 4
-  void ThreadedGenerateData( const OutputImageRegionType & outputRegionForThread, int threadId );
 
-#else
-  void ThreadedGenerateData( const OutputImageRegionType & outputRegionForThread, ThreadIdType threadId );
+  void ThreadedGenerateData( const OutputImageRegionType & outputRegionForThread, ThreadIdType threadId ) ITK_OVERRIDE;
 
-#endif
-  void GenerateOutputInformation();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
 private:
 

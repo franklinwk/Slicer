@@ -61,23 +61,20 @@ public:
   typedef typename OutputImageType::RegionType                     OutputImageRegionType;
 // typedef typename OutputTensorDataType::RealValueType TensorRealType ;
 
+  /** Run-time type information (and related methods). */
+  itkTypeMacro(DiffusionTensor3DResample, ImageToImageFilter);
+
   itkNewMacro( Self );
 // /Set the transform
   itkSetObjectMacro( Transform, TransformType );
 // /Set the interpolation
   itkSetObjectMacro( Interpolator, InterpolatorType );
 
-#if 0 // ITK_VERSION_MAJOR < 4
-// /Set the input image
-  void SetInput( const InputImageType * inputImage );
-
-#endif
-
 // /Set the output parameters (size, spacing, origin, orientation) from a reference image
   void SetOutputParametersFromImage( InputImagePointerType Image );
 
 // /Get the time of the last modification of the object
-  unsigned long GetMTime() const;
+  unsigned long GetMTime() const ITK_OVERRIDE;
 
   itkSetMacro( DefaultPixelValue, OutputDataType );
   itkGetMacro( DefaultPixelValue, OutputDataType );
@@ -94,20 +91,16 @@ public:
   itkGetMacro( OutputDirection, typename OutputImageType::DirectionType );
 protected:
   DiffusionTensor3DResample();
-#if ITK_VERSION_MAJOR < 4
-  void ThreadedGenerateData( const OutputImageRegionType & outputRegionForThread, int threadId );
 
-#else
-  void ThreadedGenerateData( const OutputImageRegionType & outputRegionForThread, ThreadIdType threadId );
+  void ThreadedGenerateData( const OutputImageRegionType & outputRegionForThread, ThreadIdType threadId ) ITK_OVERRIDE;
 
-#endif
-  void BeforeThreadedGenerateData();
+  void BeforeThreadedGenerateData() ITK_OVERRIDE;
 
-  void GenerateOutputInformation();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  void AfterThreadedGenerateData();
+  void AfterThreadedGenerateData() ITK_OVERRIDE;
 
-  void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
 private:
   typename InterpolatorType::Pointer m_Interpolator;
